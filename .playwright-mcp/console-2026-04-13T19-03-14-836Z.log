@@ -1,3 +1,0 @@
-[  731692ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3456/api/notifications?unread=true:0
-[  761693ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3456/api/notifications?unread=true:0
-[  791692ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3456/api/notifications?unread=true:0
