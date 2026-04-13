@@ -1,7 +1,10 @@
 #!/bin/bash
 set -e
 
-REGISTRY="forgejo.int.aafoods.com/ajthom90/joe-and-alex"
+REGISTRIES=(
+  "forgejo.int.aafoods.com/ajthom90/joe-and-alex"
+  "forgejo.home.njathome.net/ajthom90/joe-and-alex"
+)
 PLATFORMS="linux/arm64,linux/amd64"
 
 # Read version from package.json
@@ -23,7 +26,10 @@ usage() {
   echo "  --no-push      Build only, don't push (for bump commands)"
   echo ""
   echo "Current version: $VERSION"
-  echo "Registry: $REGISTRY"
+  echo "Registries:"
+  for reg in "${REGISTRIES[@]}"; do
+    echo "  - $reg"
+  done
 }
 
 bump_version() {
@@ -45,33 +51,49 @@ bump_version() {
   echo "Version bumped to $VERSION"
 }
 
+build_tags() {
+  local tag_latest=$1
+  local tags=()
+  for reg in "${REGISTRIES[@]}"; do
+    tags+=(-t "$reg:$VERSION")
+    [ -n "$tag_latest" ] && tags+=(-t "$reg:latest")
+  done
+  echo "${tags[@]}"
+}
+
 do_build() {
   local tag_latest=$1
-  echo "Building $REGISTRY:$VERSION for $PLATFORMS..."
+  echo "Building v$VERSION for $PLATFORMS..."
+  local tags
+  read -ra tags <<< "$(build_tags "$tag_latest")"
   docker buildx build \
     --platform "$PLATFORMS" \
-    -t "$REGISTRY:$VERSION" \
-    ${tag_latest:+-t "$REGISTRY:latest"} \
+    "${tags[@]}" \
     --load \
     .
-  echo "Built $REGISTRY:$VERSION"
+  for reg in "${REGISTRIES[@]}"; do
+    echo "Built $reg:$VERSION"
+  done
 }
 
 do_push() {
   local tag_latest=$1
-  echo "Building and pushing $REGISTRY:$VERSION for $PLATFORMS..."
+  echo "Building and pushing v$VERSION for $PLATFORMS..."
 
   # Create/use a builder that supports multi-platform push
   docker buildx create --name multiarch --use 2>/dev/null || docker buildx use multiarch 2>/dev/null || true
 
+  local tags
+  read -ra tags <<< "$(build_tags "$tag_latest")"
   docker buildx build \
     --platform "$PLATFORMS" \
-    -t "$REGISTRY:$VERSION" \
-    ${tag_latest:+-t "$REGISTRY:latest"} \
+    "${tags[@]}" \
     --push \
     .
-  echo "Pushed $REGISTRY:$VERSION"
-  ${tag_latest:+echo "Pushed $REGISTRY:latest"}
+  for reg in "${REGISTRIES[@]}"; do
+    echo "Pushed $reg:$VERSION"
+    [ -n "$tag_latest" ] && echo "Pushed $reg:latest"
+  done
 }
 
 # Parse options
