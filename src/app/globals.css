@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: 139 90 43;
+    --color-secondary: 180 148 115;
+    --color-accent: 212 175 55;
+    --color-background: 255 253 250;
+    --color-foreground: 55 48 42;
+    --font-heading: 'Playfair Display', serif;
+    --font-body: 'Lato', sans-serif;
+  }
+  body {
+    @apply bg-background font-body text-foreground;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading), serif;
+  }
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-gray-700;
+  }
+  .card {
+    @apply rounded-lg bg-white p-6 shadow-md;
+  }
+}

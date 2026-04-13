@@ -1,0 +1,96 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e12]
+  - generic [ref=e13]:
+    - navigation [ref=e14]:
+      - heading "Wedding Admin" [level=1] [ref=e16]
+      - generic [ref=e17]:
+        - link "📊 Dashboard" [ref=e18] [cursor=pointer]:
+          - /url: /admin
+          - generic [ref=e19]: 📊
+          - generic [ref=e20]: Dashboard
+        - link "💌 Invitations" [ref=e21] [cursor=pointer]:
+          - /url: /admin/invitations
+          - generic [ref=e22]: 💌
+          - generic [ref=e23]: Invitations
+        - link "✓ RSVPs" [ref=e24] [cursor=pointer]:
+          - /url: /admin/rsvps
+          - generic [ref=e25]: ✓
+          - generic [ref=e26]: RSVPs
+        - link "📝 RSVP Form" [ref=e27] [cursor=pointer]:
+          - /url: /admin/rsvp-config
+          - generic [ref=e28]: 📝
+          - generic [ref=e29]: RSVP Form
+        - link "📖 Guest Book" [ref=e30] [cursor=pointer]:
+          - /url: /admin/guestbook
+          - generic [ref=e31]: 📖
+          - generic [ref=e32]: Guest Book
+        - link "👥 Wedding Party" [ref=e33] [cursor=pointer]:
+          - /url: /admin/wedding-party
+          - generic [ref=e34]: 👥
+          - generic [ref=e35]: Wedding Party
+        - link "📷 Photos" [ref=e36] [cursor=pointer]:
+          - /url: /admin/photos
+          - generic [ref=e37]: 📷
+          - generic [ref=e38]: Photos
+        - link "📄 Content" [ref=e39] [cursor=pointer]:
+          - /url: /admin/content
+          - generic [ref=e40]: 📄
+          - generic [ref=e41]: Content
+        - link "🎨 Theme" [ref=e42] [cursor=pointer]:
+          - /url: /admin/theme
+          - generic [ref=e43]: 🎨
+          - generic [ref=e44]: Theme
+        - link "🔤 Fonts" [ref=e45] [cursor=pointer]:
+          - /url: /admin/fonts
+          - generic [ref=e46]: 🔤
+          - generic [ref=e47]: Fonts
+        - link "🔧 Features" [ref=e48] [cursor=pointer]:
+          - /url: /admin/features
+          - generic [ref=e49]: 🔧
+          - generic [ref=e50]: Features
+        - link "⚙️ Settings" [ref=e51] [cursor=pointer]:
+          - /url: /admin/settings
+          - generic [ref=e52]: ⚙️
+          - generic [ref=e53]: Settings
+      - generic [ref=e54]:
+        - link "🌐 View Site" [ref=e55] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e56]: 🌐
+          - generic [ref=e57]: View Site
+        - button "🚪 Logout" [ref=e58] [cursor=pointer]:
+          - generic [ref=e59]: 🚪
+          - generic [ref=e60]: Logout
+    - main [ref=e61]:
+      - generic [ref=e62]:
+        - heading "Dashboard" [level=1] [ref=e63]
+        - generic [ref=e64]:
+          - generic [ref=e65]:
+            - heading "Total Invitations" [level=3] [ref=e67]
+            - paragraph [ref=e69]: "0"
+          - generic [ref=e70]:
+            - heading "Total Guests" [level=3] [ref=e72]
+            - paragraph [ref=e74]: "0"
+          - generic [ref=e75]:
+            - heading "Attending" [level=3] [ref=e77]
+            - generic [ref=e78]:
+              - paragraph [ref=e79]: "0"
+              - paragraph [ref=e80]: 0 guests
+          - generic [ref=e81]:
+            - heading "Declined" [level=3] [ref=e83]
+            - paragraph [ref=e85]: "0"
+        - generic [ref=e86]:
+          - generic [ref=e87]:
+            - heading "Response Status" [level=3] [ref=e89]
+            - generic [ref=e91]:
+              - generic [ref=e92]:
+                - generic [ref=e93]: Attending
+                - generic [ref=e94]: "0"
+              - generic [ref=e96]:
+                - generic [ref=e97]: Declined
+                - generic [ref=e98]: "0"
+              - generic [ref=e100]:
+                - generic [ref=e101]: Pending
+                - generic [ref=e102]: "0"
+          - generic [ref=e104]:
+            - heading "Meal Choices" [level=3] [ref=e106]
+            - paragraph [ref=e108]: No meal selections yet

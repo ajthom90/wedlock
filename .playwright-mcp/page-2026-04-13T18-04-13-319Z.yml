@@ -1,0 +1,35 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e5]:
+        - link "Joe & Alex" [ref=e6] [cursor=pointer]:
+          - /url: /
+        - navigation [ref=e7]:
+          - link "Home" [ref=e8] [cursor=pointer]:
+            - /url: /
+          - link "Our Story" [ref=e9] [cursor=pointer]:
+            - /url: /our-story
+          - link "Wedding Party" [ref=e10] [cursor=pointer]:
+            - /url: /wedding-party
+          - link "Details" [ref=e11] [cursor=pointer]:
+            - /url: /details
+          - link "Travel" [ref=e12] [cursor=pointer]:
+            - /url: /travel
+          - link "Registry" [ref=e13] [cursor=pointer]:
+            - /url: /registry
+          - link "RSVP" [ref=e14] [cursor=pointer]:
+            - /url: /rsvp
+    - main [ref=e15]:
+      - generic [ref=e17]:
+        - heading "RSVP" [level=1] [ref=e18]
+        - paragraph [ref=e19]: The The Thompson Family Household
+        - generic [ref=e23]:
+          - paragraph [ref=e24]: Will you be attending?
+          - generic [ref=e25]:
+            - button "Joyfully Accept" [ref=e26] [cursor=pointer]
+            - button "Regretfully Decline" [ref=e27] [cursor=pointer]
+    - contentinfo [ref=e28]:
+      - generic [ref=e29]:
+        - paragraph [ref=e30]: Joe & Alex
+        - paragraph [ref=e31]: Saturday, September 19, 2026
+  - alert [ref=e32]

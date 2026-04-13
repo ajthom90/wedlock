@@ -1,0 +1,189 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Setting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+}
+
+model Page {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  title     String
+  content   String
+  updatedAt DateTime @updatedAt
+}
+
+model Invitation {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  householdName String
+  email         String?
+  maxGuests     Int      @default(2)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  guests   Guest[]
+  response RsvpResponse?
+}
+
+model Guest {
+  id           String     @id @default(uuid())
+  invitationId String
+  name         String
+  isPrimary    Boolean    @default(false)
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+}
+
+model WeddingPartyMember {
+  id          String  @id @default(uuid())
+  name        String
+  role        String
+  side        String
+  description String?
+  imageUrl    String?
+  order       Int     @default(0)
+}
+
+model Photo {
+  id             String   @id @default(uuid())
+  url            String
+  caption        String?
+  gallerySection String?
+  uploadedBy     String?
+  isGuestUpload  Boolean  @default(false)
+  approved       Boolean  @default(true)
+  order          Int      @default(0)
+  createdAt      DateTime @default(now())
+}
+
+model RsvpOption {
+  id       String  @id @default(uuid())
+  type     String
+  label    String
+  choices  String
+  required Boolean @default(false)
+  order    Int     @default(0)
+}
+
+model RsvpResponse {
+  id              String     @id @default(uuid())
+  invitationId    String     @unique
+  attending       String
+  guestCount      Int
+  responses       String
+  guestMeals      String?
+  attendingGuests String?
+  plusOneName      String?
+  plusOneMeal      String?
+  songRequests    String?
+  dietaryNotes    String?
+  message         String?
+  submittedAt     DateTime   @default(now())
+  invitation      Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+}
+
+model GuestBookEntry {
+  id        String   @id @default(uuid())
+  name      String
+  message   String
+  createdAt DateTime @default(now())
+  approved  Boolean  @default(true)
+}
+
+model AdminAuth {
+  id            String    @id @default(uuid())
+  passwordHash  String
+  loginAttempts Int       @default(0)
+  lockedUntil   DateTime?
+}
+
+model CustomFont {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  family    String
+  filename  String
+  format    String
+  createdAt DateTime @default(now())
+}
+
+// FAQ items (#5)
+model FaqItem {
+  id       String @id @default(uuid())
+  question String
+  answer   String
+  order    Int    @default(0)
+}
+
+// Multi-event support (#7)
+model Event {
+  id           String  @id @default(uuid())
+  name         String
+  date         String
+  time         String?
+  endTime      String?
+  venueName    String?
+  venueAddress String?
+  mapUrl       String?
+  description  String?
+  visibility   String  @default("public") // "public" or "wedding-party"
+  order        Int     @default(0)
+}
+
+// Customizable navigation menu
+model NavItem {
+  id      String  @id @default(uuid())
+  href    String
+  label   String
+  visible Boolean @default(true)
+  order   Int     @default(0)
+}
+
+// Table/seating assignments (#8)
+model SeatingTable {
+  id          String            @id @default(uuid())
+  name        String
+  capacity    Int               @default(10)
+  assignments TableAssignment[]
+}
+
+model TableAssignment {
+  id        String       @id @default(uuid())
+  tableId   String
+  guestName String
+  invitationId String?
+  table     SeatingTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+}
+
+// Gift tracker (#9)
+model GiftItem {
+  id           String  @id @default(uuid())
+  name         String
+  store        String?
+  url          String?
+  price        Float?
+  purchased    Boolean @default(false)
+  purchasedBy  String?
+  thankYouSent Boolean @default(false)
+  notes        String?
+  order        Int     @default(0)
+}
+
+// Admin notifications (#2)
+model Notification {
+  id        String   @id @default(uuid())
+  type      String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

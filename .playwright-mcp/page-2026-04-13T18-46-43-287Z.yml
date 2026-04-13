@@ -1,0 +1,49 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e5]:
+        - link "Joe & Alex" [ref=e6] [cursor=pointer]:
+          - /url: /
+        - navigation "Main navigation" [ref=e7]:
+          - link "Home" [ref=e8] [cursor=pointer]:
+            - /url: /
+          - link "Our Story" [ref=e9] [cursor=pointer]:
+            - /url: /our-story
+          - link "Wedding Party" [ref=e10] [cursor=pointer]:
+            - /url: /wedding-party
+          - link "Details" [ref=e11] [cursor=pointer]:
+            - /url: /details
+          - link "Travel" [ref=e12] [cursor=pointer]:
+            - /url: /travel
+          - link "Registry" [ref=e13] [cursor=pointer]:
+            - /url: /registry
+          - link "Events" [ref=e14] [cursor=pointer]:
+            - /url: /events
+          - link "FAQ" [ref=e15] [cursor=pointer]:
+            - /url: /faq
+          - link "Seating" [ref=e16] [cursor=pointer]:
+            - /url: /seating
+          - link "Guest Book" [ref=e17] [cursor=pointer]:
+            - /url: /guestbook
+          - link "RSVP" [ref=e18] [cursor=pointer]:
+            - /url: /rsvp
+    - main [ref=e19]:
+      - generic [ref=e20]:
+        - heading "Seating Chart" [level=1] [ref=e21]
+        - paragraph [ref=e22]: Find your table assignment below.
+        - generic [ref=e24]:
+          - article [ref=e25]:
+            - heading "Table 1 - Head Table" [level=2] [ref=e26]
+            - paragraph [ref=e27]: 2 / 8 seats
+            - list "Guests at Table 1 - Head Table" [ref=e28]:
+              - listitem [ref=e29]: Alex
+              - listitem [ref=e30]: Joe
+          - article [ref=e31]:
+            - heading "Table 2 - Family" [level=2] [ref=e32]
+            - paragraph [ref=e33]: 0 / 10 seats
+            - paragraph [ref=e34]: No guests assigned yet.
+    - contentinfo [ref=e35]:
+      - generic [ref=e36]:
+        - paragraph [ref=e37]: Joe & Alex
+        - paragraph [ref=e38]: Saturday, September 19, 2026
+  - alert [ref=e39]

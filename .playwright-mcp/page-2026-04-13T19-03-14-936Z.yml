@@ -1,0 +1,138 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - navigation [ref=e3]:
+      - generic [ref=e5]:
+        - heading "Wedding Admin" [level=1] [ref=e6]
+        - button "🔔" [ref=e7] [cursor=pointer]
+      - generic [ref=e8]:
+        - link "📊 Dashboard" [ref=e9] [cursor=pointer]:
+          - /url: /admin
+          - generic [ref=e10]: 📊
+          - generic [ref=e11]: Dashboard
+        - link "💌 Invitations" [ref=e12] [cursor=pointer]:
+          - /url: /admin/invitations
+          - generic [ref=e13]: 💌
+          - generic [ref=e14]: Invitations
+        - link "✓ RSVPs" [ref=e15] [cursor=pointer]:
+          - /url: /admin/rsvps
+          - generic [ref=e16]: ✓
+          - generic [ref=e17]: RSVPs
+        - link "📝 RSVP Form" [ref=e18] [cursor=pointer]:
+          - /url: /admin/rsvp-config
+          - generic [ref=e19]: 📝
+          - generic [ref=e20]: RSVP Form
+        - link "📖 Guest Book" [ref=e21] [cursor=pointer]:
+          - /url: /admin/guestbook
+          - generic [ref=e22]: 📖
+          - generic [ref=e23]: Guest Book
+        - link "👥 Wedding Party" [ref=e24] [cursor=pointer]:
+          - /url: /admin/wedding-party
+          - generic [ref=e25]: 👥
+          - generic [ref=e26]: Wedding Party
+        - link "📷 Photos" [ref=e27] [cursor=pointer]:
+          - /url: /admin/photos
+          - generic [ref=e28]: 📷
+          - generic [ref=e29]: Photos
+        - link "📄 Content" [ref=e30] [cursor=pointer]:
+          - /url: /admin/content
+          - generic [ref=e31]: 📄
+          - generic [ref=e32]: Content
+        - link "🎨 Theme" [ref=e33] [cursor=pointer]:
+          - /url: /admin/theme
+          - generic [ref=e34]: 🎨
+          - generic [ref=e35]: Theme
+        - link "🔤 Fonts" [ref=e36] [cursor=pointer]:
+          - /url: /admin/fonts
+          - generic [ref=e37]: 🔤
+          - generic [ref=e38]: Fonts
+        - link "📅 Events" [ref=e39] [cursor=pointer]:
+          - /url: /admin/events
+          - generic [ref=e40]: 📅
+          - generic [ref=e41]: Events
+        - link "❓ FAQ" [ref=e42] [cursor=pointer]:
+          - /url: /admin/faq
+          - generic [ref=e43]: ❓
+          - generic [ref=e44]: FAQ
+        - link "🪑 Seating" [ref=e45] [cursor=pointer]:
+          - /url: /admin/seating
+          - generic [ref=e46]: 🪑
+          - generic [ref=e47]: Seating
+        - link "🎁 Gifts" [ref=e48] [cursor=pointer]:
+          - /url: /admin/gifts
+          - generic [ref=e49]: 🎁
+          - generic [ref=e50]: Gifts
+        - link "🧭 Navigation" [ref=e51] [cursor=pointer]:
+          - /url: /admin/navigation
+          - generic [ref=e52]: 🧭
+          - generic [ref=e53]: Navigation
+        - link "🔧 Features" [ref=e54] [cursor=pointer]:
+          - /url: /admin/features
+          - generic [ref=e55]: 🔧
+          - generic [ref=e56]: Features
+        - link "⚙️ Settings" [ref=e57] [cursor=pointer]:
+          - /url: /admin/settings
+          - generic [ref=e58]: ⚙️
+          - generic [ref=e59]: Settings
+      - generic [ref=e60]:
+        - link "🌐 View Site" [ref=e61] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e62]: 🌐
+          - generic [ref=e63]: View Site
+        - button "🚪 Logout" [ref=e64] [cursor=pointer]:
+          - generic [ref=e65]: 🚪
+          - generic [ref=e66]: Logout
+    - main [ref=e67]:
+      - generic [ref=e68]:
+        - heading "Settings" [level=1] [ref=e69]
+        - generic [ref=e70]:
+          - heading "Couple Information" [level=3] [ref=e72]
+          - generic [ref=e73]:
+            - generic [ref=e74]:
+              - generic [ref=e75]:
+                - generic [ref=e76]: Partner 1 Name
+                - textbox "First partner's name" [ref=e78]: Joe
+              - generic [ref=e79]:
+                - generic [ref=e80]: Partner 2 Name
+                - textbox "Second partner's name" [ref=e82]: Alex
+            - generic [ref=e83]:
+              - generic [ref=e84]:
+                - generic [ref=e85]: Wedding Date
+                - textbox [ref=e87]: 2026-09-19
+                - paragraph [ref=e88]: Used for the homepage countdown timer.
+              - generic [ref=e89]:
+                - generic [ref=e90]: Wedding Time
+                - textbox [ref=e92]: 15:00
+            - paragraph [ref=e93]: Manage event dates and venues in the Events section.
+        - generic [ref=e94]:
+          - heading "RSVP Settings" [level=3] [ref=e96]
+          - generic [ref=e97]:
+            - generic [ref=e98]:
+              - generic [ref=e99]: RSVP Deadline
+              - textbox [ref=e101]
+            - generic [ref=e102]:
+              - checkbox "Close RSVP form after deadline" [ref=e103]
+              - generic [ref=e104]: Close RSVP form after deadline
+        - generic [ref=e105]:
+          - heading "Site Password Protection" [level=3] [ref=e107]
+          - generic [ref=e109]:
+            - generic [ref=e110]: Site Password
+            - textbox "Enter a site password" [ref=e112]
+            - paragraph [ref=e113]: Set a password to require visitors to enter it before viewing the site. Leave blank to disable.
+        - generic [ref=e114]:
+          - generic [ref=e116]:
+            - heading "Registry Links" [level=3] [ref=e117]
+            - button "Add Link" [ref=e118] [cursor=pointer]
+          - paragraph [ref=e120]: No registry links added yet
+        - generic [ref=e121]:
+          - heading "QR Card Dimensions" [level=3] [ref=e123]
+          - generic [ref=e124]:
+            - paragraph [ref=e125]: Set the dimensions for the QR code cards in the downloadable PDF (in inches).
+            - generic [ref=e126]:
+              - generic [ref=e127]:
+                - generic [ref=e128]: Width (inches)
+                - spinbutton [ref=e130]: "2"
+              - generic [ref=e131]:
+                - generic [ref=e132]: Height (inches)
+                - spinbutton [ref=e134]: "4"
+        - button "Save Settings" [ref=e136] [cursor=pointer]
+  - alert [ref=e137]

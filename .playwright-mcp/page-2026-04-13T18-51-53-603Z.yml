@@ -1,0 +1,86 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - navigation [ref=e3]:
+      - generic [ref=e5]:
+        - heading "Wedding Admin" [level=1] [ref=e6]
+        - button "🔔" [ref=e7] [cursor=pointer]
+      - generic [ref=e8]:
+        - link "📊 Dashboard" [ref=e9] [cursor=pointer]:
+          - /url: /admin
+          - generic [ref=e10]: 📊
+          - generic [ref=e11]: Dashboard
+        - link "💌 Invitations" [ref=e12] [cursor=pointer]:
+          - /url: /admin/invitations
+          - generic [ref=e13]: 💌
+          - generic [ref=e14]: Invitations
+        - link "✓ RSVPs" [ref=e15] [cursor=pointer]:
+          - /url: /admin/rsvps
+          - generic [ref=e16]: ✓
+          - generic [ref=e17]: RSVPs
+        - link "📝 RSVP Form" [ref=e18] [cursor=pointer]:
+          - /url: /admin/rsvp-config
+          - generic [ref=e19]: 📝
+          - generic [ref=e20]: RSVP Form
+        - link "📖 Guest Book" [ref=e21] [cursor=pointer]:
+          - /url: /admin/guestbook
+          - generic [ref=e22]: 📖
+          - generic [ref=e23]: Guest Book
+        - link "👥 Wedding Party" [ref=e24] [cursor=pointer]:
+          - /url: /admin/wedding-party
+          - generic [ref=e25]: 👥
+          - generic [ref=e26]: Wedding Party
+        - link "📷 Photos" [ref=e27] [cursor=pointer]:
+          - /url: /admin/photos
+          - generic [ref=e28]: 📷
+          - generic [ref=e29]: Photos
+        - link "📄 Content" [ref=e30] [cursor=pointer]:
+          - /url: /admin/content
+          - generic [ref=e31]: 📄
+          - generic [ref=e32]: Content
+        - link "🎨 Theme" [ref=e33] [cursor=pointer]:
+          - /url: /admin/theme
+          - generic [ref=e34]: 🎨
+          - generic [ref=e35]: Theme
+        - link "🔤 Fonts" [ref=e36] [cursor=pointer]:
+          - /url: /admin/fonts
+          - generic [ref=e37]: 🔤
+          - generic [ref=e38]: Fonts
+        - link "📅 Events" [ref=e39] [cursor=pointer]:
+          - /url: /admin/events
+          - generic [ref=e40]: 📅
+          - generic [ref=e41]: Events
+        - link "❓ FAQ" [ref=e42] [cursor=pointer]:
+          - /url: /admin/faq
+          - generic [ref=e43]: ❓
+          - generic [ref=e44]: FAQ
+        - link "🪑 Seating" [ref=e45] [cursor=pointer]:
+          - /url: /admin/seating
+          - generic [ref=e46]: 🪑
+          - generic [ref=e47]: Seating
+        - link "🎁 Gifts" [ref=e48] [cursor=pointer]:
+          - /url: /admin/gifts
+          - generic [ref=e49]: 🎁
+          - generic [ref=e50]: Gifts
+        - link "🔧 Features" [ref=e51] [cursor=pointer]:
+          - /url: /admin/features
+          - generic [ref=e52]: 🔧
+          - generic [ref=e53]: Features
+        - link "⚙️ Settings" [ref=e54] [cursor=pointer]:
+          - /url: /admin/settings
+          - generic [ref=e55]: ⚙️
+          - generic [ref=e56]: Settings
+      - generic [ref=e57]:
+        - link "🌐 View Site" [ref=e58] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e59]: 🌐
+          - generic [ref=e60]: View Site
+        - button "🚪 Logout" [ref=e61] [cursor=pointer]:
+          - generic [ref=e62]: 🚪
+          - generic [ref=e63]: Logout
+    - main [ref=e64]:
+      - generic [ref=e65]:
+        - generic [ref=e66]:
+          - heading "Wedding Party" [level=1] [ref=e67]
+          - button "Add Member" [ref=e68] [cursor=pointer]
+        - generic [ref=e71]: No wedding party members yet
+  - alert [ref=e72]
