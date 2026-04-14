@@ -95,11 +95,14 @@ do_push() {
   # mode=max pushes intermediate layer metadata so subsequent builds can reuse
   # individual stages (deps install, prisma generate, next build) instead of
   # only the final exported image.
+  # --provenance=false skips SLSA attestation generation, which adds meaningful
+  # push time and isn't consumed by our deploy target (TrueNAS Docker pull).
   docker buildx build \
     --platform "$PLATFORMS" \
     "${tags[@]}" \
     --cache-from "type=registry,ref=${CACHE_REF}" \
     --cache-to "type=registry,ref=${CACHE_REF},mode=max" \
+    --provenance=false \
     --push \
     .
   for reg in "${REGISTRIES[@]}"; do
