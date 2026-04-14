@@ -1,6 +1,7 @@
 import { getSiteSettings } from '@/lib/settings';
 import prisma from '@/lib/prisma';
 import { formatDate, formatTime } from '@/lib/utils';
+import { VenueMap } from '@/components/public/VenueMap';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,17 +46,8 @@ export default async function DetailsPage() {
         {settings.mapUrl && (
           <section className="text-center">
             <h2 className="text-2xl font-heading font-semibold mb-4">Venue Map</h2>
-            <div className="aspect-video max-w-2xl mx-auto rounded-lg overflow-hidden">
-              <iframe
-                src={settings.mapUrl}
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                allowFullScreen
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                title="Venue location map"
-              />
+            <div className="max-w-2xl mx-auto">
+              <VenueMap mapUrl={settings.mapUrl} title="Venue location map" />
             </div>
           </section>
         )}
