@@ -86,9 +86,15 @@ export function HomeBanner({ photos, style, children }: Props) {
             }}
           />
         ))}
-        {/* Darker scrim on mobile where photos crop tighter and text readability matters more. */}
+        {/* Base scrim — a flat darkening layer to lift contrast across the whole hero. */}
         <div className="absolute inset-0 bg-black/55 sm:bg-black/45 lg:bg-black/40" aria-hidden="true" />
-        <div className="relative z-10 flex items-center justify-center min-h-[360px] sm:min-h-[420px] sm:h-[55vh] lg:h-[70vh] lg:min-h-[560px] py-12 sm:py-20 md:py-32 text-center text-white [text-shadow:_0_1px_3px_rgba(0,0,0,0.5)]">
+        {/* Spotlight — an ellipse of extra darkness centered on the text so light
+            photo content near the middle doesn't swallow the typography. */}
+        <div
+          className="absolute inset-0 bg-[radial-gradient(ellipse_50%_40%_at_50%_50%,rgba(0,0,0,0.45),transparent_75%)]"
+          aria-hidden="true"
+        />
+        <div className="relative z-10 flex items-center justify-center min-h-[360px] sm:min-h-[420px] sm:h-[55vh] lg:h-[70vh] lg:min-h-[560px] py-12 sm:py-20 md:py-32 text-center text-white [text-shadow:_0_2px_4px_rgba(0,0,0,0.85),_0_0_14px_rgba(0,0,0,0.65)]">
           <div className="w-full">{children}</div>
         </div>
         {visible.length > 1 && (
