@@ -32,6 +32,9 @@
   }
 }
 
+/* display:flow-root contains any floats inside so a left/right-floated image
+   can't bleed out of the content container and collide with the footer. */
+.rich-content { display: flow-root; }
 .rich-content > * + * { margin-top: 1rem; }
 .rich-content p { line-height: 1.7; }
 .rich-content h2 { font-family: var(--font-heading, serif); font-size: 1.5rem; margin-top: 2rem; margin-bottom: 0.75rem; }
@@ -42,3 +45,35 @@
 .rich-content a { color: rgb(var(--color-primary, 139 90 43)); text-decoration: underline; }
 .rich-content blockquote { border-left: 4px solid rgb(var(--color-foreground, 55 48 42) / 0.2); padding-left: 1rem; font-style: italic; }
 .rich-content img { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 1.5rem auto; display: block; }
+/* Alignment classes emitted by the WYSIWYG editor. Floats make adjacent
+   paragraphs wrap around the image; a responsive max-width keeps them from
+   dominating narrow mobile layouts. */
+.rich-content img.align-left {
+  float: left;
+  max-width: 50%;
+  margin: 0.25rem 1rem 0.5rem 0;
+  border-radius: 0.5rem;
+}
+.rich-content img.align-right {
+  float: right;
+  max-width: 50%;
+  margin: 0.25rem 0 0.5rem 1rem;
+  border-radius: 0.5rem;
+}
+.rich-content img.align-center {
+  display: block;
+  margin: 1.5rem auto;
+  clear: both;
+  float: none;
+}
+@media (max-width: 640px) {
+  /* On narrow screens floating a half-width image makes text unreadable —
+     fall back to centered block layout for small viewports. */
+  .rich-content img.align-left,
+  .rich-content img.align-right {
+    float: none;
+    display: block;
+    max-width: 100%;
+    margin: 1rem auto;
+  }
+}

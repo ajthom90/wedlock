@@ -72,16 +72,16 @@ const LineHeight = Extension.create({
   },
 });
 
-// Extended Image node that persists width + alignment via inline style. We use
-// style rather than width/height HTML attributes because percentages work
-// cross-browser and the public-side sanitizer already allows the style keys.
+// Extended Image node that persists width (as inline style) and alignment
+// (as a class name). Keeping these in different attributes avoids Tiptap's
+// mergeAttributes concatenating two `style` strings with a space, which
+// produces invalid CSS and silently drops the second declaration.
 const ResizableImage = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
       width: {
         default: null as string | null,
-        // Parse from inline `width: X` style on the rendered <img>.
         parseHTML: (element: HTMLElement) => element.style.width || null,
         renderHTML: (attrs: { width?: string | null }) => {
           return attrs.width ? { style: `width: ${attrs.width}` } : {};
@@ -90,6 +90,12 @@ const ResizableImage = Image.extend({
       align: {
         default: null as 'left' | 'center' | 'right' | null,
         parseHTML: (element: HTMLElement) => {
+          // New format: align-left / align-right / align-center class.
+          if (element.classList.contains('align-left')) return 'left';
+          if (element.classList.contains('align-right')) return 'right';
+          if (element.classList.contains('align-center')) return 'center';
+          // Legacy format: inline float / margin:auto styles. Kept so images
+          // saved before this change still render in the correct alignment.
           const float = element.style.float;
           if (float === 'left') return 'left';
           if (float === 'right') return 'right';
@@ -98,10 +104,8 @@ const ResizableImage = Image.extend({
           return null;
         },
         renderHTML: (attrs: { align?: 'left' | 'center' | 'right' | null }) => {
-          if (attrs.align === 'left') return { style: 'float: left; margin: 0.5rem 1rem 0.5rem 0' };
-          if (attrs.align === 'right') return { style: 'float: right; margin: 0.5rem 0 0.5rem 1rem' };
-          if (attrs.align === 'center') return { style: 'display: block; margin: 1rem auto' };
-          return {};
+          if (!attrs.align) return {};
+          return { class: `align-${attrs.align}` };
         },
       },
     };
@@ -354,7 +358,9 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '200p
       )}
 
       <style jsx global>{`
-        .ProseMirror { outline: none; padding: 0.5rem 0.75rem; }
+        /* flow-root makes the editor contain its floats so the author sees
+           exactly what the public site will render, including text wrapping. */
+        .ProseMirror { outline: none; padding: 0.5rem 0.75rem; display: flow-root; }
         .ProseMirror p.is-editor-empty:first-child::before {
           content: attr(data-placeholder);
           float: left;
@@ -364,6 +370,12 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '200p
         }
         .ProseMirror img { max-width: 100%; height: auto; display: block; margin: 1rem auto; }
         .ProseMirror img.ProseMirror-selectednode { outline: 2px solid #3b82f6; }
+        /* Alignment classes written by the ResizableImage extension. Float
+           makes adjacent paragraphs wrap; the margin on the opposite side
+           keeps text from hugging the image too tightly. */
+        .ProseMirror img.align-left { float: left; margin: 0.25rem 1rem 0.5rem 0; }
+        .ProseMirror img.align-right { float: right; margin: 0.25rem 0 0.5rem 1rem; }
+        .ProseMirror img.align-center { display: block; margin: 1rem auto; clear: both; float: none; }
         .ProseMirror h2 { font-size: 1.5rem; font-weight: 600; margin: 1rem 0 0.5rem; }
         .ProseMirror h3 { font-size: 1.25rem; font-weight: 600; margin: 0.75rem 0 0.5rem; }
         .ProseMirror ul { list-style: disc; padding-left: 1.5rem; }
