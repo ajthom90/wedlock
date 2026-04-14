@@ -94,29 +94,6 @@ export default function SettingsPage() {
     }
   };
 
-  const addRegistryLink = () => {
-    setSettings({
-      ...settings,
-      registryLinks: [...settings.registryLinks, { name: '', url: '' }],
-    });
-    setSaved(false);
-  };
-
-  const removeRegistryLink = (index: number) => {
-    setSettings({
-      ...settings,
-      registryLinks: settings.registryLinks.filter((_, i) => i !== index),
-    });
-    setSaved(false);
-  };
-
-  const updateRegistryLink = (index: number, field: keyof RegistryLink, value: string) => {
-    const updated = [...settings.registryLinks];
-    updated[index] = { ...updated[index], [field]: value };
-    setSettings({ ...settings, registryLinks: updated });
-    setSaved(false);
-  };
-
   if (loading) return <div className="flex justify-center py-12"><p className="text-gray-500">Loading settings...</p></div>;
 
   return (
@@ -269,38 +246,6 @@ export default function SettingsPage() {
               Set a password to require visitors to enter it before viewing the site. Leave blank to disable.
             </p>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Registry Links</CardTitle>
-            <Button size="sm" variant="outline" onClick={addRegistryLink}>Add Link</Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {settings.registryLinks.length === 0 ? (
-            <p className="text-sm text-gray-500">No registry links added yet</p>
-          ) : (
-            settings.registryLinks.map((link, i) => (
-              <div key={i} className="flex gap-2 items-start">
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <Input
-                    value={link.name}
-                    onChange={(e) => updateRegistryLink(i, 'name', e.target.value)}
-                    placeholder="Registry name"
-                  />
-                  <Input
-                    value={link.url}
-                    onChange={(e) => updateRegistryLink(i, 'url', e.target.value)}
-                    placeholder="https://..."
-                  />
-                </div>
-                <Button size="sm" variant="danger" onClick={() => removeRegistryLink(i)}>Remove</Button>
-              </div>
-            ))
-          )}
         </CardContent>
       </Card>
 
