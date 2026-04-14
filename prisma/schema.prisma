@@ -33,9 +33,10 @@ model Invitation {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  guests   Guest[]
-  response RsvpResponse?
-  gifts    GiftItem[]
+  guests         Guest[]
+  response       RsvpResponse?
+  gifts          GiftItem[]
+  shuttleSignups ShuttleSignup[]
 }
 
 model Guest {
@@ -199,6 +200,73 @@ model BudgetItem {
   notes       String?
   order       Int      @default(0)
   createdAt   DateTime @default(now())
+}
+
+// Relationship timeline milestones shown on /our-story.
+model StoryMilestone {
+  id          String   @id @default(uuid())
+  date        String   // display-friendly, e.g. "Summer 2019"
+  title       String
+  description String?
+  imageUrl    String?
+  focalX      Int      @default(50)
+  focalY      Int      @default(50)
+  zoom        Float    @default(1.0)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+// Transportation coordination — shuttles between hotel and venue that guests
+// (gated by invitation code) can sign up for.
+model Shuttle {
+  id          String          @id @default(uuid())
+  name        String
+  departDate  String          // ISO date
+  departTime  String
+  origin      String
+  destination String
+  capacity    Int             @default(0) // 0 = unlimited
+  notes       String?
+  order       Int             @default(0)
+  signups     ShuttleSignup[]
+  createdAt   DateTime        @default(now())
+}
+
+model ShuttleSignup {
+  id           String     @id @default(uuid())
+  shuttleId    String
+  shuttle      Shuttle    @relation(fields: [shuttleId], references: [id], onDelete: Cascade)
+  invitationId String
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  guestCount   Int        @default(1)
+  createdAt    DateTime   @default(now())
+
+  @@unique([shuttleId, invitationId])
+}
+
+// Honeymoon fund — alternative to the gift registry. The couple defines
+// experiences guests can pledge toward. No real payments — just intent that
+// the couple records as received later.
+model HoneymoonItem {
+  id          String            @id @default(uuid())
+  name        String
+  description String?
+  goalAmount  Float             @default(0)
+  imageUrl    String?
+  order       Int               @default(0)
+  pledges     HoneymoonPledge[]
+  createdAt   DateTime          @default(now())
+}
+
+model HoneymoonPledge {
+  id         String        @id @default(uuid())
+  itemId     String
+  item       HoneymoonItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  guestName  String
+  amount     Float
+  message    String?
+  receivedAt DateTime?     // null = pledged only, non-null = couple recorded receipt
+  createdAt  DateTime      @default(now())
 }
 
 // Vendor contact directory — private admin rolodex for photographer, DJ,
