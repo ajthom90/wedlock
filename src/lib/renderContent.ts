@@ -27,6 +27,12 @@ const ALLOWED_STYLE_PROPERTIES = new Set([
   'text-align',
   'font-family',
   'line-height',
+  'width',
+  'max-width',
+  'margin',
+  'margin-left',
+  'margin-right',
+  'float',
 ]);
 
 function filterStyleAttribute(styleValue: string): string {

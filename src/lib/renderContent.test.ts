@@ -122,4 +122,12 @@ describe('renderContent', () => {
     const out = renderContent(input);
     expect(out).not.toContain('expression');
   });
+
+  it('allows width + float + margin for image resize and alignment', () => {
+    const input = '<img src="/uploads/a.jpg" alt="x" style="width: 50%; float: right; margin: 0 0 0 1rem">';
+    const out = renderContent(input);
+    expect(out).toContain('width: 50%');
+    expect(out).toContain('float: right');
+    expect(out).toContain('margin: 0 0 0 1rem');
+  });
 });

@@ -16,6 +16,7 @@ interface Photo {
 const BUILTIN_SECTIONS = [
   { value: 'home-banner', label: 'Home Banner' },
   { value: 'us', label: 'Our Story' },
+  { value: 'content', label: 'Content' },
   { value: 'gallery', label: 'Gallery' },
 ];
 

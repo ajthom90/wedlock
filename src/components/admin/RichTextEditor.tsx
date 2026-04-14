@@ -1,6 +1,7 @@
 'use client';
 
 import { useEditor, EditorContent, Editor, Extension } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
@@ -8,7 +9,8 @@ import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { MediaPicker } from '@/components/admin/MediaPicker';
 
 interface Props {
   value: string;
@@ -19,12 +21,11 @@ interface Props {
 
 interface FontOption {
   label: string;
-  value: string; // the CSS font-family value to apply
+  value: string;
 }
 
-// Custom Tiptap extension that lets paragraphs and headings carry a
-// `line-height` style. We don't use a pre-baked extension because none
-// match exactly what we need (single attribute on block nodes only).
+// Custom Tiptap extension: lets paragraphs and headings carry line-height as
+// an inline style. No built-in extension matches the exact shape we need.
 const LineHeight = Extension.create({
   name: 'lineHeight',
   addOptions() {
@@ -54,7 +55,6 @@ const LineHeight = Extension.create({
         ({ commands, editor }: { commands: { updateAttributes: (t: string, a: Record<string, unknown>) => boolean }; editor: Editor }) => {
           const types = (this.options as { types: string[] }).types;
           return types.every((type) => {
-            // Only update node types that actually exist in the schema.
             if (!editor.schema.nodes[type]) return true;
             return commands.updateAttributes(type, { lineHeight: value });
           });
@@ -72,9 +72,43 @@ const LineHeight = Extension.create({
   },
 });
 
-const DEFAULT_FONT_OPTIONS: FontOption[] = [
-  { label: 'Default', value: '' },
-];
+// Extended Image node that persists width + alignment via inline style. We use
+// style rather than width/height HTML attributes because percentages work
+// cross-browser and the public-side sanitizer already allows the style keys.
+const ResizableImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null as string | null,
+        // Parse from inline `width: X` style on the rendered <img>.
+        parseHTML: (element: HTMLElement) => element.style.width || null,
+        renderHTML: (attrs: { width?: string | null }) => {
+          return attrs.width ? { style: `width: ${attrs.width}` } : {};
+        },
+      },
+      align: {
+        default: null as 'left' | 'center' | 'right' | null,
+        parseHTML: (element: HTMLElement) => {
+          const float = element.style.float;
+          if (float === 'left') return 'left';
+          if (float === 'right') return 'right';
+          const margin = element.style.margin;
+          if (margin && /auto/.test(margin)) return 'center';
+          return null;
+        },
+        renderHTML: (attrs: { align?: 'left' | 'center' | 'right' | null }) => {
+          if (attrs.align === 'left') return { style: 'float: left; margin: 0.5rem 1rem 0.5rem 0' };
+          if (attrs.align === 'right') return { style: 'float: right; margin: 0.5rem 0 0.5rem 1rem' };
+          if (attrs.align === 'center') return { style: 'display: block; margin: 1rem auto' };
+          return {};
+        },
+      },
+    };
+  },
+});
+
+const DEFAULT_FONT_OPTIONS: FontOption[] = [{ label: 'Default', value: '' }];
 
 const LINE_HEIGHTS = [
   { label: 'Tight', value: '1.3' },
@@ -82,13 +116,17 @@ const LINE_HEIGHTS = [
   { label: 'Relaxed', value: '2' },
 ];
 
-export function RichTextEditor({ value, onChange, placeholder, minHeight = '200px' }: Props) {
-  const [uploading, setUploading] = useState(false);
-  const [fontOptions, setFontOptions] = useState<FontOption[]>(DEFAULT_FONT_OPTIONS);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const IMAGE_SIZES = [
+  { label: '25%', value: '25%' },
+  { label: '50%', value: '50%' },
+  { label: '75%', value: '75%' },
+  { label: '100%', value: '100%' },
+];
 
-  // Load available fonts once per editor mount: theme heading/body plus any
-  // custom-uploaded fonts. Failures fall back silently to Default only.
+export function RichTextEditor({ value, onChange, placeholder, minHeight = '200px' }: Props) {
+  const [fontOptions, setFontOptions] = useState<FontOption[]>(DEFAULT_FONT_OPTIONS);
+  const [showImagePicker, setShowImagePicker] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -124,7 +162,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '200p
     extensions: [
       StarterKit,
       Underline,
-      Image.configure({ HTMLAttributes: { class: 'rounded-md my-4' } }),
+      ResizableImage.configure({ HTMLAttributes: { class: 'rounded-md my-4' } }),
       Link.configure({
         openOnClick: false,
         HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
@@ -153,24 +191,6 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '200p
     }
   }, [value, editor]);
 
-  const handleImageUpload = async (file: File) => {
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Upload failed' }));
-        alert(err.error || 'Upload failed');
-        return;
-      }
-      const data = await res.json();
-      editor?.chain().focus().setImage({ src: data.url, alt: '' }).run();
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const addLink = () => {
     const current = editor?.getAttributes('link').href as string | undefined;
     const url = prompt('Enter URL:', current ?? 'https://');
@@ -180,6 +200,22 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '200p
       return;
     }
     editor?.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+  };
+
+  const insertImage = (url: string, caption: string | null) => {
+    editor?.chain().focus().setImage({ src: url, alt: caption || '' }).run();
+  };
+
+  const setImageSize = (width: string) => {
+    editor?.chain().focus().updateAttributes('image', { width }).run();
+  };
+
+  const setImageAlign = (align: 'left' | 'center' | 'right' | null) => {
+    editor?.chain().focus().updateAttributes('image', { align }).run();
+  };
+
+  const deleteImage = () => {
+    editor?.chain().focus().deleteSelection().run();
   };
 
   if (!editor) return null;
@@ -203,7 +239,6 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '200p
   return (
     <div className="border border-gray-300 rounded-md overflow-hidden">
       <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50 px-2 py-1.5">
-        {/* Inline formatting */}
         <Btn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} label={<b>B</b>} title="Bold" />
         <Btn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} label={<i>I</i>} title="Italic" />
         <Btn active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} label={<u>U</u>} title="Underline" />
@@ -211,7 +246,6 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '200p
 
         <span className="w-px h-5 bg-gray-300 mx-1" aria-hidden="true" />
 
-        {/* Blocks */}
         <Btn active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} label="H2" title="Heading 2" />
         <Btn active={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} label="H3" title="Heading 3" />
         <Btn active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} label="•" title="Bullet list" />
@@ -220,7 +254,6 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '200p
 
         <span className="w-px h-5 bg-gray-300 mx-1" aria-hidden="true" />
 
-        {/* Alignment */}
         <Btn active={currentAlign === 'left' || currentAlign === ''} onClick={() => editor.chain().focus().setTextAlign('left').run()} label="⬅︎" title="Align left" />
         <Btn active={currentAlign === 'center'} onClick={() => editor.chain().focus().setTextAlign('center').run()} label="⎯⎯" title="Align center" />
         <Btn active={currentAlign === 'right'} onClick={() => editor.chain().focus().setTextAlign('right').run()} label="➡︎" title="Align right" />
@@ -228,7 +261,6 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '200p
 
         <span className="w-px h-5 bg-gray-300 mx-1" aria-hidden="true" />
 
-        {/* Font family */}
         <select
           value={currentFont}
           onChange={(e) => {
@@ -244,7 +276,6 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '200p
           ))}
         </select>
 
-        {/* Line height */}
         <select
           value={currentLineHeight}
           onChange={(e) => {
@@ -263,34 +294,65 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '200p
 
         <span className="w-px h-5 bg-gray-300 mx-1" aria-hidden="true" />
 
-        {/* Link + Image */}
         <Btn active={editor.isActive('link')} onClick={addLink} label="🔗" title="Link" />
-        <Btn
-          onClick={() => fileInputRef.current?.click()}
-          label={uploading ? '⏳' : '🖼'}
-          title={uploading ? 'Uploading…' : 'Insert image'}
-          disabled={uploading}
-        />
+        <Btn onClick={() => setShowImagePicker(true)} label="🖼" title="Insert image" />
 
         <div className="ml-auto flex gap-1">
           <Btn onClick={() => editor.chain().focus().undo().run()} label="↶" title="Undo" disabled={!editor.can().undo()} />
           <Btn onClick={() => editor.chain().focus().redo().run()} label="↷" title="Redo" disabled={!editor.can().redo()} />
         </div>
       </div>
+
+      <BubbleMenu
+        editor={editor}
+        pluginKey="imageBubble"
+        shouldShow={({ editor }) => editor.isActive('image')}
+        options={{ placement: 'top' }}
+      >
+        <div className="flex items-center gap-1 bg-white border border-gray-200 shadow-lg rounded-md px-2 py-1.5">
+          <span className="text-xs text-gray-500 mr-1">Size</span>
+          {IMAGE_SIZES.map((s) => {
+            const isActive = (editor.getAttributes('image').width as string | null) === s.value;
+            return (
+              <button
+                key={s.value}
+                type="button"
+                onClick={() => setImageSize(s.value)}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${isActive ? 'bg-primary text-white' : 'hover:bg-gray-100'}`}
+              >
+                {s.label}
+              </button>
+            );
+          })}
+          <span className="w-px h-4 bg-gray-300 mx-1" aria-hidden="true" />
+          <span className="text-xs text-gray-500 mr-1">Align</span>
+          <AlignBtn editor={editor} align="left" label="⬅︎" setAlign={setImageAlign} />
+          <AlignBtn editor={editor} align="center" label="⎯⎯" setAlign={setImageAlign} />
+          <AlignBtn editor={editor} align="right" label="➡︎" setAlign={setImageAlign} />
+          <span className="w-px h-4 bg-gray-300 mx-1" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={deleteImage}
+            className="px-2 py-0.5 text-xs rounded text-red-600 hover:bg-red-50 transition-colors"
+            title="Remove image"
+          >
+            ✕
+          </button>
+        </div>
+      </BubbleMenu>
+
       <div style={{ minHeight }}>
         <EditorContent editor={editor} />
       </div>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleImageUpload(file);
-          e.target.value = '';
-        }}
-      />
+
+      {showImagePicker && (
+        <MediaPicker
+          onSelect={insertImage}
+          onClose={() => setShowImagePicker(false)}
+          uploadSection="content"
+        />
+      )}
+
       <style jsx global>{`
         .ProseMirror { outline: none; padding: 0.5rem 0.75rem; }
         .ProseMirror p.is-editor-empty:first-child::before {
@@ -301,6 +363,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '200p
           height: 0;
         }
         .ProseMirror img { max-width: 100%; height: auto; display: block; margin: 1rem auto; }
+        .ProseMirror img.ProseMirror-selectednode { outline: 2px solid #3b82f6; }
         .ProseMirror h2 { font-size: 1.5rem; font-weight: 600; margin: 1rem 0 0.5rem; }
         .ProseMirror h3 { font-size: 1.25rem; font-weight: 600; margin: 0.75rem 0 0.5rem; }
         .ProseMirror ul { list-style: disc; padding-left: 1.5rem; }
@@ -309,5 +372,29 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '200p
         .ProseMirror a { color: #2563eb; text-decoration: underline; }
       `}</style>
     </div>
+  );
+}
+
+function AlignBtn({
+  editor,
+  align,
+  label,
+  setAlign,
+}: {
+  editor: Editor;
+  align: 'left' | 'center' | 'right';
+  label: string;
+  setAlign: (a: 'left' | 'center' | 'right' | null) => void;
+}) {
+  const isActive = (editor.getAttributes('image').align as string | null) === align;
+  return (
+    <button
+      type="button"
+      onClick={() => setAlign(isActive ? null : align)}
+      className={`px-2 py-0.5 text-xs rounded transition-colors ${isActive ? 'bg-primary text-white' : 'hover:bg-gray-100'}`}
+      title={`Align ${align}`}
+    >
+      {label}
+    </button>
   );
 }
