@@ -25,6 +25,7 @@ interface Invitation {
   email: string | null;
   maxGuests: number;
   notes: string | null;
+  address: string | null;
   createdAt: string;
   guests: Guest[];
   response: RsvpResponse | null;
@@ -140,6 +141,28 @@ export default function InvitationsPage() {
     }
   };
 
+  const exportAddresses = () => {
+    // CSV export of mailing addresses collected via the RSVP flow. Useful for
+    // mail-merging save-the-dates or thank-you cards.
+    const rows = invitations
+      .filter((inv) => inv.address?.trim())
+      .map((inv) => [inv.householdName, inv.address as string]);
+    if (rows.length === 0) {
+      alert('No mailing addresses collected yet.');
+      return;
+    }
+    const csv = [['Household', 'Address'], ...rows]
+      .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'addresses.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleDownloadPdf = async () => {
     setDownloading(true);
     try {
@@ -186,9 +209,12 @@ export default function InvitationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-2">
         <h1 className="text-3xl font-bold">Invitations</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={exportAddresses}>
+            Export addresses
+          </Button>
           <Button variant="outline" onClick={handleDownloadPdf} disabled={downloading}>
             {downloading ? 'Generating...' : 'Download PDF'}
           </Button>
@@ -212,6 +238,7 @@ export default function InvitationsPage() {
                     <CardTitle>{inv.householdName}</CardTitle>
                     <p className="text-sm text-gray-500 mt-1">Code: <span className="font-mono font-semibold">{inv.code}</span></p>
                     {inv.email && <p className="text-sm text-gray-500">{inv.email}</p>}
+                    {inv.address && <p className="text-xs text-gray-500 mt-1 whitespace-pre-line">📬 {inv.address}</p>}
                   </div>
                   {getStatusBadge(inv)}
                 </div>

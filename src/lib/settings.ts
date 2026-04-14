@@ -29,6 +29,7 @@ export interface SiteSettings {
   siteDescription: string;
   venueLat: string;
   venueLng: string;
+  eventsDisplayStyle: 'list' | 'timeline';
 }
 
 export interface FeatureSettings {
@@ -74,6 +75,7 @@ const defaultSite: SiteSettings = {
   // forecast in the final week before the wedding.
   venueLat: '',
   venueLng: '',
+  eventsDisplayStyle: 'list',
 };
 
 const defaultFeatures: FeatureSettings = {
@@ -126,6 +128,8 @@ export async function getSiteSettings(): Promise<SiteSettings> {
         (site as any)[key] = parseFloat(setting.value) || defaultSite[key];
       } else if (key === 'homeBannerStyle') {
         (site as any)[key] = setting.value === 'hero' ? 'hero' : 'strip';
+      } else if (key === 'eventsDisplayStyle') {
+        (site as any)[key] = setting.value === 'timeline' ? 'timeline' : 'list';
       } else {
         (site as any)[key] = setting.value;
       }

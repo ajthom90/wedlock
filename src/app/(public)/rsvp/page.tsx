@@ -21,6 +21,7 @@ function RSVPForm() {
   const [songRequests, setSongRequests] = useState('');
   const [dietaryNotes, setDietaryNotes] = useState('');
   const [message, setMessage] = useState('');
+  const [address, setAddress] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -32,6 +33,7 @@ function RSVPForm() {
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Invitation not found'); return; }
       setInvitation(data.invitation); setRsvpOptions(data.rsvpOptions || []); setSettings(data.settings || {}); setFeatures(data.features || {});
+      setAddress(data.invitation.address || '');
       if (data.invitation.response) {
         const r = data.invitation.response;
         setAttending(r.attending); setGuestCount(r.guestCount); setMessage(r.message || ''); setSongRequests(r.songRequests || ''); setDietaryNotes(r.dietaryNotes || '');
@@ -48,7 +50,7 @@ function RSVPForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setSubmitError('');
     try {
-      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? (features.perGuestSelection ? attendingGuests.length : guestCount) : 0, responses, guestMeals: features.perGuestSelection ? guestMeals : undefined, attendingGuests: features.perGuestSelection ? attendingGuests : undefined, songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message }) });
+      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? (features.perGuestSelection ? attendingGuests.length : guestCount) : 0, responses, guestMeals: features.perGuestSelection ? guestMeals : undefined, attendingGuests: features.perGuestSelection ? attendingGuests : undefined, songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, address: address.trim() || undefined }) });
       const data = await res.json();
       if (res.ok) setSubmitted(true); else setSubmitError(data.error || 'Failed to submit RSVP');
     } catch { setSubmitError('An error occurred. Please try again.'); }
@@ -88,6 +90,7 @@ function RSVPForm() {
           {features.dietaryNotes && <Textarea label="Dietary Restrictions or Allergies" value={dietaryNotes} onChange={(e) => setDietaryNotes(e.target.value)} placeholder="Let us know about any dietary needs..." rows={2} />}
           {features.songRequests && <Textarea label="Song Requests" value={songRequests} onChange={(e) => setSongRequests(e.target.value)} placeholder="Any songs you'd like to hear?" rows={2} />}
         </>)}
+        {attending && <Textarea label="Mailing address (optional — for save-the-dates and thank-you cards)" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, Springfield, IL 62704" rows={2} />}
         {attending && <Textarea label="Message for the Couple (optional)" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Share your thoughts..." rows={3} />}
         {submitError && <p className="text-red-600 text-sm">{submitError}</p>}
         {attending && <Button type="submit" className="w-full" isLoading={submitting}>{invitation.response ? 'Update RSVP' : 'Submit RSVP'}</Button>}

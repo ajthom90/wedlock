@@ -21,6 +21,7 @@ const navItems = [
   { href: '/admin/seating', label: 'Seating', icon: '🪑' },
   { href: '/admin/gifts', label: 'Gifts & Registry', icon: '🎁' },
   { href: '/admin/vendors', label: 'Vendors', icon: '📇' },
+  { href: '/admin/budget', label: 'Budget', icon: '💵' },
   { href: '/admin/navigation', label: 'Navigation', icon: '🧭' },
   { href: '/admin/features', label: 'Features', icon: '🔧' },
   { href: '/admin/settings', label: 'Settings', icon: '⚙️' },

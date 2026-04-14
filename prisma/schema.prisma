@@ -29,11 +29,13 @@ model Invitation {
   email         String?
   maxGuests     Int      @default(2)
   notes         String?
+  address       String?  // mailing address for save-the-date, thank-you cards
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   guests   Guest[]
   response RsvpResponse?
+  gifts    GiftItem[]
 }
 
 model Guest {
@@ -172,16 +174,31 @@ model TableAssignment {
 
 // Gift tracker (#9)
 model GiftItem {
-  id           String  @id @default(uuid())
+  id           String      @id @default(uuid())
   name         String
   store        String?
   url          String?
   price        Float?
-  purchased    Boolean @default(false)
+  purchased    Boolean     @default(false)
   purchasedBy  String?
-  thankYouSent Boolean @default(false)
+  thankYouSent Boolean     @default(false)
   notes        String?
-  order        Int     @default(0)
+  order        Int         @default(0)
+  invitationId String?
+  invitation   Invitation? @relation(fields: [invitationId], references: [id], onDelete: SetNull)
+}
+
+// Budget tracker — private admin rolodex of estimated vs actual expenses.
+model BudgetItem {
+  id          String   @id @default(uuid())
+  category    String
+  description String
+  estimated   Float    @default(0)
+  actual      Float    @default(0)
+  paid        Boolean  @default(false)
+  notes       String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
 }
 
 // Vendor contact directory — private admin rolodex for photographer, DJ,

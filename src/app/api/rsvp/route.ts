@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { code, attending, guestCount, responses, guestMeals, message, attendingGuests, songRequests, dietaryNotes } = await request.json();
+    const { code, attending, guestCount, responses, guestMeals, message, attendingGuests, songRequests, dietaryNotes, address } = await request.json();
     if (!code) return NextResponse.json({ error: 'Invitation code is required' }, { status: 400 });
     const settings = await getSiteSettings();
     if (settings.rsvpDeadline && settings.rsvpCloseAfterDeadline) {
@@ -47,6 +47,14 @@ export async function POST(request: Request) {
     }
     const invitation = await prisma.invitation.findUnique({ where: { code } });
     if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
+    // Persist the mailing address on the invitation if the guest provided one.
+    // Stored separately from the RsvpResponse so it survives RSVP changes.
+    if (typeof address === 'string' && address.trim()) {
+      await prisma.invitation.update({
+        where: { id: invitation.id },
+        data: { address: address.trim() },
+      });
+    }
     const existing = await prisma.rsvpResponse.findUnique({ where: { invitationId: invitation.id } });
     const data = {
       attending, guestCount: guestCount || 0, responses: JSON.stringify(responses || {}),

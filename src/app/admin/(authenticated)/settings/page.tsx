@@ -29,6 +29,7 @@ interface SiteSettings {
   siteDescription: string;
   venueLat: string;
   venueLng: string;
+  eventsDisplayStyle: 'list' | 'timeline';
 }
 
 export default function SettingsPage() {
@@ -51,6 +52,7 @@ export default function SettingsPage() {
     siteDescription: '',
     venueLat: '',
     venueLng: '',
+    eventsDisplayStyle: 'list',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -224,6 +226,36 @@ export default function SettingsPage() {
               Used by search engines and link previews when someone shares the site.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Events Display</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="eventsDisplayStyle"
+              value="list"
+              checked={settings.eventsDisplayStyle === 'list'}
+              onChange={() => update('eventsDisplayStyle', 'list')}
+              className="h-4 w-4"
+            />
+            <span className="text-sm">List — each event in its own card, stacked vertically</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="eventsDisplayStyle"
+              value="timeline"
+              checked={settings.eventsDisplayStyle === 'timeline'}
+              onChange={() => update('eventsDisplayStyle', 'timeline')}
+              className="h-4 w-4"
+            />
+            <span className="text-sm">Timeline — visual vertical timeline with time markers</span>
+          </label>
         </CardContent>
       </Card>
 

@@ -14,6 +14,13 @@ interface Gift {
   purchased: boolean;
   purchasedBy: string;
   thankYouSent: boolean;
+  invitationId: string | null;
+}
+
+interface InvitationOption {
+  id: string;
+  householdName: string;
+  email: string | null;
 }
 
 interface RegistryLink {
@@ -31,6 +38,8 @@ export default function GiftsPage() {
   const [store, setStore] = useState('');
   const [url, setUrl] = useState('');
   const [price, setPrice] = useState('');
+  const [invitationId, setInvitationId] = useState('');
+  const [invitations, setInvitations] = useState<InvitationOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
@@ -65,10 +74,29 @@ export default function GiftsPage() {
     }
   }, []);
 
+  // Powers the "linked household" dropdown in the gift edit modal so the couple
+  // can associate a gift with the invitation it came from.
+  const fetchInvitations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/invitations');
+      if (res.ok) {
+        const data: Array<{ id: string; householdName: string; email: string | null }> = await res.json();
+        setInvitations(
+          data
+            .map((i) => ({ id: i.id, householdName: i.householdName, email: i.email }))
+            .sort((a, b) => a.householdName.localeCompare(b.householdName)),
+        );
+      }
+    } catch (error) {
+      console.error('Failed to fetch invitations:', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchGifts();
     fetchRegistryLinks();
-  }, [fetchGifts, fetchRegistryLinks]);
+    fetchInvitations();
+  }, [fetchGifts, fetchRegistryLinks, fetchInvitations]);
 
   // --- Registry link handlers ---
   const addRegistryLink = () => {
@@ -109,6 +137,7 @@ export default function GiftsPage() {
     setStore('');
     setUrl('');
     setPrice('');
+    setInvitationId('');
     setModalOpen(true);
   };
 
@@ -118,6 +147,7 @@ export default function GiftsPage() {
     setStore(gift.store || '');
     setUrl(gift.url || '');
     setPrice(gift.price ? String(gift.price) : '');
+    setInvitationId(gift.invitationId || '');
     setModalOpen(true);
   };
 
@@ -127,6 +157,7 @@ export default function GiftsPage() {
     setName('');
     setStore('');
     setUrl('');
+    setInvitationId('');
     setPrice('');
   };
 
@@ -138,6 +169,7 @@ export default function GiftsPage() {
         store,
         url,
         price: price ? parseFloat(price) : 0,
+        invitationId: invitationId || null,
       };
       if (editing) {
         const res = await fetch(`/api/gifts/${editing.id}`, {
@@ -349,6 +381,12 @@ export default function GiftsPage() {
                   {gift.purchased && gift.purchasedBy && (
                     <p className="text-sm"><span className="font-medium">Purchased by:</span> {gift.purchasedBy}</p>
                   )}
+                  {gift.invitationId && (
+                    <p className="text-sm">
+                      <span className="font-medium">From:</span>{' '}
+                      {invitations.find((i) => i.id === gift.invitationId)?.householdName || 'Unknown household'}
+                    </p>
+                  )}
                 </CardContent>
                 <CardFooter className="flex gap-4 border-t pt-4">
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -417,6 +455,24 @@ export default function GiftsPage() {
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="0.00"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">From (household)</label>
+                <select
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  value={invitationId}
+                  onChange={(e) => setInvitationId(e.target.value)}
+                >
+                  <option value="">— not linked —</option>
+                  {invitations.map((inv) => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.householdName}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Linking makes the thank-you note easy: we&apos;ll remember which household sent this gift.
+                </p>
               </div>
             </CardContent>
             <div className="flex justify-end gap-2 p-6 pt-0">

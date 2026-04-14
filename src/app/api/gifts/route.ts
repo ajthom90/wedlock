@@ -16,9 +16,19 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const { name, store, url, price, notes } = await request.json();
+    const { name, store, url, price, notes, invitationId } = await request.json();
     const maxOrder = await prisma.giftItem.aggregate({ _max: { order: true } });
-    const item = await prisma.giftItem.create({ data: { name, store: store || null, url: url || null, price: price || null, notes: notes || null, order: (maxOrder._max.order || 0) + 1 } });
+    const item = await prisma.giftItem.create({
+      data: {
+        name,
+        store: store || null,
+        url: url || null,
+        price: price || null,
+        notes: notes || null,
+        invitationId: invitationId || null,
+        order: (maxOrder._max.order || 0) + 1,
+      },
+    });
     return NextResponse.json(item);
   } catch (error) {
     console.error('Error creating gift item:', error);
