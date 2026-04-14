@@ -25,6 +25,8 @@ export interface SiteSettings {
   sitePassword: string;
   mapUrl: string;
   homeBannerStyle: 'hero' | 'strip';
+  siteTitle: string;
+  siteDescription: string;
 }
 
 export interface FeatureSettings {
@@ -62,6 +64,10 @@ const defaultSite: SiteSettings = {
   sitePassword: '',
   mapUrl: '',
   homeBannerStyle: 'strip',
+  // Empty values opt into the auto-derived defaults computed in layout.tsx
+  // (couple names + wedding date for the title, "Join us..." for description).
+  siteTitle: '',
+  siteDescription: '',
 };
 
 const defaultFeatures: FeatureSettings = {

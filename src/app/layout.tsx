@@ -1,5 +1,35 @@
 import './globals.css';
-export const metadata = { title: 'Wedding Celebration', description: 'Join us for our special day' };
+import type { Metadata } from 'next';
+import { getSiteSettings } from '@/lib/settings';
+import { formatDate } from '@/lib/utils';
+
+// Root layouts in App Router can return metadata dynamically. We read the site
+// settings on every request so the browser-tab title (and description) reflect
+// whatever the couple has saved in /admin/settings without a rebuild.
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings();
+
+  const customTitle = settings.siteTitle?.trim();
+  const customDescription = settings.siteDescription?.trim();
+
+  let autoTitle = 'Our Wedding';
+  if (settings.coupleName1 && settings.coupleName2) {
+    autoTitle = `${settings.coupleName1} & ${settings.coupleName2}`;
+    if (settings.weddingDate) {
+      try {
+        autoTitle += ` - ${formatDate(settings.weddingDate)}`;
+      } catch {
+        // formatDate failed (malformed date) — fall back to names only.
+      }
+    }
+  }
+
+  return {
+    title: customTitle || autoTitle,
+    description: customDescription || 'Join us for our special day',
+  };
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">

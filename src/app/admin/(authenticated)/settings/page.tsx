@@ -25,6 +25,8 @@ interface SiteSettings {
   qrCardHeight: number;
   sitePassword: string;
   homeBannerStyle: 'hero' | 'strip';
+  siteTitle: string;
+  siteDescription: string;
 }
 
 export default function SettingsPage() {
@@ -43,6 +45,8 @@ export default function SettingsPage() {
     qrCardHeight: 4,
     sitePassword: '',
     homeBannerStyle: 'strip',
+    siteTitle: '',
+    siteDescription: '',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -187,6 +191,37 @@ export default function SettingsPage() {
             <p className="text-xs text-gray-500 mt-1">Paste any Google Maps link or a venue address. We&apos;ll convert it for display.</p>
           </div>
           <p className="text-sm text-gray-500">Manage event dates and venues in the Events section.</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Browser Tab</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Tab title</label>
+            <Input
+              value={settings.siteTitle}
+              onChange={(e) => update('siteTitle', e.target.value)}
+              placeholder="Leave blank for: Joe & Alex - November 28, 2026"
+            />
+            <p className="text-sm text-gray-500 mt-1">
+              Shown in the browser tab and bookmarks. Leave blank to auto-build from
+              the couple names and wedding date above.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Tab description</label>
+            <Input
+              value={settings.siteDescription}
+              onChange={(e) => update('siteDescription', e.target.value)}
+              placeholder="Join us for our special day"
+            />
+            <p className="text-sm text-gray-500 mt-1">
+              Used by search engines and link previews when someone shares the site.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
