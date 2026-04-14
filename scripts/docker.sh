@@ -35,7 +35,11 @@ usage() {
   done
 }
 
-bump_version() {
+compute_bumped_version() {
+  # Compute the next version without touching package.json. Writing the new
+  # version early would invalidate Docker's COPY package.json layer and every
+  # cached step downstream of it. We defer the actual write until after the
+  # build succeeds (see write_version).
   local part=$1
   IFS='.' read -r major minor patch <<< "$VERSION"
   case $part in
@@ -44,14 +48,17 @@ bump_version() {
     patch) patch=$((patch + 1)) ;;
   esac
   VERSION="${major}.${minor}.${patch}"
-  # Update package.json
+  echo "Target version: $VERSION (will be written to package.json after build)"
+}
+
+write_version() {
   node -e "
     const fs = require('fs');
     const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
     pkg.version = '${VERSION}';
     fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
   "
-  echo "Version bumped to $VERSION"
+  echo "Wrote $VERSION to package.json"
 }
 
 build_tags() {
@@ -129,28 +136,31 @@ case "${1:-}" in
     do_push "$TAG_LATEST"
     ;;
   bump-patch)
-    bump_version patch
+    compute_bumped_version patch
     if [ "$NO_PUSH" = true ]; then
       do_build "$TAG_LATEST"
     else
       do_push "$TAG_LATEST"
     fi
+    write_version
     ;;
   bump-minor)
-    bump_version minor
+    compute_bumped_version minor
     if [ "$NO_PUSH" = true ]; then
       do_build "$TAG_LATEST"
     else
       do_push "$TAG_LATEST"
     fi
+    write_version
     ;;
   bump-major)
-    bump_version major
+    compute_bumped_version major
     if [ "$NO_PUSH" = true ]; then
       do_build "$TAG_LATEST"
     else
       do_push "$TAG_LATEST"
     fi
+    write_version
     ;;
   version)
     echo "$VERSION"
