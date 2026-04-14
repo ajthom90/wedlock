@@ -11,7 +11,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     const data: { url?: string; caption?: string | null; gallerySection?: string | null; order?: number } = {};
     if ('url' in body) data.url = body.url;
-    if ('caption' in body) data.caption = body.caption?.trim() ? body.caption : null;
+    if ('caption' in body) data.caption = body.caption?.trim() || null;
     if ('gallerySection' in body) {
       const v = typeof body.gallerySection === 'string' ? body.gallerySection.trim() : '';
       data.gallerySection = v ? v : null;

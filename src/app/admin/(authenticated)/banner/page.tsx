@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -100,6 +100,10 @@ export default function HomeBannerPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  // Abort in-flight reorder requests when a newer drop arrives so rapid drags
+  // don't race. The server state ends up matching the most recent UI state.
+  const reorderAbortRef = useRef<AbortController | null>(null);
+
   const fetchData = useCallback(async () => {
     try {
       const [photosRes, settingsRes] = await Promise.all([
@@ -149,24 +153,42 @@ export default function HomeBannerPage() {
     const reordered = arrayMove(photos, oldIndex, newIndex).map((p, i) => ({ ...p, order: i }));
     setPhotos(reordered);
 
+    // Cancel any prior in-flight reorder so the server always reflects the
+    // most recent drop, not an older one that finishes later.
+    reorderAbortRef.current?.abort();
+    const controller = new AbortController();
+    reorderAbortRef.current = controller;
+
     try {
       await fetch('/api/photos/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ updates: reordered.map((p) => ({ id: p.id, order: p.order })) }),
+        signal: controller.signal,
       });
     } catch (err) {
-      console.error('Reorder failed', err);
+      if ((err as Error).name !== 'AbortError') {
+        console.error('Reorder failed', err);
+      }
     }
   };
 
   const handleRemove = async (id: string) => {
+    const previous = photos;
     setPhotos((prev) => prev.filter((p) => p.id !== id));
-    await fetch(`/api/photos/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gallerySection: null }),
-    });
+    try {
+      const res = await fetch(`/api/photos/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gallerySection: null }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      console.error('Remove failed', err);
+      // Roll back optimistic UI change so the admin isn't lied to.
+      setPhotos(previous);
+      alert('Could not remove photo from banner. Please try again.');
+    }
   };
 
   const handleCaptionChange = (id: string, caption: string) => {
