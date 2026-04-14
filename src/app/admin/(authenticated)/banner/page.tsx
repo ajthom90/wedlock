@@ -21,12 +21,17 @@ import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { FocalPointEditor } from '@/components/admin/FocalPointEditor';
+import { Framed } from '@/components/public/Framed';
 
 interface BannerPhoto {
   id: string;
   url: string;
   caption: string | null;
   order: number;
+  focalX: number;
+  focalY: number;
+  zoom: number;
 }
 
 type BannerStyle = 'hero' | 'strip';
@@ -35,10 +40,12 @@ function SortablePhoto({
   photo,
   onRemove,
   onCaptionChange,
+  onEditFraming,
 }: {
   photo: BannerPhoto;
   onRemove: (id: string) => void;
   onCaptionChange: (id: string, caption: string) => void;
+  onEditFraming: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: photo.id });
 
@@ -64,18 +71,33 @@ function SortablePhoto({
           <circle cx="15" cy="6" r="1.5" /><circle cx="15" cy="12" r="1.5" /><circle cx="15" cy="18" r="1.5" />
         </svg>
       </button>
-      <button
-        type="button"
-        onClick={() => onRemove(photo.id)}
-        className="absolute top-2 right-2 z-10 bg-red-600/90 hover:bg-red-700 text-white rounded p-1.5 transition-colors"
-        aria-label="Remove from banner"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-        </svg>
-      </button>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={photo.url} alt={photo.caption || ''} className="w-full aspect-video object-cover" />
+      <div className="absolute top-2 right-2 z-10 flex gap-1">
+        <button
+          type="button"
+          onClick={() => onEditFraming(photo.id)}
+          className="bg-gray-900/70 hover:bg-gray-900 text-white rounded p-1.5 transition-colors"
+          aria-label="Edit framing"
+          title="Edit framing"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={() => onRemove(photo.id)}
+          className="bg-red-600/90 hover:bg-red-700 text-white rounded p-1.5 transition-colors"
+          aria-label="Remove from banner"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+      <div className="w-full aspect-video overflow-hidden bg-gray-100">
+        <Framed src={photo.url} alt={photo.caption || ''} focalX={photo.focalX} focalY={photo.focalY} zoom={photo.zoom} />
+      </div>
       <div className="p-2">
         <Input
           value={photo.caption || ''}
@@ -195,6 +217,20 @@ export default function HomeBannerPage() {
     setPhotos((prev) => prev.map((p) => (p.id === id ? { ...p, caption } : p)));
   };
 
+  const [framingId, setFramingId] = useState<string | null>(null);
+  const framingPhoto = framingId ? photos.find((p) => p.id === framingId) || null : null;
+
+  const handleFramingSave = async (focal: { focalX: number; focalY: number; zoom: number }) => {
+    if (!framingPhoto) return;
+    setPhotos((prev) => prev.map((p) => (p.id === framingPhoto.id ? { ...p, ...focal } : p)));
+    setFramingId(null);
+    await fetch(`/api/photos/${framingPhoto.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(focal),
+    });
+  };
+
   const handleCaptionBlur = async (id: string) => {
     const photo = photos.find((p) => p.id === id);
     if (!photo) return;
@@ -312,7 +348,7 @@ export default function HomeBannerPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {photos.map((photo) => (
                       <div key={photo.id} data-photo-id={photo.id}>
-                        <SortablePhoto photo={photo} onRemove={handleRemove} onCaptionChange={handleCaptionChange} />
+                        <SortablePhoto photo={photo} onRemove={handleRemove} onCaptionChange={handleCaptionChange} onEditFraming={setFramingId} />
                       </div>
                     ))}
                   </div>
@@ -324,6 +360,48 @@ export default function HomeBannerPage() {
       </Card>
 
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} onAdd={addPhoto} />}
+      {framingPhoto && (
+        <FramingModal
+          photo={framingPhoto}
+          onSave={handleFramingSave}
+          onClose={() => setFramingId(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function FramingModal({
+  photo,
+  onSave,
+  onClose,
+}: {
+  photo: BannerPhoto;
+  onSave: (focal: { focalX: number; focalY: number; zoom: number }) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [focal, setFocal] = useState({ focalX: photo.focalX, focalY: photo.focalY, zoom: photo.zoom });
+  const [saving, setSaving] = useState(false);
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <CardHeader><CardTitle>Edit Framing</CardTitle></CardHeader>
+        <CardContent>
+          <FocalPointEditor src={photo.url} value={focal} onChange={setFocal} />
+        </CardContent>
+        <CardFooter className="gap-2 justify-end">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button
+            onClick={async () => {
+              setSaving(true);
+              try { await onSave(focal); } finally { setSaving(false); }
+            }}
+            disabled={saving}
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

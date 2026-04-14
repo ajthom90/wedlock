@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { FocalPointEditor } from '@/components/admin/FocalPointEditor';
+import { Framed } from '@/components/public/Framed';
 
 interface WeddingPartyMember {
   id: string;
@@ -14,6 +16,9 @@ interface WeddingPartyMember {
   description: string | null;
   imageUrl: string | null;
   order: number;
+  focalX: number;
+  focalY: number;
+  zoom: number;
 }
 
 export default function WeddingPartyPage() {
@@ -29,6 +34,7 @@ export default function WeddingPartyPage() {
   const [description, setDescription] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState('');
+  const [focal, setFocal] = useState({ focalX: 50, focalY: 50, zoom: 1 });
   const [saving, setSaving] = useState(false);
 
   const fetchMembers = useCallback(async () => {
@@ -56,6 +62,7 @@ export default function WeddingPartyPage() {
     setDescription('');
     setImageFile(null);
     setImageUrl('');
+    setFocal({ focalX: 50, focalY: 50, zoom: 1 });
     setEditingId(null);
   };
 
@@ -72,6 +79,7 @@ export default function WeddingPartyPage() {
     setDescription(member.description || '');
     setImageUrl(member.imageUrl || '');
     setImageFile(null);
+    setFocal({ focalX: member.focalX, focalY: member.focalY, zoom: member.zoom });
     setShowModal(true);
   };
 
@@ -103,6 +111,9 @@ export default function WeddingPartyPage() {
         description: description.trim() || null,
         imageUrl: uploadedUrl,
         order: editingId ? members.find((m) => m.id === editingId)?.order || 0 : members.length,
+        focalX: focal.focalX,
+        focalY: focal.focalY,
+        zoom: focal.zoom,
       };
       const url = editingId ? `/api/wedding-party/${editingId}` : '/api/wedding-party';
       const method = editingId ? 'PUT' : 'POST';
@@ -134,6 +145,19 @@ export default function WeddingPartyPage() {
 
   const sorted = [...members].sort((a, b) => a.order - b.order);
 
+  // Shows the user the uploaded image immediately for focal-point editing, even
+  // before they click Save. Local files become blob URLs for the editor preview.
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  useEffect(() => {
+    if (imageFile) {
+      const url = URL.createObjectURL(imageFile);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreviewUrl(imageUrl);
+    }
+  }, [imageFile, imageUrl]);
+
   if (loading) return <div className="flex justify-center py-12"><p className="text-gray-500">Loading wedding party...</p></div>;
 
   return (
@@ -153,12 +177,18 @@ export default function WeddingPartyPage() {
             <Card key={member.id}>
               <CardContent className="py-4">
                 <div className="flex items-center gap-4">
-                  {member.imageUrl && (
-                    <img
-                      src={member.imageUrl}
-                      alt={member.name}
-                      className="w-16 h-16 rounded-full object-cover"
-                    />
+                  {member.imageUrl ? (
+                    <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 bg-gray-100">
+                      <Framed
+                        src={member.imageUrl}
+                        alt={member.name}
+                        focalX={member.focalX}
+                        focalY={member.focalY}
+                        zoom={member.zoom}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center text-2xl flex-shrink-0">👤</div>
                   )}
                   <div className="flex-1">
                     <p className="font-semibold">{member.name}</p>
@@ -184,7 +214,7 @@ export default function WeddingPartyPage() {
       {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle>{editingId ? 'Edit Member' : 'Add Member'}</CardTitle>
             </CardHeader>
@@ -220,10 +250,16 @@ export default function WeddingPartyPage() {
                   onChange={(e) => setImageFile(e.target.files?.[0] || null)}
                   className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-white hover:file:bg-primary/90"
                 />
-                {imageUrl && !imageFile && (
-                  <p className="text-xs text-gray-400 mt-1">Current: {imageUrl}</p>
-                )}
+                <p className="text-xs text-gray-500 mt-1">JPG, PNG, GIF, WebP, or HEIC — up to 10 MB.</p>
               </div>
+
+              {previewUrl && (
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium mb-2">Framing</p>
+                  <p className="text-xs text-gray-500 mb-3">Center the face in the circle for the best result.</p>
+                  <FocalPointEditor src={previewUrl} value={focal} onChange={setFocal} />
+                </div>
+              )}
             </CardContent>
             <CardFooter className="gap-2 justify-end">
               <Button variant="outline" onClick={() => { setShowModal(false); resetForm(); }}>Cancel</Button>

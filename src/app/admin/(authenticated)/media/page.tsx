@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { FocalPointEditor } from '@/components/admin/FocalPointEditor';
 
 interface Photo {
   id: string;
@@ -11,6 +12,9 @@ interface Photo {
   caption: string | null;
   gallerySection: string | null;
   order: number;
+  focalX: number;
+  focalY: number;
+  zoom: number;
 }
 
 const BUILTIN_SECTIONS = [
@@ -56,6 +60,9 @@ export default function MediaPage() {
       body: JSON.stringify({
         caption: updated.caption,
         gallerySection: updated.gallerySection,
+        focalX: updated.focalX,
+        focalY: updated.focalY,
+        zoom: updated.zoom,
       }),
     });
     setEditing(null);
@@ -242,6 +249,7 @@ function EditPhotoModal({
   const [customSection, setCustomSection] = useState(
     !BUILTIN_SECTIONS.some((b) => b.value === photo.gallerySection) ? photo.gallerySection || '' : '',
   );
+  const [focal, setFocal] = useState({ focalX: photo.focalX, focalY: photo.focalY, zoom: photo.zoom });
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -250,7 +258,7 @@ function EditPhotoModal({
       let gallerySection: string | null = null;
       if (sectionMode === 'preset') gallerySection = presetSection;
       else if (sectionMode === 'custom') gallerySection = customSection.trim() || null;
-      await onSave({ ...photo, caption: caption.trim() || null, gallerySection });
+      await onSave({ ...photo, caption: caption.trim() || null, gallerySection, ...focal });
     } finally {
       setSaving(false);
     }
@@ -261,10 +269,7 @@ function EditPhotoModal({
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <CardHeader><CardTitle>Edit Photo</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div className="aspect-video bg-gray-100 rounded overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photo.url} alt={photo.caption || ''} className="w-full h-full object-contain" />
-          </div>
+          <FocalPointEditor src={photo.url} value={focal} onChange={setFocal} />
 
           <div>
             <label className="block text-sm font-medium mb-1">Caption</label>

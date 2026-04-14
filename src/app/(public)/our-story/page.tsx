@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { RichContent } from '@/components/public/RichContent';
+import { Framed } from '@/components/public/Framed';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,8 +27,16 @@ export default async function OurStoryPage() {
         {photos.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {photos.map((photo) => (
-              <div key={photo.id} className="rounded-lg overflow-hidden">
-                <img src={photo.url} alt={photo.caption || ''} className="w-full h-64 object-cover" />
+              <div key={photo.id}>
+                <div className="rounded-lg overflow-hidden h-64 bg-secondary/20">
+                  <Framed
+                    src={photo.url}
+                    alt={photo.caption || ''}
+                    focalX={photo.focalX}
+                    focalY={photo.focalY}
+                    zoom={photo.zoom}
+                  />
+                </div>
                 {photo.caption && <p className="text-sm text-foreground/60 mt-2 text-center">{photo.caption}</p>}
               </div>
             ))}

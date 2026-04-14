@@ -54,7 +54,14 @@ export default async function HomePage() {
   return (
     <div>
       <HomeBanner
-        photos={bannerPhotos.map((p) => ({ id: p.id, url: p.url, caption: p.caption }))}
+        photos={bannerPhotos.map((p) => ({
+          id: p.id,
+          url: p.url,
+          caption: p.caption,
+          focalX: p.focalX,
+          focalY: p.focalY,
+          zoom: p.zoom,
+        }))}
         style={settings.homeBannerStyle}
       >
         {hero}

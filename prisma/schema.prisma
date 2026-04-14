@@ -52,6 +52,9 @@ model WeddingPartyMember {
   description String?
   imageUrl    String?
   order       Int     @default(0)
+  focalX      Int     @default(50)
+  focalY      Int     @default(50)
+  zoom        Float   @default(1.0)
 }
 
 model Photo {
@@ -63,6 +66,9 @@ model Photo {
   isGuestUpload  Boolean  @default(false)
   approved       Boolean  @default(true)
   order          Int      @default(0)
+  focalX         Int      @default(50)
+  focalY         Int      @default(50)
+  zoom           Float    @default(1.0)
   createdAt      DateTime @default(now())
 }
 

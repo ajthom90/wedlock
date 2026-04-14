@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from 'react';
 
-type BannerPhoto = { id: string; url: string; caption: string | null };
+type BannerPhoto = {
+  id: string;
+  url: string;
+  caption: string | null;
+  focalX: number;
+  focalY: number;
+  zoom: number;
+};
 
 interface Props {
   photos: BannerPhoto[];
@@ -52,7 +59,6 @@ export function HomeBanner({ photos, style, children }: Props) {
     };
   }, [visible.length]);
 
-  // Reset index if visible shrinks beneath it.
   useEffect(() => {
     if (index >= visible.length && visible.length > 0) setIndex(0);
   }, [index, visible.length]);
@@ -63,19 +69,26 @@ export function HomeBanner({ photos, style, children }: Props) {
 
   if (style === 'hero') {
     return (
-      <section className="relative overflow-hidden" style={{ minHeight: '70vh' }}>
+      <section className="relative overflow-hidden min-h-[360px] sm:min-h-[420px] sm:h-[55vh] lg:h-[70vh] lg:min-h-[560px]">
         {visible.map((photo, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             key={photo.id}
             src={photo.url}
             alt={photo.caption || ''}
             onError={() => removePhoto(photo.id)}
             className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
-            style={{ opacity: i === index ? 1 : 0 }}
+            style={{
+              opacity: i === index ? 1 : 0,
+              objectPosition: `${photo.focalX}% ${photo.focalY}%`,
+              transform: photo.zoom > 1 ? `scale(${photo.zoom})` : undefined,
+              transformOrigin: `${photo.focalX}% ${photo.focalY}%`,
+            }}
           />
         ))}
-        <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
-        <div className="relative z-10 flex items-center justify-center py-20 md:py-32 text-center text-white [text-shadow:_0_1px_3px_rgba(0,0,0,0.5)]">
+        {/* Darker scrim on mobile where photos crop tighter and text readability matters more. */}
+        <div className="absolute inset-0 bg-black/55 sm:bg-black/45 lg:bg-black/40" aria-hidden="true" />
+        <div className="relative z-10 flex items-center justify-center min-h-[360px] sm:min-h-[420px] sm:h-[55vh] lg:h-[70vh] lg:min-h-[560px] py-12 sm:py-20 md:py-32 text-center text-white [text-shadow:_0_1px_3px_rgba(0,0,0,0.5)]">
           <div className="w-full">{children}</div>
         </div>
         {visible.length > 1 && (
@@ -96,18 +109,23 @@ export function HomeBanner({ photos, style, children }: Props) {
     );
   }
 
-  // strip style
   return (
     <>
-      <section className="relative w-full overflow-hidden" style={{ height: '35vh', minHeight: '240px' }}>
+      <section className="relative w-full overflow-hidden h-[180px] sm:h-[30vh] sm:min-h-[220px] lg:h-[35vh] lg:min-h-[280px]">
         {visible.map((photo, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             key={photo.id}
             src={photo.url}
             alt={photo.caption || ''}
             onError={() => removePhoto(photo.id)}
             className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
-            style={{ opacity: i === index ? 1 : 0 }}
+            style={{
+              opacity: i === index ? 1 : 0,
+              objectPosition: `${photo.focalX}% ${photo.focalY}%`,
+              transform: photo.zoom > 1 ? `scale(${photo.zoom})` : undefined,
+              transformOrigin: `${photo.focalX}% ${photo.focalY}%`,
+            }}
           />
         ))}
         {visible.length > 1 && (
@@ -125,7 +143,7 @@ export function HomeBanner({ photos, style, children }: Props) {
           </div>
         )}
       </section>
-      <section className="py-20 md:py-32 text-center">{children}</section>
+      <section className="py-12 sm:py-20 md:py-32 text-center">{children}</section>
     </>
   );
 }
