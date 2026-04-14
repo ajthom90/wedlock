@@ -2,6 +2,7 @@ import { getSiteSettings } from '@/lib/settings';
 import prisma from '@/lib/prisma';
 import { formatDate, formatTime } from '@/lib/utils';
 import { VenueMap } from '@/components/public/VenueMap';
+import { RichContent } from '@/components/public/RichContent';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +55,7 @@ export default async function DetailsPage() {
         {content?.schedule && (
           <section className="text-center">
             <h2 className="text-2xl font-heading font-semibold mb-4">Schedule</h2>
-            <div className="text-foreground/80 whitespace-pre-line">{content.schedule}</div>
+            <RichContent html={content.schedule} className="rich-content text-foreground/80 text-left max-w-xl mx-auto" />
           </section>
         )}
         {content?.dressCode && (

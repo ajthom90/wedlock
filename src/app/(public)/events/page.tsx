@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { formatDate, formatTime } from '@/lib/utils';
 import { VenueMap } from '@/components/public/VenueMap';
 import { EventsAccessForm } from '@/components/public/EventsAccessForm';
+import { RichContent } from '@/components/public/RichContent';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,7 +83,7 @@ export default async function EventsPage() {
                     )}
                   </div>
                   {event.description && (
-                    <p className="text-foreground/70 leading-relaxed whitespace-pre-line">{event.description}</p>
+                    <RichContent html={event.description} className="rich-content text-foreground/70 leading-relaxed" />
                   )}
                 </div>
                 {event.mapUrl && (
