@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { RichTextEditor } from '@/components/admin/RichTextEditor';
 
 interface PageContent {
   id: string;
@@ -196,11 +196,11 @@ export default function ContentPage() {
           {activeTab === 'our-story' && (
             <div>
               <label className="block text-sm font-medium mb-1">Story Text</label>
-              <Textarea
+              <RichTextEditor
                 value={story}
-                onChange={(e) => setStoryText(e.target.value)}
-                placeholder="Tell your love story..."
-                className="min-h-[300px]"
+                onChange={setStoryText}
+                placeholder="Tell your love story…"
+                minHeight="300px"
               />
             </div>
           )}
@@ -209,11 +209,11 @@ export default function ContentPage() {
             <>
               <div>
                 <label className="block text-sm font-medium mb-1">Schedule</label>
-                <Textarea
+                <RichTextEditor
                   value={schedule}
-                  onChange={(e) => setSchedule(e.target.value)}
-                  placeholder="Ceremony at 4:00 PM, Reception to follow..."
-                  className="min-h-[200px]"
+                  onChange={setSchedule}
+                  placeholder="Ceremony at 4:00 PM, Reception to follow…"
+                  minHeight="200px"
                 />
               </div>
               <div>
@@ -231,11 +231,11 @@ export default function ContentPage() {
             <>
               <div>
                 <label className="block text-sm font-medium mb-1">Travel Information</label>
-                <Textarea
+                <RichTextEditor
                   value={travelInfo}
-                  onChange={(e) => setTravelInfo(e.target.value)}
-                  placeholder="Information about getting to the venue..."
-                  className="min-h-[150px]"
+                  onChange={setTravelInfo}
+                  placeholder="Information about getting to the venue…"
+                  minHeight="150px"
                 />
               </div>
               <div>
