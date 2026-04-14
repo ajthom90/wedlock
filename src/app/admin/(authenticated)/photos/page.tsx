@@ -188,6 +188,7 @@ export default function PhotosPage() {
                     onChange={(e) => setImageFile(e.target.files?.[0] || null)}
                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-white hover:file:bg-primary/90"
                   />
+                  <p className="text-xs text-gray-500 mt-1">JPG, PNG, GIF, WebP, or HEIC — up to 10 MB. HEIC files are converted to JPG automatically.</p>
                 </div>
               ) : (
                 <div>
