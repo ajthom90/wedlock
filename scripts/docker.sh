@@ -5,6 +5,9 @@ REGISTRIES=(
   "forgejo.int.aafoods.com/ajthom90/joe-and-alex"
   "forgejo.home.njathome.net/ajthom90/joe-and-alex"
 )
+# Pick one registry to host the buildx layer cache. Only one needed since
+# the cache just accelerates *building*; both registries receive full images.
+CACHE_REF="${REGISTRIES[0]}:buildcache"
 PLATFORMS="linux/arm64,linux/amd64"
 
 # Read version from package.json
@@ -66,9 +69,13 @@ do_build() {
   echo "Building v$VERSION for $PLATFORMS..."
   local tags
   read -ra tags <<< "$(build_tags "$tag_latest")"
+  # Read-only registry cache: seeds layers if they're already cached from a
+  # prior push. No --cache-to here because --load doesn't support pushing
+  # cache metadata.
   docker buildx build \
     --platform "$PLATFORMS" \
     "${tags[@]}" \
+    --cache-from "type=registry,ref=${CACHE_REF}" \
     --load \
     .
   for reg in "${REGISTRIES[@]}"; do
@@ -85,9 +92,14 @@ do_push() {
 
   local tags
   read -ra tags <<< "$(build_tags "$tag_latest")"
+  # mode=max pushes intermediate layer metadata so subsequent builds can reuse
+  # individual stages (deps install, prisma generate, next build) instead of
+  # only the final exported image.
   docker buildx build \
     --platform "$PLATFORMS" \
     "${tags[@]}" \
+    --cache-from "type=registry,ref=${CACHE_REF}" \
+    --cache-to "type=registry,ref=${CACHE_REF},mode=max" \
     --push \
     .
   for reg in "${REGISTRIES[@]}"; do

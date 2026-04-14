@@ -4,14 +4,21 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci
+# Cache the npm tarball cache across builds so we aren't re-downloading
+# ~100MB of packages on every container rebuild. Keyed per-arch automatically
+# by BuildKit (each platform gets its own cache).
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx prisma generate
-RUN npm run build
+# Prisma downloads engine binaries into ~/.cache/prisma — cache that too.
+RUN --mount=type=cache,target=/root/.cache/prisma npx prisma generate
+# Next.js stores its incremental build cache in .next/cache. Keeping it warm
+# turns a full rebuild into an incremental one when most of the code is
+# unchanged (typical for small patches).
+RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 FROM base AS runner
 RUN apk add --no-cache libc6-compat openssl
