@@ -6,8 +6,24 @@ import { formatDate } from '@/lib/utils';
 // Root layouts in App Router can return metadata dynamically. We read the site
 // settings on every request so the browser-tab title (and description) reflect
 // whatever the couple has saved in /admin/settings without a rebuild.
+//
+// Statically-pre-rendered pages (_not-found, admin/login) call this at build
+// time, when the SQLite DB doesn't exist yet inside the Docker builder stage.
+// We swallow any Prisma error and fall back to defaults so the build can
+// finish; at runtime the dynamic public pages re-invoke this function and
+// pick up the real values from the live DB.
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getSiteSettings();
+  const fallback: Metadata = {
+    title: 'Our Wedding',
+    description: 'Join us for our special day',
+  };
+
+  let settings: Awaited<ReturnType<typeof getSiteSettings>>;
+  try {
+    settings = await getSiteSettings();
+  } catch {
+    return fallback;
+  }
 
   const customTitle = settings.siteTitle?.trim();
   const customDescription = settings.siteDescription?.trim();
@@ -26,7 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     title: customTitle || autoTitle,
-    description: customDescription || 'Join us for our special day',
+    description: customDescription || fallback.description,
   };
 }
 
