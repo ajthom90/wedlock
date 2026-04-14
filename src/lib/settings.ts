@@ -27,6 +27,8 @@ export interface SiteSettings {
   homeBannerStyle: 'hero' | 'strip';
   siteTitle: string;
   siteDescription: string;
+  venueLat: string;
+  venueLng: string;
 }
 
 export interface FeatureSettings {
@@ -68,6 +70,10 @@ const defaultSite: SiteSettings = {
   // (couple names + wedding date for the title, "Join us..." for description).
   siteTitle: '',
   siteDescription: '',
+  // Optional lat/lng for the venue so the homepage can show a weather
+  // forecast in the final week before the wedding.
+  venueLat: '',
+  venueLng: '',
 };
 
 const defaultFeatures: FeatureSettings = {

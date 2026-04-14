@@ -27,6 +27,8 @@ interface SiteSettings {
   homeBannerStyle: 'hero' | 'strip';
   siteTitle: string;
   siteDescription: string;
+  venueLat: string;
+  venueLng: string;
 }
 
 export default function SettingsPage() {
@@ -47,6 +49,8 @@ export default function SettingsPage() {
     homeBannerStyle: 'strip',
     siteTitle: '',
     siteDescription: '',
+    venueLat: '',
+    venueLng: '',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -167,6 +171,27 @@ export default function SettingsPage() {
             />
             <p className="text-xs text-gray-500 mt-1">Paste any Google Maps link or a venue address. We&apos;ll convert it for display.</p>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Venue latitude</label>
+              <Input
+                value={settings.venueLat}
+                onChange={(e) => update('venueLat', e.target.value)}
+                placeholder="44.9778"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Venue longitude</label>
+              <Input
+                value={settings.venueLng}
+                onChange={(e) => update('venueLng', e.target.value)}
+                placeholder="-93.2650"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 -mt-2">
+            Optional — enables a weather forecast under the countdown in the final week. Right-click the venue on Google Maps, click the coordinates to copy both at once.
+          </p>
           <p className="text-sm text-gray-500">Manage event dates and venues in the Events section.</p>
         </CardContent>
       </Card>

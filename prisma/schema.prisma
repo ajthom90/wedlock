@@ -184,6 +184,20 @@ model GiftItem {
   order        Int     @default(0)
 }
 
+// Vendor contact directory — private admin rolodex for photographer, DJ,
+// florist, officiant, caterer, etc.
+model VendorContact {
+  id        String   @id @default(uuid())
+  name      String
+  role      String
+  phone     String?
+  email     String?
+  website   String?
+  notes     String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
 // Admin notifications (#2)
 model Notification {
   id        String   @id @default(uuid())

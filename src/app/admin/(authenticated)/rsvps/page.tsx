@@ -47,6 +47,9 @@ export default function RsvpsPage() {
   const [editSongRequests, setEditSongRequests] = useState('');
   const [editDietaryNotes, setEditDietaryNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [dietaryCopied, setDietaryCopied] = useState(false);
+  const [emailsCopied, setEmailsCopied] = useState(false);
+  const [showPending, setShowPending] = useState(false);
 
   const fetchInvitations = useCallback(async () => {
     try {
@@ -127,6 +130,34 @@ export default function RsvpsPage() {
     }
   };
 
+  const copyDietarySummary = async () => {
+    // One-line-per-guest rollup of every dietary restriction captured in the
+    // RSVP flow. Formatted for the caterer.
+    const lines = invitations
+      .filter((inv) => inv.response?.dietaryNotes?.trim())
+      .map((inv) => `${inv.householdName}: ${inv.response!.dietaryNotes!.trim()}`);
+    if (lines.length === 0) {
+      alert('No dietary notes to copy yet.');
+      return;
+    }
+    await navigator.clipboard.writeText(lines.join('\n'));
+    setDietaryCopied(true);
+    setTimeout(() => setDietaryCopied(false), 2000);
+  };
+
+  const copyPendingEmails = async () => {
+    const emails = invitations
+      .filter((inv) => !inv.response && inv.email)
+      .map((inv) => inv.email as string);
+    if (emails.length === 0) {
+      alert('No pending invitations have an email on file.');
+      return;
+    }
+    await navigator.clipboard.writeText(emails.join(', '));
+    setEmailsCopied(true);
+    setTimeout(() => setEmailsCopied(false), 2000);
+  };
+
   const exportCsv = () => {
     const headers = ['Household', 'Code', 'Email', 'Status', 'Guest Count', 'Guests', 'Message', 'Song Requests', 'Dietary Notes', 'Submitted At'];
     const rows = invitations.map((inv) => [
@@ -173,9 +204,17 @@ export default function RsvpsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-2">
         <h1 className="text-3xl font-bold">RSVPs</h1>
-        <Button variant="outline" onClick={exportCsv}>Export CSV</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={copyDietarySummary}>
+            {dietaryCopied ? 'Copied ✓' : 'Copy dietary summary'}
+          </Button>
+          <Button variant="outline" onClick={copyPendingEmails}>
+            {emailsCopied ? 'Copied ✓' : 'Copy pending emails'}
+          </Button>
+          <Button variant="outline" onClick={exportCsv}>Export CSV</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -212,6 +251,33 @@ export default function RsvpsPage() {
           </span>
           <Button size="sm" variant="ghost" onClick={() => setFilter('all')}>Clear</Button>
         </div>
+      )}
+
+      {stats.pending > 0 && (
+        <Card>
+          <CardHeader className="cursor-pointer" onClick={() => setShowPending((s) => !s)}>
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-base">
+                Not yet responded ({stats.pending})
+              </CardTitle>
+              <span className="text-sm text-gray-500">{showPending ? '▲ Hide' : '▼ Show'}</span>
+            </div>
+          </CardHeader>
+          {showPending && (
+            <CardContent>
+              <ul className="text-sm space-y-1">
+                {invitations
+                  .filter((inv) => !inv.response)
+                  .map((inv) => (
+                    <li key={inv.id} className="flex justify-between gap-4">
+                      <span className="font-medium">{inv.householdName}</span>
+                      <span className="text-gray-500">{inv.email || <em className="text-gray-400">no email on file</em>}</span>
+                    </li>
+                  ))}
+              </ul>
+            </CardContent>
+          )}
+        </Card>
       )}
 
       <div className="space-y-3">

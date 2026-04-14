@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { formatDate, formatTime } from '@/lib/utils';
 import { LiveCountdown } from '@/components/public/LiveCountdown';
 import { HomeBanner } from '@/components/public/HomeBanner';
+import { WeatherForecast } from '@/components/public/WeatherForecast';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +72,11 @@ export default async function HomePage() {
           <div className="container mx-auto px-4 text-center">
             <h2 className="text-3xl font-heading mb-8">Counting Down</h2>
             <LiveCountdown weddingDate={settings.weddingDate} weddingTime={settings.weddingTime || undefined} />
+            <WeatherForecast
+              date={settings.weddingDate}
+              lat={settings.venueLat}
+              lng={settings.venueLng}
+            />
           </div>
         </section>
       )}
