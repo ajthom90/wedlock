@@ -192,60 +192,6 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Home Banner</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-gray-500">
-            Upload banner photos under <strong>Photos</strong> with <em>Gallery Section</em> set to <code className="bg-gray-100 px-1 rounded">home-banner</code>. They&apos;ll cross-fade on the home page.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className={`flex cursor-pointer flex-col gap-2 rounded-lg border p-4 transition-colors ${settings.homeBannerStyle === 'strip' ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200 hover:border-gray-300'}`}>
-              <div className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="homeBannerStyle"
-                  value="strip"
-                  checked={settings.homeBannerStyle === 'strip'}
-                  onChange={() => update('homeBannerStyle', 'strip')}
-                  className="h-4 w-4"
-                />
-                <span className="font-medium">Strip above text</span>
-              </div>
-              <svg viewBox="0 0 200 120" className="w-full" role="img" aria-label="Strip layout preview">
-                <rect x="0" y="0" width="200" height="120" fill="#f9fafb" />
-                <rect x="10" y="10" width="180" height="40" fill="#d1d5db" />
-                <text x="100" y="75" textAnchor="middle" fontSize="10" fill="#374151">We&apos;re Getting Married</text>
-                <text x="100" y="92" textAnchor="middle" fontSize="8" fill="#6b7280">[ RSVP Now ]</text>
-              </svg>
-              <p className="text-xs text-gray-500">Photos sit above the hero text in their own block.</p>
-            </label>
-
-            <label className={`flex cursor-pointer flex-col gap-2 rounded-lg border p-4 transition-colors ${settings.homeBannerStyle === 'hero' ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200 hover:border-gray-300'}`}>
-              <div className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="homeBannerStyle"
-                  value="hero"
-                  checked={settings.homeBannerStyle === 'hero'}
-                  onChange={() => update('homeBannerStyle', 'hero')}
-                  className="h-4 w-4"
-                />
-                <span className="font-medium">Photo behind text</span>
-              </div>
-              <svg viewBox="0 0 200 120" className="w-full" role="img" aria-label="Hero layout preview">
-                <rect x="0" y="0" width="200" height="120" fill="#d1d5db" />
-                <rect x="0" y="0" width="200" height="120" fill="#000" opacity="0.3" />
-                <text x="100" y="55" textAnchor="middle" fontSize="10" fill="#fff">We&apos;re Getting Married</text>
-                <text x="100" y="75" textAnchor="middle" fontSize="8" fill="#fff">[ RSVP Now ]</text>
-              </svg>
-              <p className="text-xs text-gray-500">Photos fill the hero with text overlaid on top.</p>
-            </label>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>RSVP Settings</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
