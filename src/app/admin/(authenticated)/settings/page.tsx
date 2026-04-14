@@ -24,6 +24,7 @@ interface SiteSettings {
   qrCardWidth: number;
   qrCardHeight: number;
   sitePassword: string;
+  homeBannerStyle: 'hero' | 'strip';
 }
 
 export default function SettingsPage() {
@@ -41,6 +42,7 @@ export default function SettingsPage() {
     qrCardWidth: 2,
     qrCardHeight: 4,
     sitePassword: '',
+    homeBannerStyle: 'strip',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

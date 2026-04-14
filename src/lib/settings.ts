@@ -24,6 +24,7 @@ export interface SiteSettings {
   qrCardHeight: number;
   sitePassword: string;
   mapUrl: string;
+  homeBannerStyle: 'hero' | 'strip';
 }
 
 export interface FeatureSettings {
@@ -60,6 +61,7 @@ const defaultSite: SiteSettings = {
   qrCardHeight: 4,
   sitePassword: '',
   mapUrl: '',
+  homeBannerStyle: 'strip',
 };
 
 const defaultFeatures: FeatureSettings = {
@@ -110,6 +112,8 @@ export async function getSiteSettings(): Promise<SiteSettings> {
         (site as any)[key] = setting.value === 'true';
       } else if (key === 'qrCardWidth' || key === 'qrCardHeight') {
         (site as any)[key] = parseFloat(setting.value) || defaultSite[key];
+      } else if (key === 'homeBannerStyle') {
+        (site as any)[key] = setting.value === 'hero' ? 'hero' : 'strip';
       } else {
         (site as any)[key] = setting.value;
       }
