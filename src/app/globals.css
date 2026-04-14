@@ -67,13 +67,24 @@
   float: none;
 }
 @media (max-width: 640px) {
-  /* On narrow screens floating a half-width image makes text unreadable —
-     fall back to centered block layout for small viewports. */
+  /* On narrow screens:
+     - Ignore the editor's inline width (25/50/75/100%). A 25%-wide photo on
+       a 375px phone is ~90px — unusable. Force width: auto so images render
+       at their natural size, clamped by the container.
+     - Drop floats. Text wrapping against a half-width image on a narrow
+       column leaves too-narrow text lines.
+     - Centered block layout for everything so the photo is always prominent.
+     !important overrides the inline style attribute that Tiptap's width
+     extension writes on the <img>. */
+  .rich-content img,
   .rich-content img.align-left,
-  .rich-content img.align-right {
-    float: none;
-    display: block;
+  .rich-content img.align-right,
+  .rich-content img.align-center {
+    width: auto !important;
     max-width: 100%;
+    float: none !important;
+    display: block;
     margin: 1rem auto;
+    clear: both;
   }
 }
