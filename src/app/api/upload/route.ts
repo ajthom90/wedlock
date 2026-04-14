@@ -70,6 +70,13 @@ export async function POST(request: Request) {
       });
       buffer = Buffer.from(converted);
       ext = 'jpg';
+      if (buffer.length > maxBytes) {
+        const maxMb = maxBytes / (1024 * 1024);
+        return NextResponse.json(
+          { error: `Converted JPEG exceeds size limit of ${maxMb}MB` },
+          { status: 400 },
+        );
+      }
     }
 
     const timestamp = Date.now();

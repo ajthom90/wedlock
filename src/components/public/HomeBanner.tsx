@@ -23,9 +23,33 @@ export function HomeBanner({ photos, style, children }: Props) {
 
   useEffect(() => {
     if (visible.length <= 1) return;
-    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    const id = setInterval(() => setIndex((i) => (i + 1) % visible.length), ROTATE_MS);
-    return () => clearInterval(id);
+    if (typeof window === 'undefined') return;
+
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    let id: ReturnType<typeof setInterval> | null = null;
+
+    const startInterval = () => {
+      if (id !== null) return;
+      id = setInterval(() => setIndex((i) => (i + 1) % visible.length), ROTATE_MS);
+    };
+    const stopInterval = () => {
+      if (id !== null) {
+        clearInterval(id);
+        id = null;
+      }
+    };
+    const sync = () => {
+      if (mq?.matches) stopInterval();
+      else startInterval();
+    };
+
+    sync();
+    mq?.addEventListener?.('change', sync);
+
+    return () => {
+      mq?.removeEventListener?.('change', sync);
+      stopInterval();
+    };
   }, [visible.length]);
 
   // Reset index if visible shrinks beneath it.
@@ -55,12 +79,12 @@ export function HomeBanner({ photos, style, children }: Props) {
           <div className="w-full">{children}</div>
         </div>
         {visible.length > 1 && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2" role="tablist" aria-label="Banner photo navigation">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2" aria-label="Banner photo navigation">
             {visible.map((photo, i) => (
               <button
                 key={photo.id}
-                role="tab"
-                aria-selected={i === index}
+                type="button"
+                aria-current={i === index ? 'true' : undefined}
                 aria-label={`Show photo ${i + 1} of ${visible.length}`}
                 onClick={() => setIndex(i)}
                 className={`h-2 w-2 rounded-full transition-all ${i === index ? 'bg-white w-6' : 'bg-white/50 hover:bg-white/75'}`}
@@ -87,12 +111,12 @@ export function HomeBanner({ photos, style, children }: Props) {
           />
         ))}
         {visible.length > 1 && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex gap-2" role="tablist" aria-label="Banner photo navigation">
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex gap-2" aria-label="Banner photo navigation">
             {visible.map((photo, i) => (
               <button
                 key={photo.id}
-                role="tab"
-                aria-selected={i === index}
+                type="button"
+                aria-current={i === index ? 'true' : undefined}
                 aria-label={`Show photo ${i + 1} of ${visible.length}`}
                 onClick={() => setIndex(i)}
                 className={`h-2 w-2 rounded-full transition-all ${i === index ? 'bg-white w-6' : 'bg-white/60 hover:bg-white/80'}`}

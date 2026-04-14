@@ -17,6 +17,16 @@ const ALLOWED_TAGS = [
 ];
 const ALLOWED_ATTR = ['href', 'target', 'rel', 'src', 'alt'];
 
+// Force target and rel on every anchor element, regardless of what the input
+// provided. DOMPurify's default behavior is to pass attributes through; we
+// want stronger guarantees on links.
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'A') {
+    node.setAttribute('target', '_blank');
+    node.setAttribute('rel', 'noopener noreferrer');
+  }
+});
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
@@ -43,14 +53,12 @@ export function renderContent(input: string | null | undefined): string {
   const trimmed = input.trim();
   if (!trimmed) return '';
 
-  // Legacy plain-text content doesn't start with an HTML tag.
   const isHtml = trimmed.startsWith('<');
   const html = isHtml ? trimmed : plainTextToHtml(trimmed);
 
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
-    // Block inline style (cheapest XSS vector).
     FORBID_ATTR: ['style'],
   });
 }

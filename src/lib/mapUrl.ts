@@ -83,6 +83,8 @@ async function resolveImpl(input: string): Promise<string | null> {
   return parseParsedUrl(url);
 }
 
-// Test helper: expose cache for clearing between tests.
-// @ts-expect-error - globalThis augmentation for tests only
-globalThis.__mapUrlCache = cache;
+// Test helper: expose cache for clearing between tests (test environments only).
+if (process.env.NODE_ENV === 'test') {
+  // @ts-expect-error - globalThis augmentation for tests only
+  globalThis.__mapUrlCache = cache;
+}

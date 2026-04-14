@@ -63,4 +63,18 @@ describe('renderContent', () => {
     expect(out).toContain('<img');
     expect(out).toContain('src="/uploads/x.jpg"');
   });
+
+  it('forces target="_blank" and rel="noopener noreferrer" on links', () => {
+    const input = '<a href="https://example.com">click</a>';
+    const out = renderContent(input);
+    expect(out).toContain('target="_blank"');
+    expect(out).toContain('rel="noopener noreferrer"');
+  });
+
+  it('overrides existing target and rel with safe defaults', () => {
+    const input = '<a href="https://example.com" target="_self" rel="bookmark">click</a>';
+    const out = renderContent(input);
+    expect(out).toContain('target="_blank"');
+    expect(out).toContain('rel="noopener noreferrer"');
+  });
 });
