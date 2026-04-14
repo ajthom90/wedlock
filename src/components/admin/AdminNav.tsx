@@ -11,7 +11,7 @@ const navItems = [
   { href: '/admin/rsvp-config', label: 'RSVP Form', icon: '📝' },
   { href: '/admin/guestbook', label: 'Guest Book', icon: '📖' },
   { href: '/admin/wedding-party', label: 'Wedding Party', icon: '👥' },
-  { href: '/admin/photos', label: 'Media', icon: '📷' },
+  { href: '/admin/media', label: 'Media', icon: '📷' },
   { href: '/admin/banner', label: 'Home Banner', icon: '🏞️' },
   { href: '/admin/content', label: 'Content', icon: '📄' },
   { href: '/admin/theme', label: 'Theme', icon: '🎨' },
