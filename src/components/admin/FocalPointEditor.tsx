@@ -102,14 +102,28 @@ export function FocalPointEditor({ src, value, onChange }: Props) {
 
       <div>
         <p className="text-sm font-medium mb-2">Preview</p>
-        <div className="grid grid-cols-3 gap-3">
-          <PreviewTile label="Banner" aspectClass="aspect-video">
+        <p className="text-xs text-gray-500 mb-3">
+          The banner crops differently on desktop vs mobile. Content visible in
+          <em className="font-semibold"> both</em> banner previews is always shown.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/*
+            Aspect ratios match what HomeBanner actually renders at the common
+            breakpoints:
+              - Desktop 1440 x 70vh -> ~2.26:1
+              - Mobile  375 x 360   -> 1:1
+            Hitting these two covers the worst-case framing differences.
+          */}
+          <PreviewTile label="Banner (desktop)" aspectClass="aspect-[2.3/1]">
+            <Framed src={src} focalX={value.focalX} focalY={value.focalY} zoom={value.zoom} />
+          </PreviewTile>
+          <PreviewTile label="Banner (mobile)" aspectClass="aspect-square">
             <Framed src={src} focalX={value.focalX} focalY={value.focalY} zoom={value.zoom} />
           </PreviewTile>
           <PreviewTile label="Wedding Party" aspectClass="aspect-square" rounded>
             <Framed src={src} focalX={value.focalX} focalY={value.focalY} zoom={value.zoom} />
           </PreviewTile>
-          <PreviewTile label="Story Card" aspectClass="aspect-[4/3]">
+          <PreviewTile label="Story Card" aspectClass="aspect-[3/2]">
             <Framed src={src} focalX={value.focalX} focalY={value.focalY} zoom={value.zoom} />
           </PreviewTile>
         </div>
