@@ -270,12 +270,13 @@ export default function EventsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Map Embed URL</label>
+                <label className="block text-sm font-medium mb-1">Google Maps link</label>
                 <Input
                   value={form.mapUrl}
                   onChange={(e) => updateForm('mapUrl', e.target.value)}
-                  placeholder="Google Maps embed URL"
+                  placeholder="https://maps.app.goo.gl/..."
                 />
+                <p className="text-xs text-gray-500 mt-1">Paste any Google Maps link or a venue address. We&apos;ll convert it for display.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Description</label>

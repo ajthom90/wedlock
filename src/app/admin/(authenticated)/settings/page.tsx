@@ -159,6 +159,31 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Venue Name</label>
+            <Input
+              value={settings.venueName}
+              onChange={(e) => update('venueName', e.target.value)}
+              placeholder="e.g., The Riverhouse Estate"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Venue Address</label>
+            <Input
+              value={settings.venueAddress}
+              onChange={(e) => update('venueAddress', e.target.value)}
+              placeholder="Street, City, State ZIP"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Google Maps link</label>
+            <Input
+              value={settings.mapUrl}
+              onChange={(e) => update('mapUrl', e.target.value)}
+              placeholder="https://maps.app.goo.gl/..."
+            />
+            <p className="text-xs text-gray-500 mt-1">Paste any Google Maps link or a venue address. We&apos;ll convert it for display.</p>
+          </div>
           <p className="text-sm text-gray-500">Manage event dates and venues in the Events section.</p>
         </CardContent>
       </Card>
