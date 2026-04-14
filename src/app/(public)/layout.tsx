@@ -20,6 +20,7 @@ const fallbackNavItems = [
   { href: '/faq', label: 'FAQ' },
   { href: '/seating', label: 'Seating' },
   { href: '/guestbook', label: 'Guest Book' },
+  { href: '/trivia', label: 'Trivia' },
   { href: '/rsvp', label: 'RSVP' },
 ];
 

@@ -25,6 +25,8 @@ const navItems = [
   { href: '/admin/story-timeline', label: 'Story Timeline', icon: '📜' },
   { href: '/admin/shuttles', label: 'Shuttles', icon: '🚐' },
   { href: '/admin/honeymoon', label: 'Honeymoon Fund', icon: '🏝️' },
+  { href: '/admin/photo-wall', label: 'Photo Wall', icon: '🖼️' },
+  { href: '/admin/trivia', label: 'Trivia', icon: '❔' },
   { href: '/admin/navigation', label: 'Navigation', icon: '🧭' },
   { href: '/admin/features', label: 'Features', icon: '🔧' },
   { href: '/admin/settings', label: 'Settings', icon: '⚙️' },

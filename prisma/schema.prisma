@@ -283,6 +283,18 @@ model VendorContact {
   createdAt DateTime @default(now())
 }
 
+// Trivia game — couples author multiple-choice questions about themselves
+// and guests play at the reception.
+model TriviaQuestion {
+  id           String   @id @default(uuid())
+  question     String
+  choices      String   // JSON-encoded string[]
+  correctIndex Int      @default(0)
+  explanation  String?
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
 // Admin notifications (#2)
 model Notification {
   id        String   @id @default(uuid())
