@@ -77,4 +77,49 @@ describe('renderContent', () => {
     expect(out).toContain('target="_blank"');
     expect(out).toContain('rel="noopener noreferrer"');
   });
+
+  it('allows text-align via inline style', () => {
+    const input = '<p style="text-align: center">centered</p>';
+    expect(renderContent(input)).toContain('text-align: center');
+  });
+
+  it('allows font-family via inline style', () => {
+    const input = '<span style="font-family: Playfair Display">styled</span>';
+    expect(renderContent(input)).toContain('font-family: Playfair Display');
+  });
+
+  it('allows line-height via inline style', () => {
+    const input = '<p style="line-height: 1.8">relaxed</p>';
+    expect(renderContent(input)).toContain('line-height: 1.8');
+  });
+
+  it('strips disallowed CSS properties from style attribute', () => {
+    const input = '<p style="position: fixed; top: 0; left: 0; text-align: center">abuse</p>';
+    const out = renderContent(input);
+    expect(out).not.toContain('position');
+    expect(out).not.toContain('top:');
+    expect(out).not.toContain('left:');
+    expect(out).toContain('text-align: center');
+  });
+
+  it('removes style attribute entirely when no properties remain', () => {
+    const input = '<p style="position: absolute; z-index: 9999">abuse</p>';
+    const out = renderContent(input);
+    expect(out).not.toContain('style=');
+  });
+
+  it('allows class attribute and span tag', () => {
+    const input = '<p class="my-class">text</p><span class="another">inline</span>';
+    const out = renderContent(input);
+    expect(out).toContain('class="my-class"');
+    expect(out).toContain('<span');
+    expect(out).toContain('class="another"');
+  });
+
+  it('still blocks expression() inside allowed style', () => {
+    // DOMPurify's default CSS sanitizer should drop the entire malformed style.
+    const input = '<p style="text-align: expression(alert(1))">sneaky</p>';
+    const out = renderContent(input);
+    expect(out).not.toContain('expression');
+  });
 });
