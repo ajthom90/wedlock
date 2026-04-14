@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { RichTextEditor } from '@/components/admin/RichTextEditor';
 
 interface Event {
   id: string;
@@ -280,11 +280,11 @@ export default function EventsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Description</label>
-                <Textarea
+                <RichTextEditor
                   value={form.description}
-                  onChange={(e) => updateForm('description', e.target.value)}
+                  onChange={(html) => updateForm('description', html)}
                   placeholder="Event description"
-                  rows={3}
+                  minHeight="150px"
                 />
               </div>
             </CardContent>
