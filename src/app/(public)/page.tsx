@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getSiteSettings } from '@/lib/settings';
+import { getSiteSettings, getFeatures } from '@/lib/settings';
 import prisma from '@/lib/prisma';
 import { formatDate, formatTime } from '@/lib/utils';
 import { LiveCountdown } from '@/components/public/LiveCountdown';
@@ -9,12 +9,13 @@ import { WeatherForecast } from '@/components/public/WeatherForecast';
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const [settings, bannerPhotos] = await Promise.all([
+  const [settings, bannerPhotos, features] = await Promise.all([
     getSiteSettings(),
     prisma.photo.findMany({
       where: { gallerySection: 'home-banner', approved: true },
       orderBy: { order: 'asc' },
     }),
+    getFeatures(),
   ]);
 
   const coupleTitle =
@@ -72,11 +73,13 @@ export default async function HomePage() {
           <div className="container mx-auto px-4 text-center">
             <h2 className="text-3xl font-heading mb-8">Counting Down</h2>
             <LiveCountdown weddingDate={settings.weddingDate} weddingTime={settings.weddingTime || undefined} />
-            <WeatherForecast
-              date={settings.weddingDate}
-              lat={settings.venueLat}
-              lng={settings.venueLng}
-            />
+            {features.weatherWidget && (
+              <WeatherForecast
+                date={settings.weddingDate}
+                lat={settings.venueLat}
+                lng={settings.venueLng}
+              />
+            )}
           </div>
         </section>
       )}

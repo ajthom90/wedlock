@@ -1,8 +1,12 @@
+import { notFound } from 'next/navigation';
 import { TriviaGame } from '@/components/public/TriviaGame';
+import { getFeatures } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
-export default function TriviaPage() {
+export default async function TriviaPage() {
+  const features = await getFeatures();
+  if (!features.trivia) notFound();
   return (
     <div className="container mx-auto px-4 py-16">
       <h1 className="text-4xl md:text-5xl font-heading font-bold text-center text-primary mb-4">

@@ -27,7 +27,12 @@ export async function GET(request: Request) {
       invitation,
       rsvpOptions: options.map((o) => ({ ...o, choices: JSON.parse(o.choices) })),
       settings: { rsvpDeadline: settings.rsvpDeadline, rsvpCloseAfterDeadline: settings.rsvpCloseAfterDeadline },
-      features: { perGuestSelection: features.perGuestSelection, songRequests: features.songRequests, dietaryNotes: features.dietaryNotes },
+      features: {
+        perGuestSelection: features.perGuestSelection,
+        songRequests: features.songRequests,
+        dietaryNotes: features.dietaryNotes,
+        rsvpAddress: features.rsvpAddress,
+      },
     });
   } catch (error) {
     console.error('Error fetching invitation:', error);

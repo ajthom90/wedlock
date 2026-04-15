@@ -33,12 +33,30 @@ export interface SiteSettings {
 }
 
 export interface FeatureSettings {
+  // RSVP form toggles
   perGuestSelection: boolean;
   songRequests: boolean;
   dietaryNotes: boolean;
-  guestBook: string;
-  guestPhotoUpload: boolean;
   plusOnes: boolean;
+  rsvpAddress: boolean;
+
+  // Public site modules
+  weatherWidget: boolean;
+  storyTimeline: boolean;
+  transportation: boolean;
+  honeymoonFund: boolean;
+  photoWall: boolean;
+  trivia: boolean;
+  guestPhotoUpload: boolean;
+
+  // Guest book has three modes (off/public/moderated) — kept as a string.
+  guestBook: string;
+
+  // Admin-side tools
+  vendorContacts: boolean;
+  budgetTracker: boolean;
+
+  // Site access
   sitePasswordEnabled: boolean;
 }
 
@@ -79,12 +97,29 @@ const defaultSite: SiteSettings = {
 };
 
 const defaultFeatures: FeatureSettings = {
+  // RSVP toggles — existing defaults preserved.
   perGuestSelection: true,
   songRequests: true,
   dietaryNotes: true,
-  guestBook: 'off',
-  guestPhotoUpload: false,
   plusOnes: false,
+  rsvpAddress: true,
+
+  // Public modules — default ON so the new roadmap features are discoverable;
+  // the couple can turn each off when they decide not to use it.
+  weatherWidget: true,
+  storyTimeline: true,
+  transportation: true,
+  honeymoonFund: true,
+  photoWall: true,
+  trivia: true,
+  guestPhotoUpload: false,
+
+  guestBook: 'off',
+
+  // Admin-side tools — default ON so the nav icons appear until hidden.
+  vendorContacts: true,
+  budgetTracker: true,
+
   sitePasswordEnabled: false,
 };
 
@@ -152,12 +187,12 @@ export async function getFeatures(): Promise<FeatureSettings> {
   const features = { ...defaultFeatures };
   for (const setting of settings) {
     const key = setting.key.replace('feature.', '') as keyof FeatureSettings;
-    if (key in features) {
-      if (key === 'guestBook') {
-        (features as any)[key] = setting.value;
-      } else if (key === 'perGuestSelection' || key === 'songRequests' || key === 'dietaryNotes' || key === 'guestPhotoUpload' || key === 'plusOnes' || key === 'sitePasswordEnabled') {
-        (features as any)[key] = setting.value === 'true';
-      }
+    if (!(key in features)) continue;
+    if (key === 'guestBook') {
+      (features as any)[key] = setting.value;
+    } else {
+      // Every other feature is a boolean stored as "true"/"false".
+      (features as any)[key] = setting.value === 'true';
     }
   }
   return features;

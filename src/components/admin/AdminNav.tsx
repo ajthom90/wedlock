@@ -4,12 +4,20 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
-const navItems = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: string;
+  // Feature flag that gates this item. If undefined, always shown.
+  feature?: string;
+}
+
+const navItems: NavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: '📊' },
   { href: '/admin/invitations', label: 'Invitations', icon: '💌' },
   { href: '/admin/rsvps', label: 'RSVPs', icon: '✓' },
   { href: '/admin/rsvp-config', label: 'RSVP Form', icon: '📝' },
-  { href: '/admin/guestbook', label: 'Guest Book', icon: '📖' },
+  { href: '/admin/guestbook', label: 'Guest Book', icon: '📖', feature: 'guestBook' },
   { href: '/admin/wedding-party', label: 'Wedding Party', icon: '👥' },
   { href: '/admin/media', label: 'Media', icon: '📷' },
   { href: '/admin/banner', label: 'Home Banner', icon: '🏞️' },
@@ -20,13 +28,13 @@ const navItems = [
   { href: '/admin/faq', label: 'FAQ', icon: '❓' },
   { href: '/admin/seating', label: 'Seating', icon: '🪑' },
   { href: '/admin/gifts', label: 'Gifts & Registry', icon: '🎁' },
-  { href: '/admin/vendors', label: 'Vendors', icon: '📇' },
-  { href: '/admin/budget', label: 'Budget', icon: '💵' },
-  { href: '/admin/story-timeline', label: 'Story Timeline', icon: '📜' },
-  { href: '/admin/shuttles', label: 'Shuttles', icon: '🚐' },
-  { href: '/admin/honeymoon', label: 'Honeymoon Fund', icon: '🏝️' },
-  { href: '/admin/photo-wall', label: 'Photo Wall', icon: '🖼️' },
-  { href: '/admin/trivia', label: 'Trivia', icon: '❔' },
+  { href: '/admin/vendors', label: 'Vendors', icon: '📇', feature: 'vendorContacts' },
+  { href: '/admin/budget', label: 'Budget', icon: '💵', feature: 'budgetTracker' },
+  { href: '/admin/story-timeline', label: 'Story Timeline', icon: '📜', feature: 'storyTimeline' },
+  { href: '/admin/shuttles', label: 'Shuttles', icon: '🚐', feature: 'transportation' },
+  { href: '/admin/honeymoon', label: 'Honeymoon Fund', icon: '🏝️', feature: 'honeymoonFund' },
+  { href: '/admin/photo-wall', label: 'Photo Wall', icon: '🖼️', feature: 'photoWall' },
+  { href: '/admin/trivia', label: 'Trivia', icon: '❔', feature: 'trivia' },
   { href: '/admin/navigation', label: 'Navigation', icon: '🧭' },
   { href: '/admin/features', label: 'Features', icon: '🔧' },
   { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
@@ -36,6 +44,7 @@ export function AdminNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [features, setFeatures] = useState<Record<string, unknown>>({});
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -49,17 +58,39 @@ export function AdminNav() {
     }
   }, []);
 
+  const fetchFeatures = useCallback(async () => {
+    try {
+      const res = await fetch('/api/features');
+      if (res.ok) setFeatures(await res.json());
+    } catch {
+      // If features fail to load, show everything (fail-open to avoid a
+      // confusing empty sidebar).
+    }
+  }, []);
+
   useEffect(() => {
     fetchNotifications();
+    fetchFeatures();
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [fetchNotifications, fetchFeatures]);
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/admin/login');
     router.refresh();
   };
+
+  // Filter out items whose feature flag is explicitly disabled. Unknown keys
+  // (when features haven't loaded yet) pass through so the sidebar shows up
+  // immediately on first paint rather than flickering.
+  const visibleItems = navItems.filter((item) => {
+    if (!item.feature) return true;
+    const val = features[item.feature];
+    if (val === undefined || val === null) return true;
+    if (typeof val === 'string') return val !== 'off';  // guestBook
+    return !!val;
+  });
 
   return (
     <nav className="bg-gray-800 text-white w-64 min-h-screen flex flex-col">
@@ -80,8 +111,8 @@ export function AdminNav() {
           </button>
         </div>
       </div>
-      <div className="flex-1 py-4">
-        {navItems.map((item) => {
+      <div className="flex-1 py-4 overflow-y-auto">
+        {visibleItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
           return (
             <Link key={item.href} href={item.href} className={cn('flex items-center gap-3 px-4 py-3 text-sm transition-colors', isActive ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white')}>

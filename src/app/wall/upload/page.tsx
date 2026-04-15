@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation';
 import { WallUploadForm } from '@/components/public/WallUploadForm';
 import { getSiteSettings, getFeatures } from '@/lib/settings';
 
@@ -7,6 +8,7 @@ export const dynamic = 'force-dynamic';
 // guests are at a wedding, not trying to parse a UI.
 export default async function WallUploadPage() {
   const [settings, features] = await Promise.all([getSiteSettings(), getFeatures()]);
+  if (!features.photoWall) notFound();
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

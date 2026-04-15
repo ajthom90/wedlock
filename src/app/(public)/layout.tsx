@@ -33,9 +33,20 @@ export default async function PublicLayout({ children }: { children: React.React
     prisma.navItem.findMany({ where: { visible: true }, orderBy: { order: 'asc' } }),
   ]);
 
-  const navItems = dbNavItems.length > 0
-    ? dbNavItems.map((item) => ({ href: item.href, label: item.label }))
-    : fallbackNavItems;
+  // Nav items gated by the corresponding feature flag — when the flag is off,
+  // both the page and the link disappear. Applied to both the custom DB nav
+  // (admin can still delete the item themselves) and the fallback list so
+  // newly-disabled features vanish without requiring nav edits.
+  const disallowedPaths = new Set<string>();
+  if (!features.transportation) disallowedPaths.add('/transportation');
+  if (!features.trivia) disallowedPaths.add('/trivia');
+  if (features.guestBook === 'off') disallowedPaths.add('/guestbook');
+
+  const navItems = (
+    dbNavItems.length > 0
+      ? dbNavItems.map((item) => ({ href: item.href, label: item.label }))
+      : fallbackNavItems
+  ).filter((item) => !disallowedPaths.has(item.href));
 
   const coupleTitle = settings.coupleName1 && settings.coupleName2
     ? `${settings.coupleName1} & ${settings.coupleName2}`

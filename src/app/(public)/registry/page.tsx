@@ -1,13 +1,14 @@
 import prisma from '@/lib/prisma';
-import { getSiteSettings } from '@/lib/settings';
+import { getSiteSettings, getFeatures } from '@/lib/settings';
 import { HoneymoonPledgeForm } from '@/components/public/HoneymoonPledgeForm';
 
 export const dynamic = 'force-dynamic';
 
 export default async function RegistryPage() {
-  const [settings, honeymoonItems] = await Promise.all([
+  const [settings, honeymoonItemsRaw, features] = await Promise.all([
     getSiteSettings(),
     prisma.honeymoonItem.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
+    getFeatures(),
   ]);
 
   // Aggregate pledges per item so we can show progress without leaking names.
@@ -17,6 +18,7 @@ export default async function RegistryPage() {
   });
   const totals = Object.fromEntries(sums.map((s) => [s.itemId, s._sum.amount || 0]));
 
+  const honeymoonItems = features.honeymoonFund ? honeymoonItemsRaw : [];
   const hasLinks = settings.registryLinks && settings.registryLinks.length > 0;
   const hasHoneymoon = honeymoonItems.length > 0;
 

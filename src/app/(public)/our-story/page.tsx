@@ -1,17 +1,22 @@
 import prisma from '@/lib/prisma';
 import { RichContent } from '@/components/public/RichContent';
 import { Framed } from '@/components/public/Framed';
+import { getFeatures } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
 type Milestone = Awaited<ReturnType<typeof prisma.storyMilestone.findMany>>[number];
 
 export default async function OurStoryPage() {
-  const [page, photos, milestones] = await Promise.all([
+  const [page, photos, rawMilestones, features] = await Promise.all([
     prisma.page.findUnique({ where: { slug: 'our-story' } }),
     prisma.photo.findMany({ where: { gallerySection: 'us' }, orderBy: { order: 'asc' } }),
     prisma.storyMilestone.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
+    getFeatures(),
   ]);
+  // Hide the timeline entirely if the feature flag is off. Milestones stay in
+  // the DB so flipping it back on restores them instantly.
+  const milestones = features.storyTimeline ? rawMilestones : [];
 
   let content: { story?: string } | null = null;
   if (page?.content) {

@@ -90,7 +90,7 @@ function RSVPForm() {
           {features.dietaryNotes && <Textarea label="Dietary Restrictions or Allergies" value={dietaryNotes} onChange={(e) => setDietaryNotes(e.target.value)} placeholder="Let us know about any dietary needs..." rows={2} />}
           {features.songRequests && <Textarea label="Song Requests" value={songRequests} onChange={(e) => setSongRequests(e.target.value)} placeholder="Any songs you'd like to hear?" rows={2} />}
         </>)}
-        {attending && <Textarea label="Mailing address (optional — for save-the-dates and thank-you cards)" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, Springfield, IL 62704" rows={2} />}
+        {attending && features.rsvpAddress !== false && <Textarea label="Mailing address (optional — for save-the-dates and thank-you cards)" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, Springfield, IL 62704" rows={2} />}
         {attending && <Textarea label="Message for the Couple (optional)" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Share your thoughts..." rows={3} />}
         {submitError && <p className="text-red-600 text-sm">{submitError}</p>}
         {attending && <Button type="submit" className="w-full" isLoading={submitting}>{invitation.response ? 'Update RSVP' : 'Submit RSVP'}</Button>}

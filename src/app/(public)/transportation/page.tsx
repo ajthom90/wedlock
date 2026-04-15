@@ -1,12 +1,16 @@
 import { cookies } from 'next/headers';
+import { notFound } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import { formatDate, formatTime } from '@/lib/utils';
+import { getFeatures } from '@/lib/settings';
 import { EventsAccessForm } from '@/components/public/EventsAccessForm';
 import { ShuttleSignupForm } from '@/components/public/ShuttleSignupForm';
 
 export const dynamic = 'force-dynamic';
 
 export default async function TransportationPage() {
+  const features = await getFeatures();
+  if (!features.transportation) notFound();
   const cookieStore = await cookies();
   const rsvpCookie = cookieStore.get('rsvp_code');
 
