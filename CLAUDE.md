@@ -22,11 +22,23 @@ then writes the new version into `package.json` on success. It does **not** comm
 
 ```
 git add package.json && git commit -m "Bump to vX.Y.Z"
-git push origin main
+git push origin main && git push njathome main
 cd /Users/ajthom90/projects/wedding2 && docker compose pull && docker compose up -d
 ```
 
 The `docker compose pull && up -d` step is the local refresh step — always do it after a push so the user can smoke-test at http://localhost:37428 before promoting to prod.
+
+## Git remotes — always push to both
+
+The repo has two remotes that mirror the two docker registries:
+- `origin` → `forgejo.int.aafoods.com/ajthom90/joe-and-alex.git`
+- `njathome` → `forgejo.home.njathome.net/ajthom90/joe-and-alex.git`
+
+When the user says "push", default to pushing to **both**. Never push to only one unless they explicitly scope it. Run them sequentially:
+
+```
+git push origin main && git push njathome main
+```
 
 ## Commit convention
 
