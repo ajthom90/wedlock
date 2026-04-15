@@ -30,6 +30,7 @@ export interface SiteSettings {
   venueLat: string;
   venueLng: string;
   eventsDisplayStyle: 'list' | 'timeline';
+  weddingPartyLeftSide: 'bride' | 'groom';
 }
 
 export interface FeatureSettings {
@@ -94,6 +95,7 @@ const defaultSite: SiteSettings = {
   venueLat: '',
   venueLng: '',
   eventsDisplayStyle: 'list',
+  weddingPartyLeftSide: 'bride',
 };
 
 const defaultFeatures: FeatureSettings = {
@@ -165,6 +167,8 @@ export async function getSiteSettings(): Promise<SiteSettings> {
         (site as any)[key] = setting.value === 'hero' ? 'hero' : 'strip';
       } else if (key === 'eventsDisplayStyle') {
         (site as any)[key] = setting.value === 'timeline' ? 'timeline' : 'list';
+      } else if (key === 'weddingPartyLeftSide') {
+        (site as any)[key] = setting.value === 'groom' ? 'groom' : 'bride';
       } else {
         (site as any)[key] = setting.value;
       }

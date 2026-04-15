@@ -8,6 +8,13 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { FocalPointEditor } from '@/components/admin/FocalPointEditor';
 import { Framed } from '@/components/public/Framed';
 
+function sideLabel(side: string): string {
+  if (side === 'bride') return 'Bride';
+  if (side === 'groom') return 'Groom';
+  if (side === 'supporting-cast') return 'Supporting Cast';
+  return side;
+}
+
 interface WeddingPartyMember {
   id: string;
   name: string;
@@ -193,8 +200,8 @@ export default function WeddingPartyPage() {
                   <div className="flex-1">
                     <p className="font-semibold">{member.name}</p>
                     <p className="text-sm text-gray-600">{member.role}</p>
-                    <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 capitalize">
-                      {member.side}
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+                      {sideLabel(member.side)}
                     </span>
                     {member.description && (
                       <p className="text-sm text-gray-500 mt-1">{member.description}</p>
@@ -236,6 +243,7 @@ export default function WeddingPartyPage() {
                 >
                   <option value="bride">Bride</option>
                   <option value="groom">Groom</option>
+                  <option value="supporting-cast">Supporting Cast</option>
                 </select>
               </div>
               <div>

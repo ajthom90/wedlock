@@ -127,12 +127,15 @@ export function AdminNav() {
     } catch { /* silent — fail-open */ }
   }, []);
 
-  // Hydrate collapse state from localStorage once on mount. Auto-expand the
-  // group containing the current page so the user always sees where they are.
+  // Hydrate collapse state from localStorage once on mount. First-time visitors
+  // (no localStorage) get every group collapsed so the sidebar stays scannable;
+  // the group containing the current page auto-expands so they always see
+  // where they are. Once the user toggles anything, localStorage takes over.
   useEffect(() => {
+    const allCollapsed = () => new Set(navGroups.map((g) => g.label));
     try {
       const raw = localStorage.getItem(COLLAPSE_STORAGE_KEY);
-      const stored: string[] = raw ? JSON.parse(raw) : [];
+      const stored: string[] = raw ? JSON.parse(raw) : navGroups.map((g) => g.label);
       const next = new Set(stored);
 
       const activeGroup = navGroups.find((g) =>
@@ -142,7 +145,7 @@ export function AdminNav() {
 
       setCollapsed(next);
     } catch {
-      setCollapsed(new Set());
+      setCollapsed(allCollapsed());
     }
     setHydrated(true);
   }, [pathname]);
