@@ -8,7 +8,9 @@ import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-const fallbackNavItems = [
+type PublicNavItem = { href: string | null; label: string; children?: PublicNavItem[] };
+
+const fallbackNavItems: PublicNavItem[] = [
   { href: '/', label: 'Home' },
   { href: '/our-story', label: 'Our Story' },
   { href: '/wedding-party', label: 'Wedding Party' },
@@ -42,11 +44,28 @@ export default async function PublicLayout({ children }: { children: React.React
   if (!features.trivia) disallowedPaths.add('/trivia');
   if (features.guestBook === 'off') disallowedPaths.add('/guestbook');
 
-  const navItems = (
-    dbNavItems.length > 0
-      ? dbNavItems.map((item) => ({ href: item.href, label: item.label }))
-      : fallbackNavItems
-  ).filter((item) => !disallowedPaths.has(item.href));
+  // Build a tree from the flat DB rows. Render groups children under their
+  // parent; anything without a parent is top-level.
+  let navItems: PublicNavItem[];
+  if (dbNavItems.length > 0) {
+    const kidsByParent = new Map<string, PublicNavItem[]>();
+    for (const row of dbNavItems) {
+      if (!row.parentId) continue;
+      if (row.href && disallowedPaths.has(row.href)) continue;
+      const kids = kidsByParent.get(row.parentId) || [];
+      kids.push({ href: row.href, label: row.label });
+      kidsByParent.set(row.parentId, kids);
+    }
+    navItems = dbNavItems
+      .filter((row) => !row.parentId && !(row.href && disallowedPaths.has(row.href)))
+      .map((row) => ({
+        href: row.href,
+        label: row.label,
+        children: kidsByParent.get(row.id),
+      }));
+  } else {
+    navItems = fallbackNavItems.filter((item) => !(item.href && disallowedPaths.has(item.href)));
+  }
 
   const coupleTitle = settings.coupleName1 && settings.coupleName2
     ? `${settings.coupleName1} & ${settings.coupleName2}`

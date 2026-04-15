@@ -148,13 +148,19 @@ model Event {
   order        Int     @default(0)
 }
 
-// Customizable navigation menu
+// Customizable navigation menu — supports one level of nesting so the top bar
+// doesn't overflow. A NavItem with a null href is a dropdown label only; its
+// children are the actual links. Only top-level items can have children
+// (depth is capped at 2 on render).
 model NavItem {
-  id      String  @id @default(uuid())
-  href    String
-  label   String
-  visible Boolean @default(true)
-  order   Int     @default(0)
+  id       String    @id @default(uuid())
+  href     String?   // null = dropdown heading with no target
+  label    String
+  visible  Boolean   @default(true)
+  order    Int       @default(0)
+  parentId String?
+  parent   NavItem?  @relation("NavItemChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children NavItem[] @relation("NavItemChildren")
 }
 
 // Table/seating assignments (#8)
