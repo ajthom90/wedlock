@@ -67,6 +67,15 @@ function RSVPForm() {
           : 'Please enter at least one guest, or choose Regretfully Decline.');
         return;
       }
+      const mealOpt = rsvpOptions.find((o: any) => o.type === 'meal');
+      if (features.perGuestSelection && mealOpt?.required) {
+        const missing = attendingGuests.filter((id) => !guestMeals[id]);
+        if (missing.length > 0) {
+          const names = missing.map((id) => invitation.guests.find((g: any) => g.id === id)?.name || id).join(', ');
+          setValidationError(`Please select a meal choice for: ${names}.`);
+          return;
+        }
+      }
     }
     setShowConfirm(true);
   };
@@ -126,6 +135,7 @@ function RSVPForm() {
         attending={attending}
         guestCount={guestCount}
         attendingGuests={attendingGuests}
+        guestMeals={guestMeals}
         perGuestSelection={features.perGuestSelection}
         submitting={submitting}
         submitError={submitError}
@@ -136,11 +146,12 @@ function RSVPForm() {
   );
 }
 
-function ConfirmModal({ invitation, attending, guestCount, attendingGuests, perGuestSelection, submitting, submitError, onCancel, onConfirm }: {
+function ConfirmModal({ invitation, attending, guestCount, attendingGuests, guestMeals, perGuestSelection, submitting, submitError, onCancel, onConfirm }: {
   invitation: { guests: Guest[]; response: unknown };
   attending: string;
   guestCount: number;
   attendingGuests: string[];
+  guestMeals: Record<string, string>;
   perGuestSelection: boolean;
   submitting: boolean;
   submitError: string;
@@ -168,7 +179,7 @@ function ConfirmModal({ invitation, attending, guestCount, attendingGuests, perG
                 <p className="text-sm font-medium text-green-700 mb-1">Attending ({yes.length})</p>
                 {yes.length > 0 ? (
                   <ul className="text-sm text-foreground/80 list-disc pl-5">
-                    {yes.map((g) => <li key={g.id}>{g.name}</li>)}
+                    {yes.map((g) => <li key={g.id}>{g.name}{guestMeals[g.id] && <span className="text-foreground/60"> — {guestMeals[g.id]}</span>}</li>)}
                   </ul>
                 ) : <p className="text-sm text-foreground/50 italic">None selected</p>}
               </div>
