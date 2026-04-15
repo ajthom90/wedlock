@@ -23,15 +23,16 @@ model Page {
 }
 
 model Invitation {
-  id            String   @id @default(uuid())
-  code          String   @unique
-  householdName String
-  email         String?
-  maxGuests     Int      @default(2)
-  notes         String?
-  address       String?  // mailing address for save-the-date, thank-you cards
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(uuid())
+  code            String   @unique
+  householdName   String
+  email           String?
+  maxGuests       Int      @default(2)
+  plusOnesAllowed Int      @default(0) // number of unnamed extras this household may bring; guest fills names at RSVP time
+  notes           String?
+  address         String?  // mailing address for save-the-date, thank-you cards
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   guests         Guest[]
   response       RsvpResponse?
@@ -109,8 +110,9 @@ model RsvpResponse {
   responses       String
   guestMeals      String?
   attendingGuests String?
-  plusOneName      String?
+  plusOneName      String?  // legacy single plus-one columns, superseded by plusOnes JSON
   plusOneMeal      String?
+  plusOnes         String?  // JSON array: [{ name, meal }] for each plus-one the guest added
   songRequests    String?
   dietaryNotes    String?
   message         String?

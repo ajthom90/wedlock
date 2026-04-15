@@ -20,17 +20,22 @@ export async function PUT(request: Request, { params }: { params: Promise<{ invi
   try {
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { invitationId } = await params;
-    const { attending, guestCount, responses, guestMeals, attendingGuests, songRequests, dietaryNotes, message } = await request.json();
+    const { attending, guestCount, responses, guestMeals, attendingGuests, plusOnes, songRequests, dietaryNotes, message } = await request.json();
     if (!(await prisma.invitation.findUnique({ where: { id: invitationId } }))) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
+    const cleanPlusOnes = Array.isArray(plusOnes)
+      ? plusOnes.filter((p: any) => p && typeof p.name === 'string' && p.name.trim()).map((p: any) => ({ name: p.name.trim(), meal: p.meal || '' }))
+      : [];
     const data = {
       attending, guestCount: guestCount || 0, responses: JSON.stringify(responses || {}),
       guestMeals: guestMeals ? JSON.stringify(guestMeals) : null,
       attendingGuests: attendingGuests ? JSON.stringify(attendingGuests) : null,
+      plusOnes: cleanPlusOnes.length ? JSON.stringify(cleanPlusOnes) : null,
       songRequests: songRequests || null, dietaryNotes: dietaryNotes || null, message: message || null,
     };
     const logDetails = JSON.stringify({
       attending, guestCount: guestCount || 0,
       attendingGuests: attendingGuests || null, guestMeals: guestMeals || null,
+      plusOnes: cleanPlusOnes.length ? cleanPlusOnes : null,
       songRequests: songRequests || null, dietaryNotes: dietaryNotes || null,
       message: message || null,
     });

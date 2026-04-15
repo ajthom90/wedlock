@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { code, attending, guestCount, responses, guestMeals, message, attendingGuests, songRequests, dietaryNotes, address } = await request.json();
+    const { code, attending, guestCount, responses, guestMeals, message, attendingGuests, plusOnes, songRequests, dietaryNotes, address } = await request.json();
     if (!code) return NextResponse.json({ error: 'Invitation code is required' }, { status: 400 });
     const settings = await getSiteSettings();
     if (settings.rsvpDeadline && settings.rsvpCloseAfterDeadline) {
@@ -61,10 +61,15 @@ export async function POST(request: Request) {
       });
     }
     const existing = await prisma.rsvpResponse.findUnique({ where: { invitationId: invitation.id } });
+    // Drop plus-ones with empty names; each remaining entry carries {name, meal?}.
+    const cleanPlusOnes = Array.isArray(plusOnes)
+      ? plusOnes.filter((p: any) => p && typeof p.name === 'string' && p.name.trim()).map((p: any) => ({ name: p.name.trim(), meal: p.meal || '' }))
+      : [];
     const data = {
       attending, guestCount: guestCount || 0, responses: JSON.stringify(responses || {}),
       guestMeals: guestMeals ? JSON.stringify(guestMeals) : null,
       attendingGuests: attendingGuests ? JSON.stringify(attendingGuests) : null,
+      plusOnes: cleanPlusOnes.length ? JSON.stringify(cleanPlusOnes) : null,
       songRequests: songRequests || null, dietaryNotes: dietaryNotes || null, message: message || null,
     };
     // Snapshot of the submitted state for the change log. Stored as JSON so the
@@ -73,6 +78,7 @@ export async function POST(request: Request) {
     const logDetails = JSON.stringify({
       attending, guestCount: guestCount || 0,
       attendingGuests: attendingGuests || null, guestMeals: guestMeals || null,
+      plusOnes: cleanPlusOnes.length ? cleanPlusOnes : null,
       songRequests: songRequests || null, dietaryNotes: dietaryNotes || null,
       message: message || null,
     });

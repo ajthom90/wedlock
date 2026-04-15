@@ -19,6 +19,7 @@ interface RsvpResponse {
   responses: string;
   guestMeals: string | null;
   attendingGuests: string | null;
+  plusOnes: string | null;
   songRequests: string | null;
   dietaryNotes: string | null;
   message: string | null;
@@ -38,6 +39,7 @@ interface Invitation {
   householdName: string;
   email: string | null;
   maxGuests: number;
+  plusOnesAllowed: number;
   guests: Guest[];
   response: RsvpResponse | null;
   changeLogs?: ChangeLog[];
@@ -391,6 +393,18 @@ export default function RsvpsPage() {
                         .join(', ')}</p>
                     </div>
                   )}
+                  {(() => {
+                    let pluses: { name: string; meal: string }[] = [];
+                    try { pluses = JSON.parse(selectedInvitation.response.plusOnes || '[]'); } catch {}
+                    return pluses.length > 0 ? (
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Plus-ones</p>
+                        {pluses.map((p, i) => (
+                          <p key={i} className="text-sm">{p.name}{p.meal && <span className="text-gray-500"> — {p.meal}</span>}</p>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
                   {Object.keys(parseJson(selectedInvitation.response.responses)).length > 0 && (
                     <div>
                       <p className="text-sm font-medium text-gray-500 mb-1">Responses</p>
@@ -402,8 +416,8 @@ export default function RsvpsPage() {
                   {Object.keys(parseJson(selectedInvitation.response.guestMeals)).length > 0 && (
                     <div>
                       <p className="text-sm font-medium text-gray-500 mb-1">Meal Choices</p>
-                      {Object.entries(parseJson(selectedInvitation.response.guestMeals)).map(([guest, meal]) => (
-                        <p key={guest} className="text-sm"><span className="font-medium">{guest}:</span> {meal}</p>
+                      {Object.entries(parseJson(selectedInvitation.response.guestMeals)).map(([guestId, meal]) => (
+                        <p key={guestId} className="text-sm"><span className="font-medium">{selectedInvitation.guests.find((g) => g.id === guestId)?.name || guestId}:</span> {meal}</p>
                       ))}
                     </div>
                   )}

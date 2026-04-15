@@ -18,12 +18,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   try {
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { id } = await params;
-    const { householdName, email, maxGuests, notes, guestNames } = await request.json();
+    const { householdName, email, maxGuests, plusOnesAllowed, notes, guestNames } = await request.json();
     await prisma.guest.deleteMany({ where: { invitationId: id } });
     const invitation = await prisma.invitation.update({
       where: { id },
       data: {
-        householdName, email: email || null, maxGuests: maxGuests || 2, notes: notes || null,
+        householdName, email: email || null, maxGuests: maxGuests || 2,
+        plusOnesAllowed: Math.max(0, parseInt(plusOnesAllowed) || 0),
+        notes: notes || null,
         guests: { create: guestNames?.map((name: string, i: number) => ({ name, isPrimary: i === 0 })) || [] },
       },
       include: { guests: true, response: true },

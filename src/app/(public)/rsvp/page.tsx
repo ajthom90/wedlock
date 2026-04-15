@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, Button, Input, Textarea } from '@/components/ui';
 
 type Guest = { id: string; name: string; isPrimary: boolean };
+type PlusOne = { name: string; meal: string };
 
 function RSVPForm() {
   const searchParams = useSearchParams();
@@ -31,6 +32,8 @@ function RSVPForm() {
   // guest" doesn't disappear the moment the network error clears and vice-versa.
   const [validationError, setValidationError] = useState('');
   const [missingMeals, setMissingMeals] = useState<string[]>([]);
+  const [plusOnes, setPlusOnes] = useState<PlusOne[]>([]);
+  const [missingPlusOneMeals, setMissingPlusOneMeals] = useState<number[]>([]);
   const [showConfirm, setShowConfirm] = useState(false);
 
   const lookupInvitation = async (c: string) => {
@@ -41,12 +44,20 @@ function RSVPForm() {
       if (!res.ok) { setError(data.error || 'Invitation not found'); return; }
       setInvitation(data.invitation); setRsvpOptions(data.rsvpOptions || []); setSettings(data.settings || {}); setFeatures(data.features || {});
       setAddress(data.invitation.address || '');
+      const slotCount = data.invitation.plusOnesAllowed || 0;
+      const emptySlots = Array.from({ length: slotCount }, () => ({ name: '', meal: '' }));
       if (data.invitation.response) {
         const r = data.invitation.response;
         setAttending(r.attending); setGuestCount(r.guestCount); setMessage(r.message || ''); setSongRequests(r.songRequests || ''); setDietaryNotes(r.dietaryNotes || '');
         try { setResponses(JSON.parse(r.responses || '{}')); } catch { setResponses({}); }
         try { setGuestMeals(JSON.parse(r.guestMeals || '{}')); } catch { setGuestMeals({}); }
         try { setAttendingGuests(JSON.parse(r.attendingGuests || '[]')); } catch { setAttendingGuests([]); }
+        try {
+          const loaded: PlusOne[] = JSON.parse(r.plusOnes || '[]');
+          setPlusOnes(emptySlots.map((slot, i) => loaded[i] ? { name: loaded[i].name || '', meal: loaded[i].meal || '' } : slot));
+        } catch { setPlusOnes(emptySlots); }
+      } else {
+        setPlusOnes(emptySlots);
       }
     } catch { setError('An error occurred. Please try again.'); }
     finally { setLoading(false); }
@@ -58,10 +69,27 @@ function RSVPForm() {
   // modal. Only the modal's Confirm button actually POSTs. Accepting while
   // marking zero attendees is rejected — that's almost always a user mistake
   // (they meant to decline).
+  // Clicking Decline clears every attendance-specific field so a stale list of
+  // checkboxes/meal choices from a prior accept doesn't ride along into the
+  // submission. Dietary/song/message/address are kept — they're informational.
+  const declineRsvp = () => {
+    setAttending('no');
+    setAttendingGuests([]); setGuestMeals({}); setResponses({});
+    setMissingMeals([]); setMissingPlusOneMeals([]);
+    setPlusOnes((prev) => prev.map(() => ({ name: '', meal: '' })));
+    setValidationError('');
+  };
+
+  const updatePlusOne = (idx: number, patch: Partial<PlusOne>) =>
+    setPlusOnes((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
+
   const handleReview = (e: React.FormEvent) => {
     e.preventDefault(); setValidationError('');
     if (attending === 'yes') {
-      const count = features.perGuestSelection ? attendingGuests.length : guestCount;
+      const namedPlusOnes = plusOnes.filter((p) => p.name.trim());
+      const count = features.perGuestSelection
+        ? attendingGuests.length + namedPlusOnes.length
+        : guestCount;
       if (count < 1) {
         setValidationError(features.perGuestSelection
           ? 'Please select at least one person who is attending, or choose Regretfully Decline.'
@@ -71,14 +99,16 @@ function RSVPForm() {
       const mealOpt = rsvpOptions.find((o: any) => o.type === 'meal');
       if (features.perGuestSelection && mealOpt?.required) {
         const missing = attendingGuests.filter((id) => !guestMeals[id]);
-        if (missing.length > 0) {
-          const names = missing.map((id) => invitation.guests.find((g: any) => g.id === id)?.name || id).join(', ');
-          setValidationError(`Please select a meal choice for: ${names}.`);
-          setMissingMeals(missing);
+        const missingPlus = plusOnes.map((p, i) => (p.name.trim() && !p.meal ? i : -1)).filter((i) => i >= 0);
+        if (missing.length > 0 || missingPlus.length > 0) {
+          const regularNames = missing.map((id) => invitation.guests.find((g: any) => g.id === id)?.name || id);
+          const plusNames = missingPlus.map((i) => plusOnes[i].name.trim());
+          setValidationError(`Please select a meal choice for: ${[...regularNames, ...plusNames].join(', ')}.`);
+          setMissingMeals(missing); setMissingPlusOneMeals(missingPlus);
           return;
         }
       }
-      setMissingMeals([]);
+      setMissingMeals([]); setMissingPlusOneMeals([]);
     }
     setShowConfirm(true);
   };
@@ -86,7 +116,9 @@ function RSVPForm() {
   const confirmSubmit = async () => {
     setSubmitting(true); setSubmitError('');
     try {
-      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? (features.perGuestSelection ? attendingGuests.length : guestCount) : 0, responses, guestMeals: features.perGuestSelection ? guestMeals : undefined, attendingGuests: features.perGuestSelection ? attendingGuests : undefined, songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, address: address.trim() || undefined }) });
+      const namedPlusOnes = plusOnes.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), meal: p.meal }));
+      const totalAttending = features.perGuestSelection ? attendingGuests.length + namedPlusOnes.length : guestCount;
+      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && features.perGuestSelection ? guestMeals : undefined, attendingGuests: attending === 'yes' && features.perGuestSelection ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, address: address.trim() || undefined }) });
       const data = await res.json();
       if (res.ok) { setShowConfirm(false); setSubmitted(true); }
       else setSubmitError(data.error || 'Failed to submit RSVP');
@@ -112,7 +144,7 @@ function RSVPForm() {
       <h1 className="text-4xl font-heading font-bold text-center text-primary mb-2">RSVP</h1>
       <p className="text-center text-foreground/70 mb-8">The {invitation.householdName} Household</p>
       <Card><CardContent className="py-8"><form onSubmit={handleReview} className="space-y-6">
-        <div><p className="font-medium mb-3">Will you be attending?</p><div className="flex gap-4"><Button type="button" variant={attending === 'yes' ? 'primary' : 'outline'} onClick={() => setAttending('yes')}>Joyfully Accept</Button><Button type="button" variant={attending === 'no' ? 'primary' : 'outline'} onClick={() => setAttending('no')}>Regretfully Decline</Button></div></div>
+        <div><p className="font-medium mb-3">Will you be attending?</p><div className="flex gap-4"><Button type="button" variant={attending === 'yes' ? 'primary' : 'outline'} onClick={() => setAttending('yes')}>Joyfully Accept</Button><Button type="button" variant={attending === 'no' ? 'primary' : 'outline'} onClick={declineRsvp}>Regretfully Decline</Button></div></div>
         {attending === 'yes' && (<>
           {features.perGuestSelection && invitation.guests?.length > 0 ? (
             <div><p className="font-medium mb-3">Who will be attending?</p><div className="space-y-2">{invitation.guests.map((guest: any) => (
@@ -123,6 +155,40 @@ function RSVPForm() {
               </label>
             ))}</div></div>
           ) : <Input label="Number of Guests" type="number" min={1} max={invitation.maxGuests} value={guestCount || ''} onChange={(e) => setGuestCount(parseInt(e.target.value) || 0)} />}
+          {features.perGuestSelection && invitation.plusOnesAllowed > 0 && (
+            <div>
+              <p className="font-medium mb-1">Additional guests (up to {invitation.plusOnesAllowed})</p>
+              <p className="text-sm text-foreground/60 mb-3">Enter a name for each extra guest you&apos;d like to bring. Leave blank if unused.</p>
+              <div className="space-y-2">
+                {plusOnes.map((p, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 border rounded-md">
+                    <Input
+                      value={p.name}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        updatePlusOne(i, { name: v });
+                        if (!v.trim()) setMissingPlusOneMeals((prev) => prev.filter((x) => x !== i));
+                      }}
+                      placeholder={`Extra guest ${i + 1} name`}
+                    />
+                    {mealOption && p.name.trim() && (
+                      <select
+                        className={`border rounded px-2 py-1 text-sm ${missingPlusOneMeals.includes(i) ? 'border-red-500 ring-2 ring-red-500' : ''}`}
+                        value={p.meal}
+                        onChange={(e) => {
+                          updatePlusOne(i, { meal: e.target.value });
+                          if (e.target.value) setMissingPlusOneMeals((prev) => prev.filter((x) => x !== i));
+                        }}
+                      >
+                        <option value="">Select meal...</option>
+                        {mealOption.choices.map((c: string) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {rsvpOptions.filter((o: any) => o.type !== 'meal').map((option: any) => (<div key={option.id}><p className="font-medium mb-2">{option.label}</p><select className="w-full border rounded-md px-3 py-2" value={responses[option.id] || ''} onChange={(e) => setResponses({...responses, [option.id]: e.target.value})} required={option.required}><option value="">Select...</option>{option.choices.map((c: string) => <option key={c} value={c}>{c}</option>)}</select></div>))}
           {features.dietaryNotes && <Textarea label="Dietary Restrictions or Allergies" value={dietaryNotes} onChange={(e) => setDietaryNotes(e.target.value)} placeholder="Let us know about any dietary needs..." rows={2} />}
           {features.songRequests && <Textarea label="Song Requests" value={songRequests} onChange={(e) => setSongRequests(e.target.value)} placeholder="Any songs you'd like to hear?" rows={2} />}
@@ -139,6 +205,7 @@ function RSVPForm() {
         guestCount={guestCount}
         attendingGuests={attendingGuests}
         guestMeals={guestMeals}
+        plusOnes={plusOnes.filter((p) => p.name.trim())}
         perGuestSelection={features.perGuestSelection}
         submitting={submitting}
         submitError={submitError}
@@ -149,12 +216,13 @@ function RSVPForm() {
   );
 }
 
-function ConfirmModal({ invitation, attending, guestCount, attendingGuests, guestMeals, perGuestSelection, submitting, submitError, onCancel, onConfirm }: {
+function ConfirmModal({ invitation, attending, guestCount, attendingGuests, guestMeals, plusOnes, perGuestSelection, submitting, submitError, onCancel, onConfirm }: {
   invitation: { guests: Guest[]; response: unknown };
   attending: string;
   guestCount: number;
   attendingGuests: string[];
   guestMeals: Record<string, string>;
+  plusOnes: PlusOne[];
   perGuestSelection: boolean;
   submitting: boolean;
   submitError: string;
@@ -165,6 +233,7 @@ function ConfirmModal({ invitation, attending, guestCount, attendingGuests, gues
   const yes = invitation.guests.filter((g) => attendingSet.has(g.id));
   const no = invitation.guests.filter((g) => !attendingSet.has(g.id));
   const decliningAll = attending === 'no';
+  const totalYes = yes.length + plusOnes.length;
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <Card className="w-full max-w-md">
@@ -179,10 +248,11 @@ function ConfirmModal({ invitation, attending, guestCount, attendingGuests, gues
           ) : perGuestSelection ? (
             <div className="space-y-3">
               <div>
-                <p className="text-sm font-medium text-green-700 mb-1">Attending ({yes.length})</p>
-                {yes.length > 0 ? (
+                <p className="text-sm font-medium text-green-700 mb-1">Attending ({totalYes})</p>
+                {totalYes > 0 ? (
                   <ul className="text-sm text-foreground/80 list-disc pl-5">
                     {yes.map((g) => <li key={g.id}>{g.name}{guestMeals[g.id] && <span className="text-foreground/60"> — {guestMeals[g.id]}</span>}</li>)}
+                    {plusOnes.map((p, i) => <li key={`plus-${i}`}>{p.name}{p.meal && <span className="text-foreground/60"> — {p.meal}</span>} <span className="text-xs text-foreground/50">(plus-one)</span></li>)}
                   </ul>
                 ) : <p className="text-sm text-foreground/50 italic">None selected</p>}
               </div>

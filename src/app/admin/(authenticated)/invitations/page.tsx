@@ -24,6 +24,7 @@ interface Invitation {
   householdName: string;
   email: string | null;
   maxGuests: number;
+  plusOnesAllowed: number;
   notes: string | null;
   address: string | null;
   createdAt: string;
@@ -44,6 +45,7 @@ export default function InvitationsPage() {
   const [householdName, setHouseholdName] = useState('');
   const [email, setEmail] = useState('');
   const [maxGuests, setMaxGuests] = useState(2);
+  const [plusOnesAllowed, setPlusOnesAllowed] = useState(0);
   const [notes, setNotes] = useState('');
   const [guestNames, setGuestNames] = useState<string[]>(['']);
   const [saving, setSaving] = useState(false);
@@ -70,6 +72,7 @@ export default function InvitationsPage() {
     setHouseholdName('');
     setEmail('');
     setMaxGuests(2);
+    setPlusOnesAllowed(0);
     setNotes('');
     setGuestNames(['']);
     setEditingId(null);
@@ -85,6 +88,7 @@ export default function InvitationsPage() {
     setHouseholdName(inv.householdName);
     setEmail(inv.email || '');
     setMaxGuests(inv.maxGuests);
+    setPlusOnesAllowed(inv.plusOnesAllowed || 0);
     setNotes(inv.notes || '');
     setGuestNames(inv.guests.length > 0 ? inv.guests.map((g) => g.name) : ['']);
     setShowModal(true);
@@ -98,6 +102,7 @@ export default function InvitationsPage() {
         householdName: householdName.trim(),
         email: email.trim() || null,
         maxGuests,
+        plusOnesAllowed,
         notes: notes.trim() || null,
         guestNames: guestNames.filter((n) => n.trim()),
       };
@@ -247,6 +252,7 @@ export default function InvitationsPage() {
                 <div className="space-y-2">
                   <p className="text-sm"><span className="font-medium">Guests ({inv.guests.length}/{inv.maxGuests}):</span>{' '}
                     {inv.guests.map((g) => g.name).join(', ') || 'None'}
+                    {inv.plusOnesAllowed > 0 && <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">+{inv.plusOnesAllowed}</span>}
                   </p>
                   {inv.notes && <p className="text-sm text-gray-500">Notes: {inv.notes}</p>}
                 </div>
@@ -280,6 +286,11 @@ export default function InvitationsPage() {
               <div>
                 <label className="block text-sm font-medium mb-1">Max Guests</label>
                 <Input type="number" min={1} max={20} value={maxGuests} onChange={(e) => setMaxGuests(parseInt(e.target.value) || 1)} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Plus-ones allowed</label>
+                <Input type="number" min={0} max={10} value={plusOnesAllowed} onChange={(e) => setPlusOnesAllowed(Math.max(0, parseInt(e.target.value) || 0))} />
+                <p className="text-xs text-gray-500 mt-1">Unnamed extras the household can bring (e.g. 2 = can add up to 2 more guests at RSVP).</p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Notes</label>
