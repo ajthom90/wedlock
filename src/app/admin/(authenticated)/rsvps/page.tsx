@@ -386,7 +386,9 @@ export default function RsvpsPage() {
                   {selectedInvitation.response.attendingGuests && (
                     <div>
                       <p className="text-sm font-medium text-gray-500">Attending Guests</p>
-                      <p>{parseList(selectedInvitation.response.attendingGuests).join(', ')}</p>
+                      <p>{parseList(selectedInvitation.response.attendingGuests)
+                        .map((id) => selectedInvitation.guests.find((g) => g.id === id)?.name || id)
+                        .join(', ')}</p>
                     </div>
                   )}
                   {Object.keys(parseJson(selectedInvitation.response.responses)).length > 0 && (
