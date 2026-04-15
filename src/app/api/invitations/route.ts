@@ -13,7 +13,14 @@ async function generateUniqueCode(): Promise<string> {
 
 export async function GET() {
   try {
-    const invitations = await prisma.invitation.findMany({ include: { guests: true, response: true }, orderBy: { createdAt: 'desc' } });
+    const invitations = await prisma.invitation.findMany({
+      include: {
+        guests: true,
+        response: true,
+        changeLogs: { orderBy: { createdAt: 'desc' } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
     return NextResponse.json(invitations);
   } catch (error) {
     console.error('Error fetching invitations:', error);

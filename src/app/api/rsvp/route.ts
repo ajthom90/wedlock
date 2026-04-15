@@ -67,12 +67,23 @@ export async function POST(request: Request) {
       attendingGuests: attendingGuests ? JSON.stringify(attendingGuests) : null,
       songRequests: songRequests || null, dietaryNotes: dietaryNotes || null, message: message || null,
     };
+    // Snapshot of the submitted state for the change log. Stored as JSON so the
+    // admin RSVPs page can reconstruct "what was RSVPed on this date" without
+    // needing new columns when RsvpResponse gains fields.
+    const logDetails = JSON.stringify({
+      attending, guestCount: guestCount || 0,
+      attendingGuests: attendingGuests || null, guestMeals: guestMeals || null,
+      songRequests: songRequests || null, dietaryNotes: dietaryNotes || null,
+      message: message || null,
+    });
     if (existing) {
       const response = await prisma.rsvpResponse.update({ where: { id: existing.id }, data: { ...data, submittedAt: new Date() } });
+      await prisma.rsvpChangeLog.create({ data: { invitationId: invitation.id, source: 'guest', details: logDetails } });
       await prisma.notification.create({ data: { type: 'rsvp', title: 'New RSVP', message: `${invitation.householdName} has ${attending === 'yes' ? 'accepted' : 'declined'} the invitation` } });
       return NextResponse.json({ success: true, response });
     }
     const response = await prisma.rsvpResponse.create({ data: { invitationId: invitation.id, ...data } });
+    await prisma.rsvpChangeLog.create({ data: { invitationId: invitation.id, source: 'guest', details: logDetails } });
     await prisma.notification.create({ data: { type: 'rsvp', title: 'New RSVP', message: `${invitation.householdName} has ${attending === 'yes' ? 'accepted' : 'declined'} the invitation` } });
     return NextResponse.json({ success: true, response });
   } catch (error) {

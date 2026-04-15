@@ -25,6 +25,13 @@ interface RsvpResponse {
   submittedAt: string;
 }
 
+interface ChangeLog {
+  id: string;
+  source: string; // "guest" | "admin"
+  details: string; // JSON snapshot
+  createdAt: string;
+}
+
 interface Invitation {
   id: string;
   code: string;
@@ -33,6 +40,7 @@ interface Invitation {
   maxGuests: number;
   guests: Guest[];
   response: RsvpResponse | null;
+  changeLogs?: ChangeLog[];
 }
 
 export default function RsvpsPage() {
@@ -419,6 +427,33 @@ export default function RsvpsPage() {
                     <p className="text-sm font-medium text-gray-500">Submitted</p>
                     <p className="text-sm">{new Date(selectedInvitation.response.submittedAt).toLocaleString()}</p>
                   </div>
+                  {selectedInvitation.changeLogs && selectedInvitation.changeLogs.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-500 mb-2">Change history</p>
+                      <ul className="space-y-2 text-xs border-l-2 border-gray-200 pl-3">
+                        {selectedInvitation.changeLogs.map((log) => {
+                          const d = parseJson(log.details) as Record<string, unknown>;
+                          const attending = d.attending === 'yes' ? 'Attending' : d.attending === 'no' ? 'Declined' : '—';
+                          const count = typeof d.guestCount === 'number' ? d.guestCount : 0;
+                          // attendingGuests stores guest IDs — resolve to names against the current guest list.
+                          const ids = Array.isArray(d.attendingGuests) ? (d.attendingGuests as string[]) : null;
+                          const names = ids ? ids.map((id) => selectedInvitation.guests.find((g) => g.id === id)?.name || id) : null;
+                          return (
+                            <li key={log.id} className="space-y-0.5">
+                              <p className="font-medium text-gray-700">
+                                {new Date(log.createdAt).toLocaleString()} · <span className="text-gray-400">by {log.source}</span>
+                              </p>
+                              <p className="text-gray-600">
+                                {attending}
+                                {d.attending === 'yes' && ` · ${count} guest${count === 1 ? '' : 's'}`}
+                                {names && names.length > 0 && ` · ${names.join(', ')}`}
+                              </p>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
                 </>
               )}
             </CardContent>

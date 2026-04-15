@@ -3,6 +3,8 @@ import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, Button, Input, Textarea } from '@/components/ui';
 
+type Guest = { id: string; name: string; isPrimary: boolean };
+
 function RSVPForm() {
   const searchParams = useSearchParams();
   const codeFromUrl = searchParams.get('code') || '';
@@ -25,6 +27,10 @@ function RSVPForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  // Validation errors live separately from submit errors so "pick at least one
+  // guest" doesn't disappear the moment the network error clears and vice-versa.
+  const [validationError, setValidationError] = useState('');
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const lookupInvitation = async (c: string) => {
     setLoading(true); setError('');
@@ -47,12 +53,31 @@ function RSVPForm() {
 
   useEffect(() => { if (codeFromUrl) lookupInvitation(codeFromUrl); }, [codeFromUrl]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setSubmitError('');
+  // Two-step submit: clicking "Submit RSVP" validates then opens a confirmation
+  // modal. Only the modal's Confirm button actually POSTs. Accepting while
+  // marking zero attendees is rejected — that's almost always a user mistake
+  // (they meant to decline).
+  const handleReview = (e: React.FormEvent) => {
+    e.preventDefault(); setValidationError('');
+    if (attending === 'yes') {
+      const count = features.perGuestSelection ? attendingGuests.length : guestCount;
+      if (count < 1) {
+        setValidationError(features.perGuestSelection
+          ? 'Please select at least one person who is attending, or choose Regretfully Decline.'
+          : 'Please enter at least one guest, or choose Regretfully Decline.');
+        return;
+      }
+    }
+    setShowConfirm(true);
+  };
+
+  const confirmSubmit = async () => {
+    setSubmitting(true); setSubmitError('');
     try {
       const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? (features.perGuestSelection ? attendingGuests.length : guestCount) : 0, responses, guestMeals: features.perGuestSelection ? guestMeals : undefined, attendingGuests: features.perGuestSelection ? attendingGuests : undefined, songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, address: address.trim() || undefined }) });
       const data = await res.json();
-      if (res.ok) setSubmitted(true); else setSubmitError(data.error || 'Failed to submit RSVP');
+      if (res.ok) { setShowConfirm(false); setSubmitted(true); }
+      else setSubmitError(data.error || 'Failed to submit RSVP');
     } catch { setSubmitError('An error occurred. Please try again.'); }
     finally { setSubmitting(false); }
   };
@@ -74,7 +99,7 @@ function RSVPForm() {
     <div className="container mx-auto px-4 py-16"><div className="max-w-xl mx-auto">
       <h1 className="text-4xl font-heading font-bold text-center text-primary mb-2">RSVP</h1>
       <p className="text-center text-foreground/70 mb-8">The {invitation.householdName} Household</p>
-      <Card><CardContent className="py-8"><form onSubmit={handleSubmit} className="space-y-6">
+      <Card><CardContent className="py-8"><form onSubmit={handleReview} className="space-y-6">
         <div><p className="font-medium mb-3">Will you be attending?</p><div className="flex gap-4"><Button type="button" variant={attending === 'yes' ? 'primary' : 'outline'} onClick={() => setAttending('yes')}>Joyfully Accept</Button><Button type="button" variant={attending === 'no' ? 'primary' : 'outline'} onClick={() => setAttending('no')}>Regretfully Decline</Button></div></div>
         {attending === 'yes' && (<>
           {features.perGuestSelection && invitation.guests?.length > 0 ? (
@@ -92,10 +117,84 @@ function RSVPForm() {
         </>)}
         {attending && features.rsvpAddress !== false && <Textarea label="Mailing address (optional — for save-the-dates and thank-you cards)" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, Springfield, IL 62704" rows={2} />}
         {attending && <Textarea label="Message for the Couple (optional)" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Share your thoughts..." rows={3} />}
-        {submitError && <p className="text-red-600 text-sm">{submitError}</p>}
-        {attending && <Button type="submit" className="w-full" isLoading={submitting}>{invitation.response ? 'Update RSVP' : 'Submit RSVP'}</Button>}
+        {validationError && <p className="text-red-600 text-sm">{validationError}</p>}
+        {attending && <Button type="submit" className="w-full">{invitation.response ? 'Update RSVP' : 'Submit RSVP'}</Button>}
       </form></CardContent></Card>
+
+      {showConfirm && <ConfirmModal
+        invitation={invitation}
+        attending={attending}
+        guestCount={guestCount}
+        attendingGuests={attendingGuests}
+        perGuestSelection={features.perGuestSelection}
+        submitting={submitting}
+        submitError={submitError}
+        onCancel={() => { setShowConfirm(false); setSubmitError(''); }}
+        onConfirm={confirmSubmit}
+      />}
     </div></div>
+  );
+}
+
+function ConfirmModal({ invitation, attending, guestCount, attendingGuests, perGuestSelection, submitting, submitError, onCancel, onConfirm }: {
+  invitation: { guests: Guest[]; response: unknown };
+  attending: string;
+  guestCount: number;
+  attendingGuests: string[];
+  perGuestSelection: boolean;
+  submitting: boolean;
+  submitError: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const attendingSet = new Set(attendingGuests);
+  const yes = invitation.guests.filter((g) => attendingSet.has(g.id));
+  const no = invitation.guests.filter((g) => !attendingSet.has(g.id));
+  const decliningAll = attending === 'no';
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-md">
+        <CardContent className="py-6 space-y-4">
+          <h2 className="text-2xl font-heading font-semibold text-center">Confirm your RSVP</h2>
+          <p className="text-center text-sm text-foreground/70">Please review your response before submitting.</p>
+          {decliningAll ? (
+            <div>
+              <p className="text-sm font-medium text-foreground/80 mb-1">Regretfully declining</p>
+              <p className="text-sm text-foreground/60">{invitation.guests.map((g) => g.name).join(', ') || 'Entire household'}</p>
+            </div>
+          ) : perGuestSelection ? (
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium text-green-700 mb-1">Attending ({yes.length})</p>
+                {yes.length > 0 ? (
+                  <ul className="text-sm text-foreground/80 list-disc pl-5">
+                    {yes.map((g) => <li key={g.id}>{g.name}</li>)}
+                  </ul>
+                ) : <p className="text-sm text-foreground/50 italic">None selected</p>}
+              </div>
+              {no.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-red-700 mb-1">Not attending ({no.length})</p>
+                  <ul className="text-sm text-foreground/80 list-disc pl-5">
+                    {no.map((g) => <li key={g.id}>{g.name}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <p className="text-sm font-medium text-green-700 mb-1">Attending</p>
+              <p className="text-sm text-foreground/80">{guestCount} {guestCount === 1 ? 'guest' : 'guests'}</p>
+            </div>
+          )}
+          {submitError && <p className="text-red-600 text-sm text-center">{submitError}</p>}
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={onCancel} disabled={submitting}>Go back</Button>
+            <Button type="button" className="flex-1" onClick={onConfirm} isLoading={submitting}>Confirm &amp; submit</Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

@@ -37,6 +37,23 @@ model Invitation {
   response       RsvpResponse?
   gifts          GiftItem[]
   shuttleSignups ShuttleSignup[]
+  changeLogs     RsvpChangeLog[]
+}
+
+// Audit trail of every RSVP submission (create + update). Each row is a full
+// snapshot of what was submitted at that moment, serialized in `details` so
+// schema changes to RsvpResponse don't need to propagate here. The admin
+// RSVPs page surfaces this as a history list under each guest's RSVP so the
+// couple can see "RSVPed for 2 on Apr 15, then changed to 1 on Apr 20".
+model RsvpChangeLog {
+  id           String     @id @default(uuid())
+  invitationId String
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  source       String     // "guest" | "admin" — who made the change
+  details      String     // JSON snapshot: { attending, guestCount, attendingGuests?, guestMeals?, songRequests?, dietaryNotes?, message? }
+  createdAt    DateTime   @default(now())
+
+  @@index([invitationId, createdAt])
 }
 
 model Guest {

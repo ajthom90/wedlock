@@ -28,12 +28,20 @@ export async function PUT(request: Request, { params }: { params: Promise<{ invi
       attendingGuests: attendingGuests ? JSON.stringify(attendingGuests) : null,
       songRequests: songRequests || null, dietaryNotes: dietaryNotes || null, message: message || null,
     };
+    const logDetails = JSON.stringify({
+      attending, guestCount: guestCount || 0,
+      attendingGuests: attendingGuests || null, guestMeals: guestMeals || null,
+      songRequests: songRequests || null, dietaryNotes: dietaryNotes || null,
+      message: message || null,
+    });
     const existing = await prisma.rsvpResponse.findUnique({ where: { invitationId } });
     if (existing) {
       const response = await prisma.rsvpResponse.update({ where: { id: existing.id }, data: { ...data, submittedAt: new Date() } });
+      await prisma.rsvpChangeLog.create({ data: { invitationId, source: 'admin', details: logDetails } });
       return NextResponse.json({ success: true, response });
     }
     const response = await prisma.rsvpResponse.create({ data: { invitationId, ...data } });
+    await prisma.rsvpChangeLog.create({ data: { invitationId, source: 'admin', details: logDetails } });
     return NextResponse.json({ success: true, response });
   } catch (error) {
     console.error('Error updating RSVP:', error);
