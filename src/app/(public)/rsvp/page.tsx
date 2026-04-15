@@ -30,6 +30,7 @@ function RSVPForm() {
   // Validation errors live separately from submit errors so "pick at least one
   // guest" doesn't disappear the moment the network error clears and vice-versa.
   const [validationError, setValidationError] = useState('');
+  const [missingMeals, setMissingMeals] = useState<string[]>([]);
   const [showConfirm, setShowConfirm] = useState(false);
 
   const lookupInvitation = async (c: string) => {
@@ -73,9 +74,11 @@ function RSVPForm() {
         if (missing.length > 0) {
           const names = missing.map((id) => invitation.guests.find((g: any) => g.id === id)?.name || id).join(', ');
           setValidationError(`Please select a meal choice for: ${names}.`);
+          setMissingMeals(missing);
           return;
         }
       }
+      setMissingMeals([]);
     }
     setShowConfirm(true);
   };
@@ -116,7 +119,7 @@ function RSVPForm() {
               <label key={guest.id} className="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-gray-50">
                 <input type="checkbox" checked={attendingGuests.includes(guest.id)} onChange={() => toggleGuest(guest.id)} className="h-4 w-4" />
                 <span>{guest.name}</span>
-                {mealOption && attendingGuests.includes(guest.id) && <select className="ml-auto border rounded px-2 py-1 text-sm" value={guestMeals[guest.id] || ''} onChange={(e) => setGuestMeals({...guestMeals, [guest.id]: e.target.value})}><option value="">Select meal...</option>{mealOption.choices.map((c: string) => <option key={c} value={c}>{c}</option>)}</select>}
+                {mealOption && attendingGuests.includes(guest.id) && <select className={`ml-auto border rounded px-2 py-1 text-sm ${missingMeals.includes(guest.id) ? 'border-red-500 ring-2 ring-red-500' : ''}`} value={guestMeals[guest.id] || ''} onChange={(e) => { setGuestMeals({...guestMeals, [guest.id]: e.target.value}); if (e.target.value) setMissingMeals(prev => prev.filter(id => id !== guest.id)); }}><option value="">Select meal...</option>{mealOption.choices.map((c: string) => <option key={c} value={c}>{c}</option>)}</select>}
               </label>
             ))}</div></div>
           ) : <Input label="Number of Guests" type="number" min={1} max={invitation.maxGuests} value={guestCount || ''} onChange={(e) => setGuestCount(parseInt(e.target.value) || 0)} />}
