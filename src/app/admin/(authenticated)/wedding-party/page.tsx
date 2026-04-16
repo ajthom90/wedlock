@@ -1,6 +1,23 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,12 +25,16 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { FocalPointEditor } from '@/components/admin/FocalPointEditor';
 import { Framed } from '@/components/public/Framed';
 
-function sideLabel(side: string): string {
-  if (side === 'bride') return 'Bride';
-  if (side === 'groom') return 'Groom';
-  if (side === 'supporting-cast') return 'Supporting Cast';
-  return side;
-}
+type Side = 'bride' | 'groom' | 'supporting-cast';
+
+// Defines the render order of groups in the admin list. Public page layout
+// is still two-column bride+groom + supporting cast below, controlled
+// independently by the weddingPartyLeftSide setting.
+const GROUPS: { side: Side; label: string }[] = [
+  { side: 'bride', label: "Bride's Party" },
+  { side: 'groom', label: "Groom's Party" },
+  { side: 'supporting-cast', label: 'Supporting Cast' },
+];
 
 interface WeddingPartyMember {
   id: string;
@@ -28,6 +49,72 @@ interface WeddingPartyMember {
   zoom: number;
 }
 
+function SortableMemberRow({
+  member,
+  onEdit,
+  onDelete,
+}: {
+  member: WeddingPartyMember;
+  onEdit: (m: WeddingPartyMember) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: member.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+    >
+      <Card>
+        <CardContent className="py-4">
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              aria-label="Drag to reorder"
+              className="text-gray-400 hover:text-gray-700 cursor-grab active:cursor-grabbing touch-none px-1"
+              {...attributes}
+              {...listeners}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="9" cy="6" r="1.5" /><circle cx="9" cy="12" r="1.5" /><circle cx="9" cy="18" r="1.5" />
+                <circle cx="15" cy="6" r="1.5" /><circle cx="15" cy="12" r="1.5" /><circle cx="15" cy="18" r="1.5" />
+              </svg>
+            </button>
+            {member.imageUrl ? (
+              <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 bg-gray-100">
+                <Framed
+                  src={member.imageUrl}
+                  alt={member.name}
+                  focalX={member.focalX}
+                  focalY={member.focalY}
+                  zoom={member.zoom}
+                />
+              </div>
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center text-2xl flex-shrink-0">👤</div>
+            )}
+            <div className="flex-1">
+              <p className="font-semibold">{member.name}</p>
+              <p className="text-sm text-gray-600">{member.role}</p>
+              {member.description && (
+                <p className="text-sm text-gray-500 mt-1">{member.description}</p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => onEdit(member)}>Edit</Button>
+              <Button size="sm" variant="danger" onClick={() => onDelete(member.id)}>Delete</Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function WeddingPartyPage() {
   const [members, setMembers] = useState<WeddingPartyMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,12 +124,21 @@ export default function WeddingPartyPage() {
 
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
-  const [side, setSide] = useState('bride');
+  const [side, setSide] = useState<Side>('bride');
   const [description, setDescription] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState('');
   const [focal, setFocal] = useState({ focalX: 50, focalY: 50, zoom: 1 });
   const [saving, setSaving] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // Abort in-flight reorder requests when a newer drop arrives so rapid drags
+  // don't race. Server state ends up matching the most recent UI state.
+  const reorderAbortRef = useRef<AbortController | null>(null);
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -82,7 +178,7 @@ export default function WeddingPartyPage() {
     setEditingId(member.id);
     setName(member.name);
     setRole(member.role);
-    setSide(member.side);
+    setSide((member.side as Side) || 'bride');
     setDescription(member.description || '');
     setImageUrl(member.imageUrl || '');
     setImageFile(null);
@@ -103,21 +199,20 @@ export default function WeddingPartyPage() {
     } catch (error) {
       console.error('Failed to upload image:', error);
     }
-    return imageUrl || null;
+    return null;
   };
 
   const handleSave = async () => {
-    if (!name.trim() || !role.trim()) return;
     setSaving(true);
     try {
       const uploadedUrl = await uploadImage();
       const body = {
-        name: name.trim(),
-        role: role.trim(),
+        name,
+        role,
         side,
-        description: description.trim() || null,
+        description: description || null,
         imageUrl: uploadedUrl,
-        order: editingId ? members.find((m) => m.id === editingId)?.order || 0 : members.length,
+        order: editingId ? members.find((m) => m.id === editingId)?.order || 0 : members.filter((m) => m.side === side).length,
         focalX: focal.focalX,
         focalY: focal.focalY,
         zoom: focal.zoom,
@@ -150,7 +245,37 @@ export default function WeddingPartyPage() {
     }
   };
 
-  const sorted = [...members].sort((a, b) => a.order - b.order);
+  // On drag end within a group: recompute `order` for every member in that
+  // group (0…n-1) and batch-post to /api/wedding-party/reorder.
+  const handleDragEndWithinSide = (groupSide: Side) => async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const inGroup = members.filter((m) => m.side === groupSide).sort((a, b) => a.order - b.order);
+    const oldIndex = inGroup.findIndex((m) => m.id === active.id);
+    const newIndex = inGroup.findIndex((m) => m.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const reordered = arrayMove(inGroup, oldIndex, newIndex).map((m, i) => ({ ...m, order: i }));
+    const outsideGroup = members.filter((m) => m.side !== groupSide);
+    setMembers([...outsideGroup, ...reordered]);
+
+    reorderAbortRef.current?.abort();
+    const controller = new AbortController();
+    reorderAbortRef.current = controller;
+    try {
+      await fetch('/api/wedding-party/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates: reordered.map(({ id, order }) => ({ id, order })) }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') {
+        console.error('Failed to save reorder:', error);
+      }
+    }
+  };
 
   // Shows the user the uploaded image immediately for focal-point editing, even
   // before they click Save. Local files become blob URLs for the editor preview.
@@ -174,49 +299,40 @@ export default function WeddingPartyPage() {
         <Button onClick={openCreate}>Add Member</Button>
       </div>
 
-      <div className="space-y-3">
-        {sorted.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-gray-500">No wedding party members yet</CardContent>
-          </Card>
-        ) : (
-          sorted.map((member) => (
-            <Card key={member.id}>
-              <CardContent className="py-4">
-                <div className="flex items-center gap-4">
-                  {member.imageUrl ? (
-                    <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 bg-gray-100">
-                      <Framed
-                        src={member.imageUrl}
-                        alt={member.name}
-                        focalX={member.focalX}
-                        focalY={member.focalY}
-                        zoom={member.zoom}
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center text-2xl flex-shrink-0">👤</div>
-                  )}
-                  <div className="flex-1">
-                    <p className="font-semibold">{member.name}</p>
-                    <p className="text-sm text-gray-600">{member.role}</p>
-                    <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
-                      {sideLabel(member.side)}
-                    </span>
-                    {member.description && (
-                      <p className="text-sm text-gray-500 mt-1">{member.description}</p>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => openEdit(member)}>Edit</Button>
-                    <Button size="sm" variant="danger" onClick={() => setDeleteId(member.id)}>Delete</Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+      {members.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center text-gray-500">No wedding party members yet</CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-8">
+          {GROUPS.map((group) => {
+            const inGroup = members.filter((m) => m.side === group.side).sort((a, b) => a.order - b.order);
+            return (
+              <section key={group.side}>
+                <h2 className="text-lg font-semibold mb-3">{group.label}</h2>
+                {inGroup.length === 0 ? (
+                  <p className="text-sm text-gray-500 italic">No one in this group yet.</p>
+                ) : (
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndWithinSide(group.side)}>
+                    <SortableContext items={inGroup.map((m) => m.id)} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-3">
+                        {inGroup.map((member) => (
+                          <SortableMemberRow
+                            key={member.id}
+                            member={member}
+                            onEdit={openEdit}
+                            onDelete={setDeleteId}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      )}
 
       {/* Create/Edit Modal */}
       {showModal && (
@@ -239,7 +355,7 @@ export default function WeddingPartyPage() {
                 <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   value={side}
-                  onChange={(e) => setSide(e.target.value)}
+                  onChange={(e) => setSide(e.target.value as Side)}
                 >
                   <option value="bride">Bride</option>
                   <option value="groom">Groom</option>
