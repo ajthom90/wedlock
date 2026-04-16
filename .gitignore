@@ -15,3 +15,6 @@ next-env.d.ts
 *.db
 *.db-journal
 .playwright-mcp/
+# Verification screenshots from Playwright testing sessions
+/rsvp-*.png
+/page-*.png
