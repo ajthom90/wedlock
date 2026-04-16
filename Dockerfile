@@ -9,15 +9,31 @@ RUN apk add --no-cache libc6-compat openssl
 
 
 # ---------------------------------------------------------------------------
-# deps: install npm packages. Invalidates only when package-lock.json changes.
+# deps: install all deps (dev + prod) for the build. Invalidates only when
+# package-lock.json changes.
 # ---------------------------------------------------------------------------
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-# --no-audit / --no-fund skip two network round-trips that do nothing for us.
-# --prefer-offline uses the BuildKit-mounted npm tarball cache first.
 RUN --mount=type=cache,target=/root/.npm,id=npm \
     npm ci --no-audit --no-fund --prefer-offline
+
+
+# ---------------------------------------------------------------------------
+# prod-deps: production-only deps for the runtime image. Runs `prisma generate`
+# here so node_modules/.prisma ends up in the same tree we'll copy to runner.
+# This stage is why `prisma` lives in `dependencies`, not `devDependencies` —
+# the CLI (+ its transitive runtime deps like @prisma/config and `effect`) is
+# needed at container start for `prisma db push` in docker-entrypoint.sh.
+# ---------------------------------------------------------------------------
+FROM base AS prod-deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm,id=npm \
+    npm ci --omit=dev --no-audit --no-fund --prefer-offline
+COPY prisma ./prisma
+RUN --mount=type=cache,target=/root/.cache/prisma,id=prisma \
+    npx prisma generate
 
 
 # ---------------------------------------------------------------------------
@@ -28,37 +44,25 @@ RUN --mount=type=cache,target=/root/.npm,id=npm \
 FROM base AS builder
 WORKDIR /app
 
-# node_modules from deps. Content-addressable — no physical copy cost when
-# the deps layer is cached.
 COPY --from=deps /app/node_modules ./node_modules
-
-# package metadata so next build can resolve the runtime version string.
 COPY package.json package-lock.json ./
 
-# Prisma schema → regenerate client. Cached unless schema.prisma changes.
 COPY prisma ./prisma
 RUN --mount=type=cache,target=/root/.cache/prisma,id=prisma \
     npx prisma generate
 
-# Build-time config files. Rarely change; separating them from src/ keeps
-# the src-changes path from invalidating the config-parsing layer.
 # (next-env.d.ts is gitignored; next build regenerates it.)
 COPY next.config.mjs tsconfig.json postcss.config.mjs tailwind.config.ts ./
-
-# Static assets. Change occasionally.
 COPY public ./public
-
-# Source code. Changes most often — put last so everything above can cache.
 COPY src ./src
 
-# Next.js incremental build cache survives across builds, turning a full
-# rebuild into an incremental one when many modules are unchanged.
 RUN --mount=type=cache,target=/app/.next/cache,id=next \
     npm run build
 
 
 # ---------------------------------------------------------------------------
-# runner: minimal production image. Only copies what's needed at runtime.
+# runner: minimal production image. Next.js standalone output layered over
+# the pruned production node_modules from prod-deps.
 # ---------------------------------------------------------------------------
 FROM base AS runner
 WORKDIR /app
@@ -72,23 +76,27 @@ ENV NODE_ENV=production \
 RUN addgroup --system --gid 568 nodejs && \
     adduser --system --uid 568 nextjs
 
-# Static assets served by next server.
-COPY --from=builder /app/public ./public
-
-# Prepare .next + uploads volume link.
 RUN mkdir .next && chown nextjs:nodejs .next && \
-    mkdir -p /data/uploads && chown -R nextjs:nodejs /data && \
-    ln -sf /data/uploads ./public/uploads
+    mkdir -p /data/uploads && chown -R nextjs:nodejs /data
 
-# Next.js standalone output — smallest possible node server bundle.
+# Production node_modules first (includes prisma CLI + every transitive dep
+# the entrypoint migration step needs at runtime).
+COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+
+# Prisma schema lives next to the app — `prisma db push` reads it relative
+# to cwd at container start.
+COPY --from=prod-deps --chown=nextjs:nodejs /app/prisma ./prisma
+
+# Next.js build output: the standalone server bundle + static assets + public.
+# server.js / package.json come from the standalone output; node_modules in
+# it is a subset of prod-deps (which we've already placed) so no conflict.
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Prisma client + CLI (entrypoint runs `prisma db push` on start).
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+# Guest uploads share the /data volume with SQLite so they persist across
+# image upgrades. Symlinked after public/ is in place.
+RUN ln -sf /data/uploads ./public/uploads
 
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
