@@ -42,7 +42,8 @@ RUN --mount=type=cache,target=/root/.cache/prisma,id=prisma \
 
 # Build-time config files. Rarely change; separating them from src/ keeps
 # the src-changes path from invalidating the config-parsing layer.
-COPY next.config.mjs tsconfig.json postcss.config.mjs tailwind.config.ts next-env.d.ts ./
+# (next-env.d.ts is gitignored; next build regenerates it.)
+COPY next.config.mjs tsconfig.json postcss.config.mjs tailwind.config.ts ./
 
 # Static assets. Change occasionally.
 COPY public ./public
