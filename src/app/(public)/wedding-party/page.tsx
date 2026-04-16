@@ -55,9 +55,15 @@ export default async function WeddingPartyPage() {
           {supportingCast.length > 0 && (
             <section>
               <h2 className="text-3xl font-heading font-semibold text-center mb-8">Supporting Cast</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                {supportingCast.map((m) => <MemberCard key={m.id} member={m} />)}
-              </div>
+              {supportingCast.length === 1 ? (
+                <div className="max-w-xs mx-auto">
+                  <MemberCard member={supportingCast[0]} />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
+                  {supportingCast.map((m) => <MemberCard key={m.id} member={m} />)}
+                </div>
+              )}
             </section>
           )}
         </div>
