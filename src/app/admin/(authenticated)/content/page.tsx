@@ -26,11 +26,6 @@ interface OurStoryContent {
   story: string;
 }
 
-interface DetailsContent {
-  schedule: string;
-  dressCode: string;
-}
-
 interface TravelContent {
   travelInfo: string;
   hotels: HotelInfo[];
@@ -38,7 +33,6 @@ interface TravelContent {
 
 const TABS = [
   { slug: 'our-story', label: 'Our Story' },
-  { slug: 'details', label: 'Details' },
   { slug: 'travel', label: 'Travel' },
 ];
 
@@ -50,10 +44,6 @@ export default function ContentPage() {
 
   // Our Story fields
   const [story, setStoryText] = useState('');
-
-  // Details fields
-  const [schedule, setSchedule] = useState('');
-  const [dressCode, setDressCode] = useState('');
 
   // Travel fields
   const [travelInfo, setTravelInfo] = useState('');
@@ -69,12 +59,6 @@ export default function ContentPage() {
         case 'our-story': {
           const data = content as OurStoryContent;
           setStoryText(data.story || '');
-          break;
-        }
-        case 'details': {
-          const data = content as DetailsContent;
-          setSchedule(data.schedule || '');
-          setDressCode(data.dressCode || '');
           break;
         }
         case 'travel': {
@@ -117,17 +101,13 @@ export default function ContentPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      let content: OurStoryContent | DetailsContent | TravelContent;
+      let content: OurStoryContent | TravelContent;
       let title: string;
 
       switch (activeTab) {
         case 'our-story':
           title = 'Our Story';
           content = { story };
-          break;
-        case 'details':
-          title = 'Details';
-          content = { schedule, dressCode };
           break;
         case 'travel':
           title = 'Travel';
@@ -203,28 +183,6 @@ export default function ContentPage() {
                 minHeight="300px"
               />
             </div>
-          )}
-
-          {activeTab === 'details' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium mb-1">Schedule</label>
-                <RichTextEditor
-                  value={schedule}
-                  onChange={setSchedule}
-                  placeholder="Ceremony at 4:00 PM, Reception to follow…"
-                  minHeight="200px"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Dress Code</label>
-                <Input
-                  value={dressCode}
-                  onChange={(e) => setDressCode(e.target.value)}
-                  placeholder="e.g., Formal, Semi-Formal, Cocktail"
-                />
-              </div>
-            </>
           )}
 
           {activeTab === 'travel' && (

@@ -18,7 +18,6 @@ const fallbackNavItems: PublicNavItem[] = [
   { href: '/travel', label: 'Travel' },
   { href: '/transportation', label: 'Transportation' },
   { href: '/registry', label: 'Registry' },
-  { href: '/events', label: 'Events' },
   { href: '/faq', label: 'FAQ' },
   { href: '/seating', label: 'Seating' },
   { href: '/guestbook', label: 'Guest Book' },

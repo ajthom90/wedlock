@@ -9,11 +9,10 @@ const defaultNavItems = [
   { href: '/details', label: 'Details', order: 3 },
   { href: '/travel', label: 'Travel', order: 4 },
   { href: '/registry', label: 'Registry', order: 5 },
-  { href: '/events', label: 'Events', order: 6 },
-  { href: '/faq', label: 'FAQ', order: 7 },
-  { href: '/seating', label: 'Seating', order: 8 },
-  { href: '/guestbook', label: 'Guest Book', order: 9 },
-  { href: '/rsvp', label: 'RSVP', order: 10 },
+  { href: '/faq', label: 'FAQ', order: 6 },
+  { href: '/seating', label: 'Seating', order: 7 },
+  { href: '/guestbook', label: 'Guest Book', order: 8 },
+  { href: '/rsvp', label: 'RSVP', order: 9 },
 ];
 
 export async function GET() {

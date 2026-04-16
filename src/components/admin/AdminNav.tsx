@@ -39,7 +39,7 @@ const navGroups: NavGroup[] = [
       { href: '/admin/content', label: 'Pages', icon: '📄' },
       { href: '/admin/banner', label: 'Home Banner', icon: '🏞️' },
       { href: '/admin/wedding-party', label: 'Wedding Party', icon: '💑' },
-      { href: '/admin/events', label: 'Events', icon: '📅' },
+      { href: '/admin/details', label: 'Details', icon: '📅' },
       { href: '/admin/story-timeline', label: 'Story Timeline', icon: '📜', feature: 'storyTimeline' },
       { href: '/admin/faq', label: 'FAQ', icon: '❓' },
     ],

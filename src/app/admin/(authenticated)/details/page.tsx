@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
 
 interface Event {
@@ -19,6 +19,14 @@ interface Event {
   visibility: string;
 }
 
+interface PageContent {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  updatedAt: string;
+}
+
 const emptyForm: Omit<Event, 'id'> = {
   name: '',
   date: '',
@@ -31,7 +39,7 @@ const emptyForm: Omit<Event, 'id'> = {
   visibility: 'public',
 };
 
-export default function EventsPage() {
+export default function DetailsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -39,6 +47,14 @@ export default function EventsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  // Dress code lives in Page{slug='details'}.content (JSON). We preserve any
+  // other keys (e.g. legacy `schedule` prose) on save so older data isn't
+  // clobbered just because we're not surfacing it here.
+  const [dressCode, setDressCode] = useState('');
+  const [existingPageContent, setExistingPageContent] = useState<Record<string, unknown>>({});
+  const [savingDressCode, setSavingDressCode] = useState(false);
+  const [dressCodeSaved, setDressCodeSaved] = useState(false);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -54,9 +70,53 @@ export default function EventsPage() {
     }
   }, []);
 
+  const fetchDressCode = useCallback(async () => {
+    try {
+      const res = await fetch('/api/pages');
+      if (!res.ok) return;
+      const pages: PageContent[] = await res.json();
+      const page = pages.find((p) => p.slug === 'details');
+      if (!page?.content) return;
+      try {
+        const parsed = JSON.parse(page.content);
+        if (parsed && typeof parsed === 'object') {
+          setExistingPageContent(parsed);
+          setDressCode(parsed.dressCode || '');
+        }
+      } catch {
+        // Legacy plain-text content — no dress code to extract.
+      }
+    } catch (error) {
+      console.error('Failed to fetch dress code:', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchEvents();
-  }, [fetchEvents]);
+    fetchDressCode();
+  }, [fetchEvents, fetchDressCode]);
+
+  const saveDressCode = async () => {
+    setSavingDressCode(true);
+    setDressCodeSaved(false);
+    try {
+      const content = { ...existingPageContent, dressCode };
+      const res = await fetch('/api/pages', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'details', title: 'Details', content }),
+      });
+      if (res.ok) {
+        setExistingPageContent(content);
+        setDressCodeSaved(true);
+        setTimeout(() => setDressCodeSaved(false), 2000);
+      }
+    } catch (error) {
+      console.error('Failed to save dress code:', error);
+    } finally {
+      setSavingDressCode(false);
+    }
+  };
 
   const updateForm = (key: keyof typeof emptyForm, value: string) => {
     setForm({ ...form, [key]: value });
@@ -134,12 +194,33 @@ export default function EventsPage() {
     }
   };
 
-  if (loading) return <div className="flex justify-center py-12"><p className="text-gray-500">Loading events...</p></div>;
+  if (loading) return <div className="flex justify-center py-12"><p className="text-gray-500">Loading details...</p></div>;
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Event Management</h1>
+      <h1 className="text-3xl font-bold">Details</h1>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Dress Code</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Input
+            value={dressCode}
+            onChange={(e) => setDressCode(e.target.value)}
+            placeholder="e.g., Formal, Semi-Formal, Cocktail"
+          />
+        </CardContent>
+        <CardFooter className="justify-end gap-3">
+          {dressCodeSaved && <span className="text-sm text-green-600">Saved</span>}
+          <Button onClick={saveDressCode} disabled={savingDressCode}>
+            {savingDressCode ? 'Saving...' : 'Save Dress Code'}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      <div className="flex justify-between items-center pt-4">
+        <h2 className="text-2xl font-semibold">Events</h2>
         <Button onClick={openAdd}>Add Event</Button>
       </div>
 
