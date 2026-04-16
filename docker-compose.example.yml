@@ -1,0 +1,19 @@
+# Example deployment compose file. Copy to docker-compose.yml and edit for
+# your environment (image, password, data path, port).
+services:
+  wedlock:
+    image: ghcr.io/YOUR-USERNAME/wedlock:latest
+    restart: unless-stopped
+    pull_policy: always
+    environment:
+      # Password for /admin — change this to something strong.
+      ADMIN_PASSWORD: changeme
+      # Your local timezone (affects countdown + date display).
+      TZ: America/Chicago
+    ports:
+      # Host:container. Container listens on 3000.
+      - "3000:3000"
+    volumes:
+      # SQLite DB + uploaded photos/fonts live here. Bind-mount a host
+      # directory so your content survives image upgrades.
+      - /path/to/wedlock/data:/data

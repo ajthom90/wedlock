@@ -1,10 +1,19 @@
 #!/bin/bash
 set -e
 
-REGISTRIES=(
-  "forgejo.int.aafoods.com/ajthom90/joe-and-alex"
-  "forgejo.home.njathome.net/ajthom90/joe-and-alex"
-)
+# Registries are configured per-deployer via the DOCKER_REGISTRIES env var
+# (space-separated image repo paths). Drop it in a local .env file — see
+# .env.example for the format. If unset, a placeholder is used so you get
+# an obvious error instead of an accidental push to the wrong place.
+if [ -f .env ]; then
+  set -a; . ./.env; set +a
+fi
+if [ -n "${DOCKER_REGISTRIES:-}" ]; then
+  IFS=' ' read -ra REGISTRIES <<< "$DOCKER_REGISTRIES"
+else
+  REGISTRIES=("ghcr.io/YOUR-USERNAME/wedlock")
+  echo "Warning: DOCKER_REGISTRIES not set — using placeholder ${REGISTRIES[0]}. Set it in .env before pushing." >&2
+fi
 # Pick one registry to host the buildx layer cache. Only one needed since
 # the cache just accelerates *building*; both registries receive full images.
 CACHE_REF="${REGISTRIES[0]}:buildcache"

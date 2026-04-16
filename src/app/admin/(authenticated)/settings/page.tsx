@@ -210,7 +210,7 @@ export default function SettingsPage() {
             <Input
               value={settings.siteTitle}
               onChange={(e) => update('siteTitle', e.target.value)}
-              placeholder="Leave blank for: Joe & Alex - November 28, 2026"
+              placeholder="Leave blank for a default title"
             />
             <p className="text-sm text-gray-500 mt-1">
               Shown in the browser tab and bookmarks. Leave blank to auto-build from
