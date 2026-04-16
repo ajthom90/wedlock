@@ -143,7 +143,7 @@ function RSVPForm() {
   return (
     <div className="container mx-auto px-4 py-16"><div className="max-w-xl mx-auto">
       <h1 className="text-4xl font-heading font-bold text-center text-primary mb-2">RSVP</h1>
-      <p className="text-center text-foreground/70 mb-8">The {invitation.householdName} Household</p>
+      <p className="text-center text-foreground/70 mb-8">{/^the\s/i.test(invitation.householdName) ? '' : 'The '}{invitation.householdName} Household</p>
       <Card><CardContent className="py-8"><form onSubmit={handleReview} className="space-y-6">
         <div><p className="font-medium mb-3">Will you be attending?</p><div className="flex gap-4"><Button type="button" variant={attending === 'yes' ? 'primary' : 'outline'} onClick={() => setAttending('yes')}>Joyfully Accept</Button><Button type="button" variant={attending === 'no' ? 'primary' : 'outline'} onClick={declineRsvp}>Regretfully Decline</Button></div></div>
         {attending === 'yes' && (<>
