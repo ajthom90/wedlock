@@ -5,6 +5,7 @@ import { Card, CardContent, Button, Input, Textarea } from '@/components/ui';
 
 type Guest = { id: string; name: string; isPrimary: boolean };
 type PlusOne = { name: string; meal: string };
+type RsvpChoice = { name: string; description?: string };
 
 function RSVPForm() {
   const searchParams = useSearchParams();
@@ -146,12 +147,25 @@ function RSVPForm() {
       <Card><CardContent className="py-8"><form onSubmit={handleReview} className="space-y-6">
         <div><p className="font-medium mb-3">Will you be attending?</p><div className="flex gap-4"><Button type="button" variant={attending === 'yes' ? 'primary' : 'outline'} onClick={() => setAttending('yes')}>Joyfully Accept</Button><Button type="button" variant={attending === 'no' ? 'primary' : 'outline'} onClick={declineRsvp}>Regretfully Decline</Button></div></div>
         {attending === 'yes' && (<>
+          {mealOption && mealOption.choices.some((c: RsvpChoice) => c.description) && (
+            <div className="rounded-md border border-primary/20 bg-primary/5 p-4">
+              <p className="font-medium mb-2">Dinner menu</p>
+              <ul className="space-y-2">
+                {mealOption.choices.map((c: RsvpChoice) => (
+                  <li key={c.name} className="text-sm">
+                    <span className="font-medium">{c.name}</span>
+                    {c.description && <span className="text-foreground/70"> — {c.description}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {features.perGuestSelection && invitation.guests?.length > 0 ? (
             <div><p className="font-medium mb-3">Who will be attending?</p><div className="space-y-2">{invitation.guests.map((guest: any) => (
               <label key={guest.id} className="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-gray-50">
                 <input type="checkbox" checked={attendingGuests.includes(guest.id)} onChange={() => toggleGuest(guest.id)} className="h-4 w-4" />
                 <span>{guest.name}</span>
-                {mealOption && attendingGuests.includes(guest.id) && <select className={`ml-auto border rounded px-2 py-1 text-sm ${missingMeals.includes(guest.id) ? 'border-red-500 ring-2 ring-red-500' : ''}`} value={guestMeals[guest.id] || ''} onChange={(e) => { setGuestMeals({...guestMeals, [guest.id]: e.target.value}); if (e.target.value) setMissingMeals(prev => prev.filter(id => id !== guest.id)); }}><option value="">Select meal...</option>{mealOption.choices.map((c: string) => <option key={c} value={c}>{c}</option>)}</select>}
+                {mealOption && attendingGuests.includes(guest.id) && <select className={`ml-auto border rounded px-2 py-1 text-sm ${missingMeals.includes(guest.id) ? 'border-red-500 ring-2 ring-red-500' : ''}`} value={guestMeals[guest.id] || ''} onChange={(e) => { setGuestMeals({...guestMeals, [guest.id]: e.target.value}); if (e.target.value) setMissingMeals(prev => prev.filter(id => id !== guest.id)); }}><option value="">Select meal...</option>{mealOption.choices.map((c: RsvpChoice) => <option key={c.name} value={c.name}>{c.name}</option>)}</select>}
               </label>
             ))}</div></div>
           ) : <Input label="Number of Guests" type="number" min={1} max={invitation.maxGuests} value={guestCount || ''} onChange={(e) => setGuestCount(parseInt(e.target.value) || 0)} />}
@@ -181,7 +195,7 @@ function RSVPForm() {
                         }}
                       >
                         <option value="">Select meal...</option>
-                        {mealOption.choices.map((c: string) => <option key={c} value={c}>{c}</option>)}
+                        {mealOption.choices.map((c: RsvpChoice) => <option key={c.name} value={c.name}>{c.name}</option>)}
                       </select>
                     )}
                   </div>
@@ -189,7 +203,7 @@ function RSVPForm() {
               </div>
             </div>
           )}
-          {rsvpOptions.filter((o: any) => o.type !== 'meal').map((option: any) => (<div key={option.id}><p className="font-medium mb-2">{option.label}</p><select className="w-full border rounded-md px-3 py-2" value={responses[option.id] || ''} onChange={(e) => setResponses({...responses, [option.id]: e.target.value})} required={option.required}><option value="">Select...</option>{option.choices.map((c: string) => <option key={c} value={c}>{c}</option>)}</select></div>))}
+          {rsvpOptions.filter((o: any) => o.type !== 'meal').map((option: any) => (<div key={option.id}><p className="font-medium mb-2">{option.label}</p><select className="w-full border rounded-md px-3 py-2" value={responses[option.id] || ''} onChange={(e) => setResponses({...responses, [option.id]: e.target.value})} required={option.required}><option value="">Select...</option>{option.choices.map((c: RsvpChoice) => <option key={c.name} value={c.name}>{c.name}</option>)}</select></div>))}
           {features.dietaryNotes && <Textarea label="Dietary Restrictions or Allergies" value={dietaryNotes} onChange={(e) => setDietaryNotes(e.target.value)} placeholder="Let us know about any dietary needs..." rows={2} />}
           {features.songRequests && <Textarea label="Song Requests" value={songRequests} onChange={(e) => setSongRequests(e.target.value)} placeholder="Any songs you'd like to hear?" rows={2} />}
         </>)}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getSiteSettings, getFeatures } from '@/lib/settings';
+import { parseRsvpChoices } from '@/lib/rsvpChoices';
 import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       invitation,
-      rsvpOptions: options.map((o) => ({ ...o, choices: JSON.parse(o.choices) })),
+      rsvpOptions: options.map((o) => ({ ...o, choices: parseRsvpChoices(o.choices) })),
       settings: { rsvpDeadline: settings.rsvpDeadline, rsvpCloseAfterDeadline: settings.rsvpCloseAfterDeadline },
       features: {
         perGuestSelection: features.perGuestSelection,

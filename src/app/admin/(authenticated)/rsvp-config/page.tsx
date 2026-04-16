@@ -14,6 +14,33 @@ interface RsvpOption {
   order: number;
 }
 
+type ChoiceRow = { name: string; description: string };
+
+// Parse the stored choices JSON, tolerating both legacy string[] and the new
+// [{ name, description? }] shape. Always returns rows with both fields so the
+// admin form can edit them uniformly.
+function parseChoiceRows(raw: string): ChoiceRow[] {
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [{ name: '', description: '' }];
+    const rows = parsed
+      .map((c: unknown): ChoiceRow | null => {
+        if (typeof c === 'string') return c.trim() ? { name: c.trim(), description: '' } : null;
+        if (c && typeof c === 'object') {
+          const r = c as { name?: unknown; description?: unknown };
+          const name = typeof r.name === 'string' ? r.name.trim() : '';
+          const description = typeof r.description === 'string' ? r.description : '';
+          return name ? { name, description } : null;
+        }
+        return null;
+      })
+      .filter((r): r is ChoiceRow => r !== null);
+    return rows.length ? rows : [{ name: '', description: '' }];
+  } catch {
+    return [{ name: '', description: '' }];
+  }
+}
+
 export default function RsvpConfigPage() {
   const [options, setOptions] = useState<RsvpOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +50,7 @@ export default function RsvpConfigPage() {
 
   const [type, setType] = useState('meal');
   const [label, setLabel] = useState('');
-  const [choices, setChoices] = useState('');
+  const [choiceRows, setChoiceRows] = useState<ChoiceRow[]>([{ name: '', description: '' }]);
   const [required, setRequired] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -48,7 +75,7 @@ export default function RsvpConfigPage() {
   const resetForm = () => {
     setType('meal');
     setLabel('');
-    setChoices('');
+    setChoiceRows([{ name: '', description: '' }]);
     setRequired(false);
     setEditingId(null);
   };
@@ -62,7 +89,7 @@ export default function RsvpConfigPage() {
     setEditingId(opt.id);
     setType(opt.type);
     setLabel(opt.label);
-    try { setChoices(JSON.parse(opt.choices).join(', ')); } catch { setChoices(opt.choices); }
+    setChoiceRows(parseChoiceRows(opt.choices));
     setRequired(opt.required);
     setShowModal(true);
   };
@@ -71,10 +98,14 @@ export default function RsvpConfigPage() {
     if (!label.trim()) return;
     setSaving(true);
     try {
+      const cleanedChoices = choiceRows
+        .map((r) => ({ name: r.name.trim(), description: r.description.trim() }))
+        .filter((r) => r.name)
+        .map((r) => (r.description ? r : { name: r.name }));
       const body = {
         type,
         label: label.trim(),
-        choices: choices.split(',').map((c: string) => c.trim()).filter(Boolean),
+        choices: cleanedChoices,
         required,
         order: editingId ? options.find((o) => o.id === editingId)?.order || 0 : options.length,
       };
@@ -149,9 +180,15 @@ export default function RsvpConfigPage() {
               </CardHeader>
               {opt.choices && (
                 <CardContent>
-                  <p className="text-sm text-gray-600">
-                    <span className="font-medium">Choices:</span> {(() => { try { return JSON.parse(opt.choices).join(', '); } catch { return opt.choices; } })()}
-                  </p>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Choices</p>
+                  <ul className="space-y-1">
+                    {parseChoiceRows(opt.choices).filter((r) => r.name).map((r) => (
+                      <li key={r.name} className="text-sm text-gray-600">
+                        <span className="font-medium">{r.name}</span>
+                        {r.description && <span className="text-gray-500"> — {r.description}</span>}
+                      </li>
+                    ))}
+                  </ul>
                 </CardContent>
               )}
               <CardFooter className="gap-2">
@@ -188,8 +225,40 @@ export default function RsvpConfigPage() {
                 <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g., Meal Preference" />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Choices (comma-separated)</label>
-                <Input value={choices} onChange={(e) => setChoices(e.target.value)} placeholder="e.g., Chicken, Fish, Vegetarian" />
+                <label className="block text-sm font-medium mb-1">Choices</label>
+                <p className="text-xs text-gray-500 mb-2">Add one row per option. Description is optional — if set, guests see it alongside the meal name in a menu block on the RSVP form.</p>
+                <div className="space-y-2">
+                  {choiceRows.map((row, i) => (
+                    <div key={i} className="flex gap-2 items-start">
+                      <Input
+                        className="w-40 shrink-0"
+                        value={row.name}
+                        placeholder="Name (e.g. Chicken)"
+                        onChange={(e) => setChoiceRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, name: e.target.value } : r)))}
+                      />
+                      <Input
+                        value={row.description}
+                        placeholder="Description (optional)"
+                        onChange={(e) => setChoiceRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, description: e.target.value } : r)))}
+                      />
+                      {choiceRows.length > 1 && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          type="button"
+                          onClick={() => setChoiceRows((rows) => rows.filter((_, idx) => idx !== i))}
+                        >Remove</Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  className="mt-2"
+                  onClick={() => setChoiceRows((rows) => [...rows, { name: '', description: '' }])}
+                >Add choice</Button>
               </div>
               <div className="flex items-center gap-2">
                 <input

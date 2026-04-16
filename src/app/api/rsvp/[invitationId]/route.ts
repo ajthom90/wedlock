@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isAuthenticated } from '@/lib/auth';
+import { parseRsvpChoices } from '@/lib/rsvpChoices';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ invitationId: string }> }) {
   try {
@@ -9,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ inv
     const invitation = await prisma.invitation.findUnique({ where: { id: invitationId }, include: { guests: true, response: true } });
     if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
     const options = await prisma.rsvpOption.findMany({ orderBy: { order: 'asc' } });
-    return NextResponse.json({ invitation, rsvpOptions: options.map((o) => ({ ...o, choices: JSON.parse(o.choices) })) });
+    return NextResponse.json({ invitation, rsvpOptions: options.map((o) => ({ ...o, choices: parseRsvpChoices(o.choices) })) });
   } catch (error) {
     console.error('Error fetching RSVP:', error);
     return NextResponse.json({ error: 'Failed to fetch RSVP' }, { status: 500 });
