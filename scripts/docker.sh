@@ -15,8 +15,12 @@ PLATFORMS="linux/arm64,linux/amd64"
 # Read version from package.json
 VERSION=$(node -p "require('./package.json').version")
 # Preserved across the whole script so the EXIT trap can restore the file
-# if anything fails mid-build and leaves a placeholder behind.
+# if anything fails mid-build and leaves a placeholder behind. The bump
+# flow re-points RESTORE_VERSION at the new tag once git push succeeds, so
+# a failure in the local Docker step after the tag has already been pushed
+# won't roll package.json back and desync it from git.
 ORIGINAL_VERSION="$VERSION"
+RESTORE_VERSION="$VERSION"
 
 usage() {
   echo "Usage: $0 <command> [options]"
@@ -29,10 +33,11 @@ usage() {
   echo "  bump-major     Bump major version (e.g. 1.0.0 → 2.0.0), commit, tag, push remotes"
   echo "  version        Show current version"
   echo ""
-  echo "Bump flow: update package.json → (optional) build & push to DOCKER_REGISTRIES →"
-  echo "git commit → git tag vX.Y.Z → git push main + tag to every remote. The pushed"
-  echo "tag triggers .github/workflows/docker.yml, which publishes a multi-arch image"
-  echo "to ghcr.io/<repo>:X.Y.Z (plus :X.Y and :latest)."
+  echo "Bump flow: update package.json → git commit → git tag vX.Y.Z → git push main +"
+  echo "tag to every remote (kicks off .github/workflows/docker.yml to publish GHCR in"
+  echo "parallel) → build & push multi-arch image to DOCKER_REGISTRIES. Git push goes"
+  echo "first so the GitHub Actions build runs concurrently with the local registry"
+  echo "build, cutting total release time."
   echo ""
   echo "Options:"
   echo "  --no-latest    Don't tag local Docker push as :latest"
@@ -79,16 +84,17 @@ stabilize_version() {
 }
 
 # Trap that runs on any exit. On success the caller has already written the
-# correct final version. On failure we restore the original, so a failed
-# build never leaves the repo with the '0.0.0-build' placeholder.
+# correct final version. On failure we restore whatever version we should
+# currently be at (ORIGINAL_VERSION before a bump's tag push, the bumped
+# VERSION after it — so git and package.json never disagree).
 on_exit() {
   local rc=$?
   if [ $rc -ne 0 ]; then
     local current
     current=$(node -p "require('./package.json').version" 2>/dev/null || echo '')
     if [ "$current" = "0.0.0-build" ]; then
-      echo "Build failed — restoring package.json version to $ORIGINAL_VERSION"
-      write_version_to "$ORIGINAL_VERSION"
+      echo "Build failed — restoring package.json version to $RESTORE_VERSION"
+      write_version_to "$RESTORE_VERSION"
     fi
   fi
   return $rc
@@ -248,8 +254,15 @@ case "${1:-}" in
       echo ""
       echo "--no-push set; skipping git commit/tag/push. package.json is at $VERSION."
     else
-      build_with_stable_pkg "$VERSION" push
+      # Git push first so the GitHub Actions workflow kicks off immediately
+      # and builds GHCR in parallel with the local multi-arch build below.
+      # Once tag_and_push succeeds, git is authoritative on the new version,
+      # so if the local Docker step fails later, on_exit restores
+      # package.json to $VERSION (not ORIGINAL_VERSION) to keep them aligned.
+      write_version_to "$VERSION"
       tag_and_push "$VERSION"
+      RESTORE_VERSION="$VERSION"
+      build_with_stable_pkg "$VERSION" push
     fi
     ;;
   version)
