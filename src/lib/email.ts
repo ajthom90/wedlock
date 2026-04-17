@@ -225,7 +225,13 @@ export async function sendRsvpConfirmation(
 export async function renderThemedEmailHtml(plainBody: string): Promise<string> {
   const theme = await getTheme();
   const site = await getSiteSettings();
-  const coupleNames = escapeHtml(`${site.coupleName1} & ${site.coupleName2}`);
+  const coupleNames = `${site.coupleName1} & ${site.coupleName2}`;
+  // Admin can override the default "{couple names}" heading and
+  // "Sent from the {couple names} wedding site." footer via Email Settings.
+  // Blank falls back to the defaults. Both overrides and fallbacks are
+  // HTML-escaped so admin input can't break the template.
+  const heading = escapeHtml(site.emailHeading.trim() || coupleNames);
+  const footer = escapeHtml(site.emailFooter.trim() || `Sent from the ${coupleNames} wedding site.`);
   const primary = `rgb(${theme.primaryColor})`;
   const secondary = `rgb(${theme.secondaryColor})`;
   const fg = `rgb(${theme.foregroundColor})`;
@@ -242,11 +248,11 @@ export async function renderThemedEmailHtml(plainBody: string): Promise<string> 
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; padding: 32px;">
         <tr><td>
-          <h1 style="margin: 0 0 8px; font-family: ${headingFamily}; color: ${primary}; font-size: 28px; text-align: center; font-weight: normal;">${coupleNames}</h1>
+          <h1 style="margin: 0 0 8px; font-family: ${headingFamily}; color: ${primary}; font-size: 28px; text-align: center; font-weight: normal;">${heading}</h1>
           <hr style="border: none; border-top: 1px solid ${secondary}; margin: 24px 0;">
           <div style="font-size: 16px; line-height: 1.6; color: ${fg};">${bodyHtml}</div>
           <hr style="border: none; border-top: 1px solid ${secondary}; margin: 24px 0;">
-          <p style="margin: 0; font-size: 12px; color: ${secondary}; text-align: center;">Sent from the ${coupleNames} wedding site.</p>
+          <p style="margin: 0; font-size: 12px; color: ${secondary}; text-align: center;">${footer}</p>
         </td></tr>
       </table>
     </td></tr>

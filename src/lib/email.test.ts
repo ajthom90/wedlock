@@ -102,6 +102,59 @@ describe('renderThemedEmailHtml', () => {
     expect(html).toContain('<a href="https://example.com"');
     expect(html).toContain('>https://example.com</a>');
   });
+
+  it('falls back to couple names and default footer when no overrides are set', async () => {
+    const html = await renderThemedEmailHtml('body');
+    expect(html).toContain('>Joe &amp; Alex</h1>');
+    expect(html).toContain('Sent from the Joe &amp; Alex wedding site.');
+  });
+
+  it('uses site.emailHeading when set, falling back for footer', async () => {
+    vi.spyOn(prisma.setting, 'findMany').mockResolvedValue([
+      { id: '1', key: 'theme.primaryColor', value: '139 90 43' },
+      { id: '2', key: 'theme.secondaryColor', value: '180 148 115' },
+      { id: '3', key: 'theme.headingFont', value: 'Playfair Display' },
+      { id: '4', key: 'theme.bodyFont', value: 'Lato' },
+      { id: '5', key: 'site.coupleName1', value: 'Joe' },
+      { id: '6', key: 'site.coupleName2', value: 'Alex' },
+      { id: '7', key: 'site.emailHeading', value: 'Our Wedding' },
+    ] as any);
+    const html = await renderThemedEmailHtml('body');
+    expect(html).toContain('>Our Wedding</h1>');
+    expect(html).not.toContain('>Joe &amp; Alex</h1>');
+    // Footer still falls back.
+    expect(html).toContain('Sent from the Joe &amp; Alex wedding site.');
+  });
+
+  it('uses site.emailFooter when set', async () => {
+    vi.spyOn(prisma.setting, 'findMany').mockResolvedValue([
+      { id: '1', key: 'theme.primaryColor', value: '139 90 43' },
+      { id: '2', key: 'theme.secondaryColor', value: '180 148 115' },
+      { id: '3', key: 'theme.headingFont', value: 'Playfair Display' },
+      { id: '4', key: 'theme.bodyFont', value: 'Lato' },
+      { id: '5', key: 'site.coupleName1', value: 'Joe' },
+      { id: '6', key: 'site.coupleName2', value: 'Alex' },
+      { id: '7', key: 'site.emailFooter', value: 'Questions? hit reply.' },
+    ] as any);
+    const html = await renderThemedEmailHtml('body');
+    expect(html).toContain('Questions? hit reply.');
+    expect(html).not.toContain('Sent from the Joe &amp; Alex wedding site.');
+  });
+
+  it('HTML-escapes heading and footer overrides', async () => {
+    vi.spyOn(prisma.setting, 'findMany').mockResolvedValue([
+      { id: '1', key: 'theme.primaryColor', value: '139 90 43' },
+      { id: '2', key: 'theme.secondaryColor', value: '180 148 115' },
+      { id: '3', key: 'theme.headingFont', value: 'Playfair Display' },
+      { id: '4', key: 'theme.bodyFont', value: 'Lato' },
+      { id: '5', key: 'site.coupleName1', value: 'Joe' },
+      { id: '6', key: 'site.coupleName2', value: 'Alex' },
+      { id: '7', key: 'site.emailHeading', value: '<script>alert(1)</script>' },
+    ] as any);
+    const html = await renderThemedEmailHtml('body');
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+  });
 });
 
 import { sendMail, _resetEmailTransportForTests } from './email';

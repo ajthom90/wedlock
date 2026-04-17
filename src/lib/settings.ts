@@ -32,6 +32,12 @@ export interface SiteSettings {
   eventsDisplayStyle: 'list' | 'timeline';
   weddingPartyLeftSide: 'bride' | 'groom';
   replyToEmail: string;
+  // Optional overrides for the themed email wrapper. Blank falls back to
+  // couple names (heading) and "Sent from the … wedding site." (footer).
+  // Applied to every system-sent email: broadcasts, RSVP confirmations,
+  // admin test sends.
+  emailHeading: string;
+  emailFooter: string;
 }
 
 export interface FeatureSettings {
@@ -102,6 +108,8 @@ const defaultSite: SiteSettings = {
   eventsDisplayStyle: 'list',
   weddingPartyLeftSide: 'bride',
   replyToEmail: '',
+  emailHeading: '',
+  emailFooter: '',
 };
 
 const defaultFeatures: FeatureSettings = {

@@ -17,8 +17,13 @@ interface EmailStatus {
 export default function EmailSettingsPage() {
   const [status, setStatus] = useState<EmailStatus | null>(null);
   const [replyTo, setReplyTo] = useState('');
+  const [emailHeading, setEmailHeading] = useState('');
+  const [emailFooter, setEmailFooter] = useState('');
+  const [coupleNames, setCoupleNames] = useState('');
   const [savingReply, setSavingReply] = useState(false);
   const [replyMessage, setReplyMessage] = useState('');
+  const [savingBranding, setSavingBranding] = useState(false);
+  const [brandingMessage, setBrandingMessage] = useState('');
   const [testTo, setTestTo] = useState('');
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -33,6 +38,9 @@ export default function EmailSettingsPage() {
       if (settingsRes.ok) {
         const s = await settingsRes.json();
         setReplyTo(s.site?.replyToEmail || '');
+        setEmailHeading(s.site?.emailHeading || '');
+        setEmailFooter(s.site?.emailFooter || '');
+        setCoupleNames(`${s.site?.coupleName1 || ''} & ${s.site?.coupleName2 || ''}`.trim().replace(/^&\s*|\s*&$/g, ''));
       }
     })();
   }, []);
@@ -49,6 +57,21 @@ export default function EmailSettingsPage() {
       setReplyMessage(res.ok ? 'Saved' : 'Save failed');
     } finally {
       setSavingReply(false);
+    }
+  };
+
+  const saveBranding = async () => {
+    setSavingBranding(true);
+    setBrandingMessage('');
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ site: { emailHeading: emailHeading.trim(), emailFooter: emailFooter.trim() } }),
+      });
+      setBrandingMessage(res.ok ? 'Saved' : 'Save failed');
+    } finally {
+      setSavingBranding(false);
     }
   };
 
@@ -98,6 +121,38 @@ export default function EmailSettingsPage() {
           <div className="flex items-center gap-3">
             <Button onClick={saveReplyTo} disabled={savingReply}>{savingReply ? 'Saving…' : 'Save'}</Button>
             {replyMessage && <span className="text-sm">{replyMessage}</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Email heading &amp; footer</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-gray-600">
+            Override the heading at the top of every email and the footer line underneath.
+            Applies to broadcasts, RSVP confirmations, and test sends. Leave either blank to fall back to the default.
+          </p>
+          <div>
+            <label className="block text-sm font-medium mb-1">Heading</label>
+            <Input
+              value={emailHeading}
+              onChange={(e) => setEmailHeading(e.target.value)}
+              placeholder={coupleNames || 'Couple names'}
+            />
+            <p className="text-xs text-gray-500 mt-1">Default: {coupleNames || 'your couple names'}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Footer</label>
+            <Input
+              value={emailFooter}
+              onChange={(e) => setEmailFooter(e.target.value)}
+              placeholder={coupleNames ? `Sent from the ${coupleNames} wedding site.` : 'Sent from the … wedding site.'}
+            />
+            <p className="text-xs text-gray-500 mt-1">Default: Sent from the {coupleNames || '…'} wedding site.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={saveBranding} disabled={savingBranding}>{savingBranding ? 'Saving…' : 'Save'}</Button>
+            {brandingMessage && <span className="text-sm">{brandingMessage}</span>}
           </div>
         </CardContent>
       </Card>
