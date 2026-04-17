@@ -25,7 +25,11 @@ function RSVPForm() {
   const [songRequests, setSongRequests] = useState('');
   const [dietaryNotes, setDietaryNotes] = useState('');
   const [message, setMessage] = useState('');
-  const [address, setAddress] = useState('');
+  const [mailingAddress1, setMailingAddress1] = useState('');
+  const [mailingAddress2, setMailingAddress2] = useState('');
+  const [mailingCity, setMailingCity] = useState('');
+  const [mailingState, setMailingState] = useState('');
+  const [mailingPostalCode, setMailingPostalCode] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -45,7 +49,11 @@ function RSVPForm() {
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Invitation not found'); return; }
       setInvitation(data.invitation); setRsvpOptions(data.rsvpOptions || []); setSettings(data.settings || {}); setFeatures(data.features || {});
-      setAddress(data.invitation.address || '');
+      setMailingAddress1(data.invitation.mailingAddress1 || '');
+      setMailingAddress2(data.invitation.mailingAddress2 || '');
+      setMailingCity(data.invitation.mailingCity || '');
+      setMailingState(data.invitation.mailingState || '');
+      setMailingPostalCode(data.invitation.mailingPostalCode || '');
       setContactEmail(data.invitation.contactEmail || '');
       const slotCount = data.invitation.plusOnesAllowed || 0;
       const emptySlots = Array.from({ length: slotCount }, () => ({ name: '', meal: '' }));
@@ -121,7 +129,7 @@ function RSVPForm() {
     try {
       const namedPlusOnes = plusOnes.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), meal: p.meal }));
       const totalAttending = features.perGuestSelection ? attendingGuests.length + namedPlusOnes.length : guestCount;
-      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && features.perGuestSelection ? guestMeals : undefined, attendingGuests: attending === 'yes' && features.perGuestSelection ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, address: address.trim() || undefined, contactEmail }) });
+      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && features.perGuestSelection ? guestMeals : undefined, attendingGuests: attending === 'yes' && features.perGuestSelection ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, contactEmail }) });
       const data = await res.json();
       if (res.ok) { setShowConfirm(false); setSubmitted(true); }
       else setSubmitError(data.error || 'Failed to submit RSVP');
@@ -232,7 +240,18 @@ function RSVPForm() {
           {features.dietaryNotes && <Textarea label="Dietary Restrictions or Allergies" value={dietaryNotes} onChange={(e) => setDietaryNotes(e.target.value)} placeholder="Let us know about any dietary needs..." rows={2} />}
           {features.songRequests && <Textarea label="Song Requests" value={songRequests} onChange={(e) => setSongRequests(e.target.value)} placeholder="Any songs you'd like to hear?" rows={2} />}
         </>)}
-        {attending && features.rsvpAddress !== false && <Textarea label="Mailing address (optional — for save-the-dates and thank-you cards)" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, Springfield, IL 62704" rows={2} />}
+        {attending && features.rsvpAddress !== false && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Mailing address <span className="text-gray-500 font-normal">(optional — for save-the-dates and thank-you cards)</span></label>
+            <Input value={mailingAddress1} onChange={(e) => setMailingAddress1(e.target.value)} placeholder="Address line 1" />
+            <Input value={mailingAddress2} onChange={(e) => setMailingAddress2(e.target.value)} placeholder="Address line 2 (apt, suite, etc.)" />
+            <div className="grid grid-cols-3 gap-2">
+              <Input className="col-span-2" value={mailingCity} onChange={(e) => setMailingCity(e.target.value)} placeholder="City" />
+              <Input value={mailingState} onChange={(e) => setMailingState(e.target.value)} placeholder="State" />
+            </div>
+            <Input value={mailingPostalCode} onChange={(e) => setMailingPostalCode(e.target.value)} placeholder="Postal code" />
+          </div>
+        )}
         {attending && (features.rsvpConfirmationEmails || features.dayOfBroadcasts) && (
           <div className="mt-4">
             <label className="block text-sm font-medium mb-1">Stay in the loop (optional)</label>

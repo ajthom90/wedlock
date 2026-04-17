@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { code, attending, guestCount, responses, guestMeals, message, attendingGuests, plusOnes, songRequests, dietaryNotes, address, contactEmail } = await request.json();
+    const { code, attending, guestCount, responses, guestMeals, message, attendingGuests, plusOnes, songRequests, dietaryNotes, contactEmail, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode } = await request.json();
     if (!code) return NextResponse.json({ error: 'Invitation code is required' }, { status: 400 });
     const settings = await getSiteSettings();
     if (settings.rsvpDeadline && settings.rsvpCloseAfterDeadline) {
@@ -57,12 +57,24 @@ export async function POST(request: Request) {
     const invitation = await prisma.invitation.findUnique({ where: { code } });
     if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
     const features = await getFeatures();
-    // Persist the mailing address on the invitation if the guest provided one.
-    // Stored separately from the RsvpResponse so it survives RSVP changes.
-    if (typeof address === 'string' && address.trim()) {
+    // Persist structured mailing address on the invitation. Each field is
+    // independently updated so clearing one field doesn't clobber the others.
+    const addressPatch: {
+      mailingAddress1?: string | null;
+      mailingAddress2?: string | null;
+      mailingCity?: string | null;
+      mailingState?: string | null;
+      mailingPostalCode?: string | null;
+    } = {};
+    if (typeof mailingAddress1 === 'string') addressPatch.mailingAddress1 = mailingAddress1.trim() || null;
+    if (typeof mailingAddress2 === 'string') addressPatch.mailingAddress2 = mailingAddress2.trim() || null;
+    if (typeof mailingCity === 'string') addressPatch.mailingCity = mailingCity.trim() || null;
+    if (typeof mailingState === 'string') addressPatch.mailingState = mailingState.trim() || null;
+    if (typeof mailingPostalCode === 'string') addressPatch.mailingPostalCode = mailingPostalCode.trim() || null;
+    if (Object.keys(addressPatch).length > 0) {
       await prisma.invitation.update({
         where: { id: invitation.id },
-        data: { address: address.trim() },
+        data: addressPatch,
       });
     }
     // Persist contactEmail on the invitation. Empty string clears the opt-in.
