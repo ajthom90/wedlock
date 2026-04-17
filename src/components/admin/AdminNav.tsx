@@ -9,6 +9,9 @@ interface NavItem {
   label: string;
   icon: string;
   feature?: string;  // feature flag that gates this item; undefined = always shown
+  // OR-list of feature flags; if ANY are on, item is visible. Mutually
+  // exclusive with `feature`.
+  anyFeature?: string[];
 }
 
 interface NavGroup {
@@ -59,6 +62,7 @@ const navGroups: NavGroup[] = [
       { href: '/admin/photo-wall', label: 'Photo Wall', icon: '📸', feature: 'photoWall' },
       { href: '/admin/shuttles', label: 'Shuttles', icon: '🚐', feature: 'transportation' },
       { href: '/admin/trivia', label: 'Trivia', icon: '❔', feature: 'trivia' },
+      { href: '/admin/broadcasts', label: 'Broadcasts', icon: '📣', feature: 'dayOfBroadcasts' },
     ],
   },
   {
@@ -83,6 +87,7 @@ const navGroups: NavGroup[] = [
     label: 'System',
     icon: '⚙️',
     items: [
+      { href: '/admin/email-settings', label: 'Email Settings', icon: '✉️', anyFeature: ['rsvpConfirmationEmails', 'dayOfBroadcasts'] },
       { href: '/admin/features', label: 'Features', icon: '🔧' },
       { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
     ],
@@ -95,6 +100,14 @@ const TOP_LEVEL: NavItem = { href: '/admin', label: 'Dashboard', icon: '📊' };
 const COLLAPSE_STORAGE_KEY = 'admin-nav-collapsed-groups';
 
 function isItemVisible(item: NavItem, features: Record<string, unknown>): boolean {
+  if (item.anyFeature) {
+    return item.anyFeature.some((f) => {
+      const val = features[f];
+      if (val === undefined || val === null) return true;  // loading state — fail-open
+      if (typeof val === 'string') return val !== 'off';   // guestBook
+      return !!val;
+    });
+  }
   if (!item.feature) return true;
   const val = features[item.feature];
   if (val === undefined || val === null) return true;  // loading state — fail-open
