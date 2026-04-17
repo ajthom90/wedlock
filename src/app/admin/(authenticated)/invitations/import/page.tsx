@@ -42,6 +42,12 @@ export default function InvitationImportPage() {
   const [rows, setRows] = useState<EditableRow[] | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [committing, setCommitting] = useState(false);
+  const [committedCount, setCommittedCount] = useState(0);
+  const [totalToCommit, setTotalToCommit] = useState(0);
+  const [failures, setFailures] = useState<Array<{ rowNumber: number; householdName: string; error: string }>>([]);
+  const [fatalError, setFatalError] = useState<string | null>(null);
+  const [finished, setFinished] = useState(false);
 
   const readyCount = useMemo(() => rows?.filter((r) => r.bucket === 'ready').length ?? 0, [rows]);
   const duplicateCount = useMemo(() => rows?.filter((r) => r.bucket === 'duplicate').length ?? 0, [rows]);
@@ -102,6 +108,49 @@ export default function InvitationImportPage() {
   const resetImport = () => {
     setRows(null);
     setUploadError(null);
+  };
+
+  const CHUNK_SIZE = 50;
+
+  const handleCommit = async () => {
+    if (!rows) return;
+    const toImport = rows.filter((r) => r.bucket !== 'error').map((r) => ({
+      rowNumber: r.rowNumber,
+      ...r.normalized,
+    }));
+    setCommitting(true);
+    setFinished(false);
+    setFailures([]);
+    setFatalError(null);
+    setCommittedCount(0);
+    setTotalToCommit(toImport.length);
+
+    for (let i = 0; i < toImport.length; i += CHUNK_SIZE) {
+      const chunk = toImport.slice(i, i + CHUNK_SIZE);
+      try {
+        const res = await fetch('/api/invitations/import/commit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows: chunk }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setFatalError(data.error || `Server returned ${res.status}`);
+          setCommitting(false);
+          return;
+        }
+        setCommittedCount((c) => c + (data.createdCount || 0));
+        if (Array.isArray(data.failures) && data.failures.length > 0) {
+          setFailures((prev) => [...prev, ...data.failures]);
+        }
+      } catch (err) {
+        setFatalError(err instanceof Error ? err.message : 'Network error');
+        setCommitting(false);
+        return;
+      }
+    }
+    setCommitting(false);
+    setFinished(true);
   };
 
   // State 1 — upload
@@ -258,12 +307,68 @@ export default function InvitationImportPage() {
       <div className="flex items-center gap-3">
         <Button
           disabled={errorCount > 0 || (readyCount + duplicateCount) === 0}
-          onClick={() => { /* wired in Task 10 */ }}
+          onClick={handleCommit}
         >
           Import {readyCount + duplicateCount} invitation{(readyCount + duplicateCount) === 1 ? '' : 's'}
         </Button>
         {errorCount > 0 && <span className="text-xs text-red-700">Fix errors above before importing.</span>}
       </div>
+
+      {(committing || finished || fatalError) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-lg">
+            {committing ? (
+              <>
+                <CardHeader><CardTitle>Importing…</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-primary h-2 rounded-full transition-all" style={{ width: totalToCommit ? `${(committedCount / totalToCommit) * 100}%` : '0%' }} />
+                  </div>
+                  <p className="text-sm text-gray-600">{committedCount} of {totalToCommit} imported</p>
+                </CardContent>
+              </>
+            ) : fatalError ? (
+              <>
+                <CardHeader><CardTitle>Import interrupted</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm">{fatalError}</p>
+                  <p className="text-sm text-gray-600">{committedCount} of {totalToCommit} invitations were imported before the error. You can go to Invitations to see the partial result, then re-upload a corrected sheet with the missing rows.</p>
+                  <div className="flex justify-end">
+                    <Link href="/admin/invitations"><Button>Go to Invitations</Button></Link>
+                  </div>
+                </CardContent>
+              </>
+            ) : (
+              <>
+                <CardHeader><CardTitle>{failures.length === 0 ? 'Imported' : 'Imported with errors'}</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm">
+                    Imported {committedCount} of {totalToCommit} invitation{totalToCommit === 1 ? '' : 's'}.
+                    {failures.length > 0 && ` ${failures.length} failed.`}
+                  </p>
+                  {failures.length > 0 && (
+                    <details className="text-sm">
+                      <summary className="cursor-pointer text-red-700">Show failure details</summary>
+                      <ul className="mt-2 space-y-1">
+                        {failures.map((f, i) => (
+                          <li key={i} className="text-xs">
+                            <span className="font-medium">Row {f.rowNumber} ({f.householdName}):</span> {f.error}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-xs text-gray-500">Fix these in a new sheet and re-upload just those rows.</p>
+                    </details>
+                  )}
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => { setFinished(false); resetImport(); }}>Import another file</Button>
+                    <Link href="/admin/invitations"><Button>Go to Invitations</Button></Link>
+                  </div>
+                </CardContent>
+              </>
+            )}
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
