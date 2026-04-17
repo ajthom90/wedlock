@@ -38,11 +38,22 @@ interface Invitation {
   code: string;
   householdName: string;
   email: string | null;
+  address: string | null;
+  contactEmail: string | null;
   maxGuests: number;
   plusOnesAllowed: number;
   guests: Guest[];
   response: RsvpResponse | null;
   changeLogs?: ChangeLog[];
+}
+
+interface RsvpOption {
+  id: string;
+  type: string;           // "meal" drives per-guest meal UI; others are household-level
+  label: string;
+  choices: { name: string; description?: string }[];
+  required: boolean;
+  order: number;
 }
 
 export default function RsvpsPage() {
@@ -56,6 +67,13 @@ export default function RsvpsPage() {
   const [editMessage, setEditMessage] = useState('');
   const [editSongRequests, setEditSongRequests] = useState('');
   const [editDietaryNotes, setEditDietaryNotes] = useState('');
+  const [editAttendingGuests, setEditAttendingGuests] = useState<string[]>([]);
+  const [editGuestMeals, setEditGuestMeals] = useState<Record<string, string>>({});
+  const [editPlusOnes, setEditPlusOnes] = useState<{ name: string; meal: string }[]>([]);
+  const [editResponses, setEditResponses] = useState<Record<string, string>>({});
+  const [editAddress, setEditAddress] = useState('');
+  const [editContactEmail, setEditContactEmail] = useState('');
+  const [rsvpOptions, setRsvpOptions] = useState<RsvpOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [dietaryCopied, setDietaryCopied] = useState(false);
   const [emailsCopied, setEmailsCopied] = useState(false);
@@ -79,6 +97,24 @@ export default function RsvpsPage() {
     fetchInvitations();
   }, [fetchInvitations]);
 
+  // Fetch RSVP options once so the edit modal can render the same fields
+  // the public form does (per-guest meal selects, custom household-level
+  // questions). `choices` comes back as a JSON string — parse it here.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/rsvp-options');
+        if (!res.ok) return;
+        const raw = (await res.json()) as Array<Omit<RsvpOption, 'choices'> & { choices: string }>;
+        setRsvpOptions(raw.map((o) => {
+          let choices: RsvpOption['choices'] = [];
+          try { choices = JSON.parse(o.choices); } catch { /* keep empty */ }
+          return { ...o, choices };
+        }));
+      } catch { /* silent */ }
+    })();
+  }, []);
+
   const filtered = invitations.filter((inv) => {
     if (filter === 'all') return true;
     if (filter === 'attending') return inv.response?.attending === 'yes';
@@ -100,31 +136,81 @@ export default function RsvpsPage() {
   const openDetail = (inv: Invitation) => {
     setSelectedInvitation(inv);
     setEditingResponse(false);
+
+    // Address and contactEmail live on the invitation and persist across
+    // RSVP changes, so seed them whether or not a response exists yet.
+    setEditAddress(inv.address || '');
+    setEditContactEmail(inv.contactEmail || '');
+
+    // Prefill plus-one slots up to the invitation's allowance; the first N
+    // slots are seeded from any existing response.
+    const plusOneSlots = Array.from(
+      { length: inv.plusOnesAllowed || 0 },
+      () => ({ name: '', meal: '' }),
+    );
+
+    const safeParse = <T,>(raw: string | null | undefined, fallback: T): T => {
+      if (!raw) return fallback;
+      try { return JSON.parse(raw) as T; } catch { return fallback; }
+    };
+
     if (inv.response) {
       setEditAttending(inv.response.attending);
       setEditGuestCount(inv.response.guestCount);
       setEditMessage(inv.response.message || '');
       setEditSongRequests(inv.response.songRequests || '');
       setEditDietaryNotes(inv.response.dietaryNotes || '');
+      setEditAttendingGuests(safeParse<string[]>(inv.response.attendingGuests, []));
+      setEditGuestMeals(safeParse<Record<string, string>>(inv.response.guestMeals, {}));
+      const loadedPluses = safeParse<{ name: string; meal: string }[]>(inv.response.plusOnes, []);
+      setEditPlusOnes(plusOneSlots.map((slot, i) => loadedPluses[i] ? { name: loadedPluses[i].name || '', meal: loadedPluses[i].meal || '' } : slot));
+      setEditResponses(safeParse<Record<string, string>>(inv.response.responses, {}));
+    } else {
+      setEditAttending('yes');
+      setEditGuestCount(inv.guests.length || 1);
+      setEditMessage('');
+      setEditSongRequests('');
+      setEditDietaryNotes('');
+      setEditAttendingGuests([]);
+      setEditGuestMeals({});
+      setEditPlusOnes(plusOneSlots);
+      setEditResponses({});
     }
+  };
+
+  const toggleEditAttendingGuest = (id: string) => {
+    setEditAttendingGuests((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]);
+  };
+
+  const updateEditPlusOne = (index: number, patch: Partial<{ name: string; meal: string }>) => {
+    setEditPlusOnes((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
   };
 
   const handleSaveResponse = async () => {
     if (!selectedInvitation) return;
     setSaving(true);
     try {
-      // Pass plusOnes through unchanged so admin edits to other fields
-      // don't wipe the stored plus-one roster.
+      // Derive guestCount from the per-guest selections when accepting, so
+      // the stored count always matches the actual attendee roster. When
+      // declining, force it to zero so stale counts don't linger in reports.
+      const namedPlusOnes = editPlusOnes.filter((p) => p.name.trim());
+      const computedGuestCount = editAttending === 'yes'
+        ? editAttendingGuests.length + namedPlusOnes.length
+        : 0;
+
       const body = {
         attending: editAttending,
-        guestCount: editGuestCount,
+        guestCount: computedGuestCount,
         message: editMessage.trim() || null,
         songRequests: editSongRequests.trim() || null,
         dietaryNotes: editDietaryNotes.trim() || null,
-        responses: selectedInvitation.response?.responses ? JSON.parse(selectedInvitation.response.responses) : {},
-        guestMeals: selectedInvitation.response?.guestMeals ? JSON.parse(selectedInvitation.response.guestMeals) : null,
-        attendingGuests: selectedInvitation.response?.attendingGuests ? JSON.parse(selectedInvitation.response.attendingGuests) : null,
-        plusOnes: selectedInvitation.response?.plusOnes ? JSON.parse(selectedInvitation.response.plusOnes) : null,
+        responses: editResponses,
+        guestMeals: Object.keys(editGuestMeals).length > 0 ? editGuestMeals : null,
+        attendingGuests: editAttendingGuests.length > 0 ? editAttendingGuests : null,
+        plusOnes: namedPlusOnes.map((p) => ({ name: p.name.trim(), meal: p.meal || '' })),
+        // Invitation-level fields (persisted by the PUT route to the Invitation, not RsvpResponse).
+        address: editAddress.trim() || null,
+        contactEmail: editContactEmail.trim() || null,
       };
       const res = await fetch(`/api/rsvp/${selectedInvitation.id}`, {
         method: 'PUT',
@@ -377,7 +463,7 @@ export default function RsvpsPage() {
       {/* Detail/Edit Modal */}
       {selectedInvitation && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle>{selectedInvitation.householdName} - RSVP Details</CardTitle>
             </CardHeader>
@@ -385,41 +471,145 @@ export default function RsvpsPage() {
               {!selectedInvitation.response ? (
                 <p className="text-gray-500">No response submitted yet.</p>
               ) : editingResponse ? (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Attending</label>
-                    <select
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      value={editAttending}
-                      onChange={(e) => setEditAttending(e.target.value)}
-                    >
-                      <option value="yes">Yes</option>
-                      <option value="no">No</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Guest Count</label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={selectedInvitation.maxGuests}
-                      value={editGuestCount}
-                      onChange={(e) => setEditGuestCount(parseInt(e.target.value) || 1)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Message</label>
-                    <Textarea value={editMessage} onChange={(e) => setEditMessage(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Song Requests</label>
-                    <Input value={editSongRequests} onChange={(e) => setEditSongRequests(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Dietary Notes</label>
-                    <Input value={editDietaryNotes} onChange={(e) => setEditDietaryNotes(e.target.value)} />
-                  </div>
-                </>
+                (() => {
+                  const mealOption = rsvpOptions.find((o) => o.type === 'meal');
+                  const householdOptions = rsvpOptions.filter((o) => o.type !== 'meal');
+                  const attendingSet = new Set(editAttendingGuests);
+                  const namedPlusCount = editPlusOnes.filter((p) => p.name.trim()).length;
+                  const derivedCount = editAttending === 'yes' ? editAttendingGuests.length + namedPlusCount : 0;
+                  return (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Attending</label>
+                        <select
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                          value={editAttending}
+                          onChange={(e) => setEditAttending(e.target.value)}
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      {editAttending === 'yes' && selectedInvitation.guests.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium mb-2">Who will be attending?</p>
+                          <div className="space-y-2">
+                            {selectedInvitation.guests.map((g) => (
+                              <label key={g.id} className="flex items-center gap-3 p-2 border rounded-md">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4"
+                                  checked={attendingSet.has(g.id)}
+                                  onChange={() => toggleEditAttendingGuest(g.id)}
+                                />
+                                <span className="flex-1 text-sm">{g.name}</span>
+                                {mealOption && attendingSet.has(g.id) && (
+                                  <select
+                                    className="text-sm border border-gray-300 rounded px-2 py-1"
+                                    value={editGuestMeals[g.id] || ''}
+                                    onChange={(e) => setEditGuestMeals({ ...editGuestMeals, [g.id]: e.target.value })}
+                                  >
+                                    <option value="">{mealOption.label}…</option>
+                                    {mealOption.choices.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                                  </select>
+                                )}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {editAttending === 'yes' && selectedInvitation.plusOnesAllowed > 0 && (
+                        <div>
+                          <p className="text-sm font-medium mb-2">
+                            Plus-ones <span className="text-xs text-gray-500">(up to {selectedInvitation.plusOnesAllowed})</span>
+                          </p>
+                          <div className="space-y-2">
+                            {editPlusOnes.map((p, i) => (
+                              <div key={i} className="flex gap-2">
+                                <Input
+                                  placeholder={`Plus-one ${i + 1} name`}
+                                  value={p.name}
+                                  onChange={(e) => updateEditPlusOne(i, { name: e.target.value })}
+                                />
+                                {mealOption && p.name.trim() && (
+                                  <select
+                                    className="text-sm border border-gray-300 rounded px-2 py-1"
+                                    value={p.meal}
+                                    onChange={(e) => updateEditPlusOne(i, { meal: e.target.value })}
+                                  >
+                                    <option value="">{mealOption.label}…</option>
+                                    {mealOption.choices.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                                  </select>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {editAttending === 'yes' && householdOptions.length > 0 && (
+                        <div className="space-y-3">
+                          {householdOptions.map((opt) => (
+                            <div key={opt.id}>
+                              <label className="block text-sm font-medium mb-1">{opt.label}{opt.required && ' *'}</label>
+                              <select
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                value={editResponses[opt.id] || ''}
+                                onChange={(e) => setEditResponses({ ...editResponses, [opt.id]: e.target.value })}
+                              >
+                                <option value="">Select…</option>
+                                {opt.choices.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Fallback guest-count input for deployments not using per-guest checkboxes */}
+                      {editAttending === 'yes' && selectedInvitation.guests.length === 0 && (
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Guest Count</label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={selectedInvitation.maxGuests}
+                            value={editGuestCount}
+                            onChange={(e) => setEditGuestCount(parseInt(e.target.value) || 1)}
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Mailing Address</label>
+                        <Textarea rows={2} value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="123 Main St…" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Contact Email (for RSVP confirmation & day-of updates)</label>
+                        <Input type="email" value={editContactEmail} onChange={(e) => setEditContactEmail(e.target.value)} placeholder="guest@example.com" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Song Requests</label>
+                        <Input value={editSongRequests} onChange={(e) => setEditSongRequests(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Dietary Notes</label>
+                        <Textarea rows={2} value={editDietaryNotes} onChange={(e) => setEditDietaryNotes(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Message for the Couple</label>
+                        <Textarea rows={3} value={editMessage} onChange={(e) => setEditMessage(e.target.value)} />
+                      </div>
+
+                      {editAttending === 'yes' && selectedInvitation.guests.length > 0 && (
+                        <p className="text-xs text-gray-500">
+                          Total attending: {derivedCount} {derivedCount === 1 ? 'guest' : 'guests'} (computed from selections above).
+                        </p>
+                      )}
+                    </>
+                  );
+                })()
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-4">
@@ -484,6 +674,18 @@ export default function RsvpsPage() {
                     <div>
                       <p className="text-sm font-medium text-gray-500">Message</p>
                       <p className="text-sm">{selectedInvitation.response.message}</p>
+                    </div>
+                  )}
+                  {selectedInvitation.address && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Mailing Address</p>
+                      <p className="text-sm whitespace-pre-line">{selectedInvitation.address}</p>
+                    </div>
+                  )}
+                  {selectedInvitation.contactEmail && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Contact Email (for RSVP confirmation & day-of updates)</p>
+                      <p className="text-sm">{selectedInvitation.contactEmail}</p>
                     </div>
                   )}
                   <div>

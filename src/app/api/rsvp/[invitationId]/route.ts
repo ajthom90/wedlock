@@ -21,11 +21,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ invi
   try {
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { invitationId } = await params;
-    const { attending, guestCount, responses, guestMeals, attendingGuests, plusOnes, songRequests, dietaryNotes, message } = await request.json();
+    const { attending, guestCount, responses, guestMeals, attendingGuests, plusOnes, songRequests, dietaryNotes, message, address, contactEmail } = await request.json();
     if (!(await prisma.invitation.findUnique({ where: { id: invitationId } }))) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
     const cleanPlusOnes = Array.isArray(plusOnes)
       ? plusOnes.filter((p: any) => p && typeof p.name === 'string' && p.name.trim()).map((p: any) => ({ name: p.name.trim(), meal: p.meal || '' }))
       : [];
+    // address and contactEmail live on Invitation, not RsvpResponse; apply
+    // them here so admin edits stay in one round-trip.
+    const invitationPatch: { address?: string | null; contactEmail?: string | null } = {};
+    if (typeof address === 'string') invitationPatch.address = address.trim() || null;
+    if (typeof contactEmail === 'string') invitationPatch.contactEmail = contactEmail.trim() || null;
+    if (Object.keys(invitationPatch).length > 0) {
+      await prisma.invitation.update({ where: { id: invitationId }, data: invitationPatch });
+    }
     const data = {
       attending, guestCount: guestCount || 0, responses: JSON.stringify(responses || {}),
       guestMeals: guestMeals ? JSON.stringify(guestMeals) : null,
