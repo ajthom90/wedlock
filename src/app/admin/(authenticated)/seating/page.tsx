@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 interface TableAssignment {
   id: string;
   guestName: string;
+  invitationId: string | null;
 }
 
 interface Table {
@@ -17,21 +18,24 @@ interface Table {
   assignments: TableAssignment[];
 }
 
-interface Guest {
-  id: string;
+interface UnseatedGuest {
+  // Synthetic React key — built from invitation + primary-guest id or plus-one index
+  // so React keeps rows stable across re-renders.
+  key: string;
   name: string;
+  invitationId: string;
+  householdName: string;
 }
 
 export default function SeatingPage() {
   const [tables, setTables] = useState<Table[]>([]);
-  const [unseatedGuests, setUnseatedGuests] = useState<Guest[]>([]);
+  const [unseatedGuests, setUnseatedGuests] = useState<UnseatedGuest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [tableModalOpen, setTableModalOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [tableName, setTableName] = useState('');
   const [tableCapacity, setTableCapacity] = useState('8');
-  const [newGuestName, setNewGuestName] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
@@ -69,9 +73,11 @@ export default function SeatingPage() {
         //      array of Guest.id values we resolve against inv.guests), and
         //   2. plus-ones the household filled in (plusOnes = JSON array of
         //      { name, meal }).
-        // Both need to appear in the unseated list until they're assigned.
+        // Both need to appear in the unseated list, with enough metadata
+        // (invitationId, householdName) for the UI to group and assign them.
         type InvitationFromApi = {
           id: string;
+          householdName: string;
           guests: { id: string; name: string }[];
           response?: {
             attending: string;
@@ -84,7 +90,7 @@ export default function SeatingPage() {
           try { return JSON.parse(raw) as T; } catch { return fallback; }
         };
 
-        const attendingGuests: Guest[] = [];
+        const attendingGuests: UnseatedGuest[] = [];
         (invitations as InvitationFromApi[]).forEach((inv) => {
           if (inv.response?.attending !== 'yes') return;
 
@@ -93,7 +99,12 @@ export default function SeatingPage() {
           attendingIds.forEach((id) => {
             const name = guestsById.get(id) ?? id;
             if (!assignedNames.has(name.toLowerCase())) {
-              attendingGuests.push({ id: `${inv.id}-${id}`, name });
+              attendingGuests.push({
+                key: `${inv.id}-${id}`,
+                name,
+                invitationId: inv.id,
+                householdName: inv.householdName,
+              });
             }
           });
 
@@ -101,7 +112,12 @@ export default function SeatingPage() {
           pluses.forEach((p, idx) => {
             if (!p?.name) return;
             if (!assignedNames.has(p.name.toLowerCase())) {
-              attendingGuests.push({ id: `${inv.id}-plusone-${idx}`, name: p.name });
+              attendingGuests.push({
+                key: `${inv.id}-plusone-${idx}`,
+                name: p.name,
+                invitationId: inv.id,
+                householdName: inv.householdName,
+              });
             }
           });
         });
@@ -192,24 +208,51 @@ export default function SeatingPage() {
     }
   };
 
-  const handleAddAssignment = async () => {
-    if (!selectedTable || !newGuestName.trim()) return;
+  // Keeps the currently-selected table in sync after a mutation so the right
+  // panel reflects the new state (Prisma doesn't push; we re-fetch).
+  const refreshSelectedTable = useCallback(async (tableId: string) => {
+    const res = await fetch('/api/tables');
+    if (!res.ok) return;
+    const updatedTables: Table[] = await res.json();
+    const updated = updatedTables.find((t) => t.id === tableId);
+    if (updated) setSelectedTable(updated);
+  }, []);
+
+  // Create a new assignment by POSTing to /api/tables/assign. When called for
+  // an unseated guest we know their invitationId so we wire it through; when
+  // moving an existing assignment, the caller passes it through from the row.
+  const createAssignment = useCallback(async (args: {
+    tableId: string; guestName: string; invitationId: string | null;
+  }) => {
+    const res = await fetch('/api/tables/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(args),
+    });
+    return res.ok;
+  }, []);
+
+  const deleteAssignment = useCallback(async (assignmentId: string) => {
+    const res = await fetch('/api/tables/assign', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assignmentId }),
+    });
+    return res.ok;
+  }, []);
+
+  const handleAssignUnseated = async (guest: UnseatedGuest) => {
+    if (!selectedTable) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/tables/${selectedTable.id}/assignments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestName: newGuestName.trim() }),
+      const ok = await createAssignment({
+        tableId: selectedTable.id,
+        guestName: guest.name,
+        invitationId: guest.invitationId,
       });
-      if (res.ok) {
-        setNewGuestName('');
+      if (ok) {
         await fetchAll();
-        const updatedTablesRes = await fetch('/api/tables');
-        if (updatedTablesRes.ok) {
-          const updatedTables = await updatedTablesRes.json();
-          const updated = updatedTables.find((t: Table) => t.id === selectedTable.id);
-          if (updated) setSelectedTable(updated);
-        }
+        await refreshSelectedTable(selectedTable.id);
       }
     } catch (error) {
       console.error('Failed to add assignment:', error);
@@ -218,23 +261,61 @@ export default function SeatingPage() {
     }
   };
 
+  const handleAssignHousehold = async (invitationId: string, guests: UnseatedGuest[]) => {
+    if (!selectedTable) return;
+    setSaving(true);
+    try {
+      // Sequential to keep order stable in the table view (the API doesn't
+      // accept bulk inserts and parallel creates can interleave).
+      for (const g of guests) {
+        await createAssignment({
+          tableId: selectedTable.id,
+          guestName: g.name,
+          invitationId,
+        });
+      }
+      await fetchAll();
+      await refreshSelectedTable(selectedTable.id);
+    } catch (error) {
+      console.error('Failed to add household:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleRemoveAssignment = async (assignmentId: string) => {
     if (!selectedTable) return;
     try {
-      const res = await fetch(`/api/tables/${selectedTable.id}/assignments/${assignmentId}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
+      const ok = await deleteAssignment(assignmentId);
+      if (ok) {
         await fetchAll();
-        const updatedTablesRes = await fetch('/api/tables');
-        if (updatedTablesRes.ok) {
-          const updatedTables = await updatedTablesRes.json();
-          const updated = updatedTables.find((t: Table) => t.id === selectedTable.id);
-          if (updated) setSelectedTable(updated);
-        }
+        await refreshSelectedTable(selectedTable.id);
       }
     } catch (error) {
       console.error('Failed to remove assignment:', error);
+    }
+  };
+
+  // Move an existing assignment to a different table. Implemented as
+  // delete + create since the API doesn't support patching tableId. We
+  // snapshot the name/invitationId from the assignment row before deleting.
+  const handleMoveAssignment = async (assignment: TableAssignment, toTableId: string) => {
+    if (!selectedTable) return;
+    setSaving(true);
+    try {
+      const removed = await deleteAssignment(assignment.id);
+      if (!removed) return;
+      await createAssignment({
+        tableId: toTableId,
+        guestName: assignment.guestName,
+        invitationId: assignment.invitationId,
+      });
+      await fetchAll();
+      await refreshSelectedTable(selectedTable.id);
+    } catch (error) {
+      console.error('Failed to move assignment:', error);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -291,34 +372,45 @@ export default function SeatingPage() {
           )}
         </div>
 
-        {/* Right side: Selected table assignments */}
+        {/* Right side: seated + unseated workspace. */}
         <div className="space-y-4">
           {selectedTable ? (
-            <>
-              <Card>
-                <CardHeader>
-                  <CardTitle>{selectedTable.name} - Assignments</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex gap-2">
-                    <Input
-                      value={newGuestName}
-                      onChange={(e) => setNewGuestName(e.target.value)}
-                      placeholder="Guest name"
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddAssignment()}
-                    />
-                    <Button onClick={handleAddAssignment} disabled={saving || !newGuestName.trim()}>
-                      Add
-                    </Button>
-                  </div>
-
+            <Card>
+              <CardHeader>
+                <div className="flex items-baseline justify-between">
+                  <CardTitle>{selectedTable.name}</CardTitle>
+                  <span className={`text-sm ${
+                    (selectedTable.assignments?.length || 0) > selectedTable.capacity ? 'text-red-700 font-semibold' : 'text-gray-500'
+                  }`}>
+                    {selectedTable.assignments?.length || 0} / {selectedTable.capacity} seats
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium mb-2">Seated at this table</p>
                   {selectedTable.assignments?.length === 0 ? (
-                    <p className="text-sm text-gray-500">No guests assigned to this table yet.</p>
+                    <p className="text-sm text-gray-500 italic">No one seated yet. Pick a guest below.</p>
                   ) : (
                     <div className="space-y-2">
                       {selectedTable.assignments?.map((assignment) => (
-                        <div key={assignment.id} className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded">
-                          <span className="text-sm">{assignment.guestName}</span>
+                        <div key={assignment.id} className="flex items-center gap-2 py-2 px-3 bg-gray-50 rounded">
+                          <span className="flex-1 text-sm">{assignment.guestName}</span>
+                          <select
+                            className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+                            value=""
+                            onChange={(e) => {
+                              const toTableId = e.target.value;
+                              if (toTableId) handleMoveAssignment(assignment, toTableId);
+                            }}
+                            disabled={saving || tables.length <= 1}
+                            title="Move to another table"
+                          >
+                            <option value="">Move to…</option>
+                            {tables.filter((t) => t.id !== selectedTable.id).map((t) => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                          </select>
                           <Button size="sm" variant="danger" onClick={() => handleRemoveAssignment(assignment.id)}>
                             Remove
                           </Button>
@@ -326,37 +418,31 @@ export default function SeatingPage() {
                       ))}
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </>
+                </div>
+
+                <div>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <p className="text-sm font-medium">Unseated guests</p>
+                    <span className="text-xs text-gray-500">{unseatedGuests.length} remaining</span>
+                  </div>
+                  <UnseatedList
+                    guests={unseatedGuests}
+                    onAssignOne={handleAssignUnseated}
+                    onAssignHousehold={handleAssignHousehold}
+                    saving={saving}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           ) : (
             <Card>
-              <CardContent className="py-8 text-center">
-                <p className="text-gray-500">Select a table to manage its seating assignments.</p>
+              <CardHeader><CardTitle>Unseated guests</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-500 mb-3">Select a table on the left to start assigning the guests below.</p>
+                <UnseatedList guests={unseatedGuests} saving={false} />
               </CardContent>
             </Card>
           )}
-
-          {/* Unseated guests */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Unseated Guests</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {unseatedGuests.length === 0 ? (
-                <p className="text-sm text-gray-500">All attending guests have been assigned to a table.</p>
-              ) : (
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-500 mb-2">{unseatedGuests.length} guest(s) still need seating:</p>
-                  {unseatedGuests.map((guest) => (
-                    <div key={guest.id} className="py-1 px-3 bg-yellow-50 rounded text-sm">
-                      {guest.name}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
       </div>
 
@@ -396,6 +482,68 @@ export default function SeatingPage() {
           </Card>
         </div>
       )}
+    </div>
+  );
+}
+
+// Unseated guests grouped by household. Households with 2+ unseated members
+// get a "seat whole household" shortcut, which is the most common case for
+// wedding seating. onAssignOne/onAssignHousehold are only wired when a table
+// is selected; otherwise the list is purely informational.
+function UnseatedList({
+  guests,
+  onAssignOne,
+  onAssignHousehold,
+  saving,
+}: {
+  guests: UnseatedGuest[];
+  onAssignOne?: (guest: UnseatedGuest) => void;
+  onAssignHousehold?: (invitationId: string, guests: UnseatedGuest[]) => void;
+  saving: boolean;
+}) {
+  const groups = useMemo(() => {
+    // Preserve insertion order so households stay grouped as they appeared in
+    // the source scan (no alphabetical re-sort — the original order is
+    // already RSVP-created-at order, which feels natural).
+    const byHousehold = new Map<string, { householdName: string; members: UnseatedGuest[] }>();
+    for (const g of guests) {
+      const bucket = byHousehold.get(g.invitationId);
+      if (bucket) bucket.members.push(g);
+      else byHousehold.set(g.invitationId, { householdName: g.householdName, members: [g] });
+    }
+    return Array.from(byHousehold.entries()).map(([invitationId, v]) => ({ invitationId, ...v }));
+  }, [guests]);
+
+  if (guests.length === 0) {
+    return <p className="text-sm text-gray-500 italic">All attending guests have been seated. 🎉</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {groups.map(({ invitationId, householdName, members }) => (
+        <div key={invitationId} className="border border-gray-200 rounded">
+          <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
+            <p className="text-xs font-medium text-gray-700">{householdName}</p>
+            {onAssignHousehold && members.length > 1 && (
+              <Button size="sm" variant="outline" disabled={saving} onClick={() => onAssignHousehold(invitationId, members)}>
+                Seat whole household
+              </Button>
+            )}
+          </div>
+          <div className="divide-y divide-gray-100">
+            {members.map((g) => (
+              <div key={g.key} className="flex items-center gap-2 px-3 py-2">
+                <span className="flex-1 text-sm">{g.name}</span>
+                {onAssignOne && (
+                  <Button size="sm" disabled={saving} onClick={() => onAssignOne(g)}>
+                    Assign
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
