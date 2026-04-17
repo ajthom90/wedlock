@@ -12,12 +12,14 @@ interface RsvpResponse {
   attending: string;
   guestCount: number;
   guestMeals?: string | null;
+  plusOnes?: string | null;  // JSON: [{ name, meal }]
 }
 
 interface Invitation {
   id: string;
   householdName: string;
   guests: Guest[];
+  plusOnesAllowed: number;
   response?: RsvpResponse | null;
 }
 
@@ -34,7 +36,13 @@ export default function AdminDashboard() {
   }, []);
 
   const totalInvitations = invitations.length;
-  const totalGuests = invitations.reduce((sum, inv) => sum + inv.guests.length, 0);
+  // Counts every possible attendee — named guests plus any plus-one slots the
+  // invitation allows. Matches the semantics of the "Attending" card's guest
+  // count, which also includes actualized plus-ones.
+  const totalGuests = invitations.reduce(
+    (sum, inv) => sum + inv.guests.length + (inv.plusOnesAllowed || 0),
+    0,
+  );
   const responded = invitations.filter((inv) => inv.response);
   const attending = responded.filter((inv) => inv.response?.attending === 'yes');
   const declining = responded.filter((inv) => inv.response?.attending === 'no');
@@ -44,21 +52,30 @@ export default function AdminDashboard() {
     0
   );
 
+  // Meal totals span both named guests (guestMeals, a {guestId: meal} map) and
+  // plus-ones (plusOnes, an array of {name, meal} entries) — either may be null.
   const mealCounts: Record<string, number> = {};
+  const bump = (meal: unknown) => {
+    if (typeof meal === 'string' && meal) {
+      mealCounts[meal] = (mealCounts[meal] || 0) + 1;
+    }
+  };
   for (const inv of attending) {
     if (inv.response?.guestMeals) {
       try {
         const meals = JSON.parse(inv.response.guestMeals);
-        if (typeof meals === 'object' && meals !== null) {
-          for (const meal of Object.values(meals)) {
-            if (typeof meal === 'string' && meal) {
-              mealCounts[meal] = (mealCounts[meal] || 0) + 1;
-            }
-          }
+        if (meals && typeof meals === 'object') {
+          for (const meal of Object.values(meals)) bump(meal);
         }
-      } catch {
-        // skip invalid JSON
-      }
+      } catch { /* skip invalid JSON */ }
+    }
+    if (inv.response?.plusOnes) {
+      try {
+        const pluses = JSON.parse(inv.response.plusOnes);
+        if (Array.isArray(pluses)) {
+          for (const p of pluses) bump(p?.meal);
+        }
+      } catch { /* skip invalid JSON */ }
     }
   }
 
