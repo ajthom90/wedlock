@@ -122,6 +122,17 @@ export function AdminNav() {
   const [features, setFeatures] = useState<Record<string, unknown>>({});
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [hydrated, setHydrated] = useState(false);
+  const [currentVersion, setCurrentVersion] = useState('');
+
+  useEffect(() => {
+    // Version is read from package.json server-side. This is lazy and
+    // tolerates failure — the footer just shows blank if the endpoint
+    // isn't reachable (e.g. old image without the route).
+    fetch('/api/release-notes')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d?.currentVersion) setCurrentVersion(d.currentVersion); })
+      .catch(() => { /* silent */ });
+  }, []);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -250,6 +261,15 @@ export function AdminNav() {
         <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors w-full text-left">
           <span>🚪</span><span>Logout</span>
         </button>
+        {currentVersion && (
+          <Link
+            href="/admin/changelog"
+            className="block mt-3 px-4 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            title="What's new"
+          >
+            wedlock v{currentVersion}
+          </Link>
+        )}
       </div>
     </nav>
   );

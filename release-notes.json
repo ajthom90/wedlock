@@ -1,0 +1,34 @@
+[
+  {
+    "version": "2.8.0",
+    "date": "2026-04-17",
+    "changes": [
+      { "type": "feature", "text": "RSVP confirmation emails — guests get a themed email after submitting or editing their RSVP, with a recap of what they told you and a link to change it before the deadline. Turn on at Features → Email features." },
+      { "type": "feature", "text": "Day-of broadcasts — send timely email updates (ceremony timing, shuttle delays, weather pivots) to guests who opted in. Compose from Broadcasts and see delivery status per household." },
+      { "type": "feature", "text": "Email heading and footer overrides — customize the text at the top and bottom of every email you send. Configured at Email Settings." },
+      { "type": "feature", "text": "Free-text RSVP questions — add a new 'Free-text (large box)' question type for anything that doesn't fit a fixed list of choices." },
+      { "type": "improvement", "text": "Seating chart — no more typing guest names. Click an unseated guest to add them to the selected table, or 'Seat whole household' in one click. Seated guests get Move-to and Remove buttons for quick reshuffling." },
+      { "type": "improvement", "text": "Admin RSVP edit modal — now mirrors the public RSVP form exactly. You can edit attending guests, plus-ones, meals, address, contact email, and custom RSVP questions from one place." },
+      { "type": "improvement", "text": "RSVP export — the CSV now has one row per attendee (instead of one row per invitation), with per-person meal info, so caterers and printers see the full roster." },
+      { "type": "improvement", "text": "RSVP Option editor — the per-choice Description field now only shows when it's actually used (meal options)." },
+      { "type": "fix", "text": "Dashboard now counts plus-ones in Total Guests and Meal Choices." },
+      { "type": "fix", "text": "Editing an RSVP from the admin side no longer silently wipes the guest's plus-ones." },
+      { "type": "fix", "text": "Confirmation emails render attending guest names instead of their internal IDs." },
+      { "type": "fix", "text": "Confirmation email greetings drop the leading 'The' (so 'The Johnson Family' reads as 'Hi Johnson Family,')." }
+    ]
+  },
+  {
+    "version": "2.7.2",
+    "date": "2026-04-10",
+    "changes": [
+      { "type": "feature", "text": "Drag-to-reorder within wedding-party groups — rearrange bridesmaids / groomsmen / other role groups by dragging, without retyping the order numbers." }
+    ]
+  },
+  {
+    "version": "2.7.1",
+    "date": "2026-03-28",
+    "changes": [
+      { "type": "fix", "text": "Stability improvements." }
+    ]
+  }
+]

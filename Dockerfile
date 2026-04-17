@@ -53,6 +53,9 @@ RUN --mount=type=cache,target=/root/.cache/prisma,id=prisma \
 
 # (next-env.d.ts is gitignored; next build regenerates it.)
 COPY next.config.mjs tsconfig.json postcss.config.mjs tailwind.config.ts ./
+# release-notes.json is imported by src/lib/releaseNotes.ts at build time
+# and inlined into the bundle — the container doesn't need it at runtime.
+COPY release-notes.json ./
 COPY public ./public
 COPY src ./src
 

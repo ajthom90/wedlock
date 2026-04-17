@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { NewFeaturesBanner } from '@/components/admin/NewFeaturesBanner';
 
 interface Guest {
   id: string;
@@ -89,6 +90,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
+      <NewFeaturesBanner />
       <h1 className="text-3xl font-bold">Dashboard</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
