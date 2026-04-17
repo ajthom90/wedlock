@@ -27,6 +27,7 @@ model Invitation {
   code            String   @unique
   householdName   String
   email           String?
+  contactEmail    String?  // guest-supplied at RSVP time; opts the invitation into RSVP confirmations + day-of broadcasts
   maxGuests       Int      @default(2)
   plusOnesAllowed Int      @default(0) // number of unnamed extras this household may bring; guest fills names at RSVP time
   notes           String?
@@ -34,11 +35,12 @@ model Invitation {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  guests         Guest[]
-  response       RsvpResponse?
-  gifts          GiftItem[]
-  shuttleSignups ShuttleSignup[]
-  changeLogs     RsvpChangeLog[]
+  guests               Guest[]
+  response             RsvpResponse?
+  gifts                GiftItem[]
+  shuttleSignups       ShuttleSignup[]
+  changeLogs           RsvpChangeLog[]
+  broadcastDeliveries  BroadcastDelivery[]
 }
 
 // Audit trail of every RSVP submission (create + update). Each row is a full
@@ -328,4 +330,31 @@ model Notification {
   message   String
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+// Day-of broadcast emails — admin composes a message and sends it to every
+// invitation with a contactEmail on file.
+model Broadcast {
+  id             String              @id @default(uuid())
+  subject        String
+  body           String              // plain text — themed HTML wrapper applied at send time
+  sentAt         DateTime            @default(now())
+  sentBy         String              // "admin" for now; future-proof for multi-admin
+  recipientCount Int                 // denormalized — count at send time
+  deliveries     BroadcastDelivery[]
+}
+
+model BroadcastDelivery {
+  id           String     @id @default(uuid())
+  broadcastId  String
+  broadcast    Broadcast  @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  invitationId String
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  emailAddress String     // snapshot at send time so later edits don't rewrite history
+  status       String     // "sent" | "failed"
+  errorMessage String?
+  sentAt       DateTime   @default(now())
+
+  @@index([broadcastId])
+  @@unique([broadcastId, invitationId])
 }
