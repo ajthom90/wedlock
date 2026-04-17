@@ -1,5 +1,5 @@
 # Example deployment compose file. Copy to docker-compose.yml and edit for
-# your environment (image, password, data path, port).
+# your environment (image, password, data path, port, email).
 services:
   wedlock:
     image: ghcr.io/YOUR-USERNAME/wedlock:latest
@@ -10,6 +10,28 @@ services:
       ADMIN_PASSWORD: changeme
       # Your local timezone (affects countdown + date display).
       TZ: America/Chicago
+
+      # --- Email features (RSVP confirmations + day-of broadcasts) ---
+      # All five SMTP_* vars must be set for either email feature to work.
+      # Both feature flags also need to be turned on at /admin/features.
+      #
+      # Gmail-specific setup:
+      #   1. Enable 2-step verification on the Google account.
+      #   2. Generate a 16-character app password at:
+      #        https://myaccount.google.com/apppasswords
+      #      (Regular account passwords will NOT work.)
+      #   3. Paste the app password as SMTP_PASS below.
+      #   4. Daily limit: 500 recipients across all messages — well above
+      #      wedding-scale.
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: "587"
+      SMTP_USER: you@gmail.com
+      SMTP_PASS: your-16-char-app-password
+      SMTP_FROM: you@gmail.com
+
+      # Public origin of the site, no trailing slash. Used to build the
+      # "edit your RSVP" magic link in confirmation emails.
+      PUBLIC_SITE_URL: https://wedding.example.com
     ports:
       # Host:container. Container listens on 3000.
       - "3000:3000"
