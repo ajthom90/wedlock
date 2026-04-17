@@ -38,7 +38,11 @@ interface Invitation {
   code: string;
   householdName: string;
   email: string | null;
-  address: string | null;
+  mailingAddress1: string | null;
+  mailingAddress2: string | null;
+  mailingCity: string | null;
+  mailingState: string | null;
+  mailingPostalCode: string | null;
   contactEmail: string | null;
   maxGuests: number;
   plusOnesAllowed: number;
@@ -71,7 +75,11 @@ export default function RsvpsPage() {
   const [editGuestMeals, setEditGuestMeals] = useState<Record<string, string>>({});
   const [editPlusOnes, setEditPlusOnes] = useState<{ name: string; meal: string }[]>([]);
   const [editResponses, setEditResponses] = useState<Record<string, string>>({});
-  const [editAddress, setEditAddress] = useState('');
+  const [editMailingAddress1, setEditMailingAddress1] = useState('');
+  const [editMailingAddress2, setEditMailingAddress2] = useState('');
+  const [editMailingCity, setEditMailingCity] = useState('');
+  const [editMailingState, setEditMailingState] = useState('');
+  const [editMailingPostalCode, setEditMailingPostalCode] = useState('');
   const [editContactEmail, setEditContactEmail] = useState('');
   const [rsvpOptions, setRsvpOptions] = useState<RsvpOption[]>([]);
   const [saving, setSaving] = useState(false);
@@ -137,9 +145,13 @@ export default function RsvpsPage() {
     setSelectedInvitation(inv);
     setEditingResponse(false);
 
-    // Address and contactEmail live on the invitation and persist across
+    // Mailing address and contactEmail live on the invitation and persist across
     // RSVP changes, so seed them whether or not a response exists yet.
-    setEditAddress(inv.address || '');
+    setEditMailingAddress1(inv.mailingAddress1 || '');
+    setEditMailingAddress2(inv.mailingAddress2 || '');
+    setEditMailingCity(inv.mailingCity || '');
+    setEditMailingState(inv.mailingState || '');
+    setEditMailingPostalCode(inv.mailingPostalCode || '');
     setEditContactEmail(inv.contactEmail || '');
 
     // Prefill plus-one slots up to the invitation's allowance; the first N
@@ -209,7 +221,11 @@ export default function RsvpsPage() {
         attendingGuests: editAttendingGuests.length > 0 ? editAttendingGuests : null,
         plusOnes: namedPlusOnes.map((p) => ({ name: p.name.trim(), meal: p.meal || '' })),
         // Invitation-level fields (persisted by the PUT route to the Invitation, not RsvpResponse).
-        address: editAddress.trim() || null,
+        mailingAddress1: editMailingAddress1.trim() || null,
+        mailingAddress2: editMailingAddress2.trim() || null,
+        mailingCity: editMailingCity.trim() || null,
+        mailingState: editMailingState.trim() || null,
+        mailingPostalCode: editMailingPostalCode.trim() || null,
         contactEmail: editContactEmail.trim() || null,
       };
       const res = await fetch(`/api/rsvp/${selectedInvitation.id}`, {
@@ -589,9 +605,15 @@ export default function RsvpsPage() {
                         </div>
                       )}
 
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Mailing Address</label>
-                        <Textarea rows={2} value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="123 Main St…" />
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium">Mailing Address</label>
+                        <Input placeholder="Address line 1" value={editMailingAddress1} onChange={(e) => setEditMailingAddress1(e.target.value)} />
+                        <Input placeholder="Address line 2" value={editMailingAddress2} onChange={(e) => setEditMailingAddress2(e.target.value)} />
+                        <div className="grid grid-cols-3 gap-2">
+                          <Input className="col-span-2" placeholder="City" value={editMailingCity} onChange={(e) => setEditMailingCity(e.target.value)} />
+                          <Input placeholder="State" value={editMailingState} onChange={(e) => setEditMailingState(e.target.value)} />
+                        </div>
+                        <Input placeholder="Postal code" value={editMailingPostalCode} onChange={(e) => setEditMailingPostalCode(e.target.value)} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Contact Email (for RSVP confirmation & day-of updates)</label>
@@ -684,10 +706,15 @@ export default function RsvpsPage() {
                       <p className="text-sm">{selectedInvitation.response.message}</p>
                     </div>
                   )}
-                  {selectedInvitation.address && (
+                  {(selectedInvitation.mailingAddress1 || selectedInvitation.mailingCity || selectedInvitation.mailingPostalCode) && (
                     <div>
                       <p className="text-sm font-medium text-gray-500">Mailing Address</p>
-                      <p className="text-sm whitespace-pre-line">{selectedInvitation.address}</p>
+                      <p className="text-sm whitespace-pre-line">
+                        {[selectedInvitation.mailingAddress1, selectedInvitation.mailingAddress2].filter(Boolean).join('\n')}
+                        {(selectedInvitation.mailingAddress1 || selectedInvitation.mailingAddress2) && '\n'}
+                        {[selectedInvitation.mailingCity, selectedInvitation.mailingState].filter(Boolean).join(', ')}
+                        {selectedInvitation.mailingPostalCode ? ` ${selectedInvitation.mailingPostalCode}` : ''}
+                      </p>
                     </div>
                   )}
                   {selectedInvitation.contactEmail && (

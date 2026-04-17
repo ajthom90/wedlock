@@ -21,15 +21,26 @@ export async function PUT(request: Request, { params }: { params: Promise<{ invi
   try {
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { invitationId } = await params;
-    const { attending, guestCount, responses, guestMeals, attendingGuests, plusOnes, songRequests, dietaryNotes, message, address, contactEmail } = await request.json();
+    const { attending, guestCount, responses, guestMeals, attendingGuests, plusOnes, songRequests, dietaryNotes, message, contactEmail, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode } = await request.json();
     if (!(await prisma.invitation.findUnique({ where: { id: invitationId } }))) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
     const cleanPlusOnes = Array.isArray(plusOnes)
       ? plusOnes.filter((p: any) => p && typeof p.name === 'string' && p.name.trim()).map((p: any) => ({ name: p.name.trim(), meal: p.meal || '' }))
       : [];
-    // address and contactEmail live on Invitation, not RsvpResponse; apply
-    // them here so admin edits stay in one round-trip.
-    const invitationPatch: { address?: string | null; contactEmail?: string | null } = {};
-    if (typeof address === 'string') invitationPatch.address = address.trim() || null;
+    // address and contactEmail + structured mailing address live on Invitation,
+    // not RsvpResponse; apply them here so admin edits stay in one round-trip.
+    const invitationPatch: {
+      mailingAddress1?: string | null;
+      mailingAddress2?: string | null;
+      mailingCity?: string | null;
+      mailingState?: string | null;
+      mailingPostalCode?: string | null;
+      contactEmail?: string | null;
+    } = {};
+    if (typeof mailingAddress1 === 'string') invitationPatch.mailingAddress1 = mailingAddress1.trim() || null;
+    if (typeof mailingAddress2 === 'string') invitationPatch.mailingAddress2 = mailingAddress2.trim() || null;
+    if (typeof mailingCity === 'string') invitationPatch.mailingCity = mailingCity.trim() || null;
+    if (typeof mailingState === 'string') invitationPatch.mailingState = mailingState.trim() || null;
+    if (typeof mailingPostalCode === 'string') invitationPatch.mailingPostalCode = mailingPostalCode.trim() || null;
     if (typeof contactEmail === 'string') invitationPatch.contactEmail = contactEmail.trim() || null;
     if (Object.keys(invitationPatch).length > 0) {
       await prisma.invitation.update({ where: { id: invitationId }, data: invitationPatch });
