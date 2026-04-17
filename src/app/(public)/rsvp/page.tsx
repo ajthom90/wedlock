@@ -205,7 +205,30 @@ function RSVPForm() {
               </div>
             </div>
           )}
-          {rsvpOptions.filter((o: any) => o.type !== 'meal').map((option: any) => (<div key={option.id}><p className="font-medium mb-2">{option.label}</p><select className="w-full border rounded-md px-3 py-2" value={responses[option.id] || ''} onChange={(e) => setResponses({...responses, [option.id]: e.target.value})} required={option.required}><option value="">Select...</option>{option.choices.map((c: RsvpChoice) => <option key={c.name} value={c.name}>{c.name}</option>)}</select></div>))}
+          {rsvpOptions.filter((o: any) => o.type !== 'meal').map((option: any) => (
+            <div key={option.id}>
+              <p className="font-medium mb-2">{option.label}{option.required && ' *'}</p>
+              {option.type === 'textarea' ? (
+                <Textarea
+                  value={responses[option.id] || ''}
+                  onChange={(e) => setResponses({ ...responses, [option.id]: e.target.value })}
+                  required={option.required}
+                  rows={4}
+                  placeholder="Type your answer…"
+                />
+              ) : (
+                <select
+                  className="w-full border rounded-md px-3 py-2"
+                  value={responses[option.id] || ''}
+                  onChange={(e) => setResponses({ ...responses, [option.id]: e.target.value })}
+                  required={option.required}
+                >
+                  <option value="">Select...</option>
+                  {option.choices.map((c: RsvpChoice) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                </select>
+              )}
+            </div>
+          ))}
           {features.dietaryNotes && <Textarea label="Dietary Restrictions or Allergies" value={dietaryNotes} onChange={(e) => setDietaryNotes(e.target.value)} placeholder="Let us know about any dietary needs..." rows={2} />}
           {features.songRequests && <Textarea label="Song Requests" value={songRequests} onChange={(e) => setSongRequests(e.target.value)} placeholder="Any songs you'd like to hear?" rows={2} />}
         </>)}

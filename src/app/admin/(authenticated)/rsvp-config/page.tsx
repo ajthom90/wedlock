@@ -142,8 +142,10 @@ export default function RsvpConfigPage() {
       meal: 'bg-blue-100 text-blue-800',
       dietary: 'bg-green-100 text-green-800',
       custom: 'bg-purple-100 text-purple-800',
+      textarea: 'bg-amber-100 text-amber-800',
     };
-    return <span className={`px-2 py-1 text-xs rounded-full ${colors[t] || 'bg-gray-100 text-gray-800'}`}>{t}</span>;
+    const labels: Record<string, string> = { textarea: 'free-text' };
+    return <span className={`px-2 py-1 text-xs rounded-full ${colors[t] || 'bg-gray-100 text-gray-800'}`}>{labels[t] || t}</span>;
   };
 
   if (loading) return <div className="flex justify-center py-12"><p className="text-gray-500">Loading RSVP options...</p></div>;
@@ -178,7 +180,11 @@ export default function RsvpConfigPage() {
                   </div>
                 </div>
               </CardHeader>
-              {opt.choices && (
+              {opt.type === 'textarea' ? (
+                <CardContent>
+                  <p className="text-sm text-gray-500 italic">Guests write their own answer in a free-text box.</p>
+                </CardContent>
+              ) : opt.choices && (
                 <CardContent>
                   <p className="text-sm font-medium text-gray-600 mb-1">Choices</p>
                   <ul className="space-y-1">
@@ -218,48 +224,58 @@ export default function RsvpConfigPage() {
                   <option value="meal">Meal</option>
                   <option value="dietary">Dietary</option>
                   <option value="custom">Custom</option>
+                  <option value="textarea">Free-text (large box)</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Label *</label>
                 <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g., Meal Preference" />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Choices</label>
-                <p className="text-xs text-gray-500 mb-2">Add one row per option. Description is optional — if set, guests see it alongside the meal name in a menu block on the RSVP form.</p>
-                <div className="space-y-2">
-                  {choiceRows.map((row, i) => (
-                    <div key={i} className="flex gap-2 items-start">
-                      <Input
-                        className="w-40 shrink-0"
-                        value={row.name}
-                        placeholder="Name (e.g. Chicken)"
-                        onChange={(e) => setChoiceRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, name: e.target.value } : r)))}
-                      />
-                      <Input
-                        value={row.description}
-                        placeholder="Description (optional)"
-                        onChange={(e) => setChoiceRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, description: e.target.value } : r)))}
-                      />
-                      {choiceRows.length > 1 && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          type="button"
-                          onClick={() => setChoiceRows((rows) => rows.filter((_, idx) => idx !== i))}
-                        >Remove</Button>
-                      )}
-                    </div>
-                  ))}
+              {/* Free-text options have no preset choices — guests write their own answer. */}
+              {type !== 'textarea' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Choices</label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Add one row per option.
+                    {type === 'meal' && ' Description is optional — if set, guests see it alongside the meal name in a menu block on the RSVP form.'}
+                  </p>
+                  <div className="space-y-2">
+                    {choiceRows.map((row, i) => (
+                      <div key={i} className="flex gap-2 items-start">
+                        <Input
+                          className={type === 'meal' ? 'w-40 shrink-0' : 'flex-1'}
+                          value={row.name}
+                          placeholder={type === 'meal' ? 'Name (e.g. Chicken)' : 'Choice'}
+                          onChange={(e) => setChoiceRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, name: e.target.value } : r)))}
+                        />
+                        {/* Per-choice descriptions are only surfaced to guests for meal options (rendered as a menu block). For other types the extra column is noise. */}
+                        {type === 'meal' && (
+                          <Input
+                            value={row.description}
+                            placeholder="Description (optional)"
+                            onChange={(e) => setChoiceRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, description: e.target.value } : r)))}
+                          />
+                        )}
+                        {choiceRows.length > 1 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            type="button"
+                            onClick={() => setChoiceRows((rows) => rows.filter((_, idx) => idx !== i))}
+                          >Remove</Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    className="mt-2"
+                    onClick={() => setChoiceRows((rows) => [...rows, { name: '', description: '' }])}
+                  >Add choice</Button>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  type="button"
-                  className="mt-2"
-                  onClick={() => setChoiceRows((rows) => [...rows, { name: '', description: '' }])}
-                >Add choice</Button>
-              </div>
+              )}
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"

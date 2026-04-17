@@ -554,14 +554,22 @@ export default function RsvpsPage() {
                           {householdOptions.map((opt) => (
                             <div key={opt.id}>
                               <label className="block text-sm font-medium mb-1">{opt.label}{opt.required && ' *'}</label>
-                              <select
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                                value={editResponses[opt.id] || ''}
-                                onChange={(e) => setEditResponses({ ...editResponses, [opt.id]: e.target.value })}
-                              >
-                                <option value="">Select…</option>
-                                {opt.choices.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                              </select>
+                              {opt.type === 'textarea' ? (
+                                <Textarea
+                                  rows={3}
+                                  value={editResponses[opt.id] || ''}
+                                  onChange={(e) => setEditResponses({ ...editResponses, [opt.id]: e.target.value })}
+                                />
+                              ) : (
+                                <select
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                  value={editResponses[opt.id] || ''}
+                                  onChange={(e) => setEditResponses({ ...editResponses, [opt.id]: e.target.value })}
+                                >
+                                  <option value="">Select…</option>
+                                  {opt.choices.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                                </select>
+                              )}
                             </div>
                           ))}
                         </div>
