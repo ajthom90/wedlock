@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.10.0",
+    "date": "2026-04-17",
+    "changes": [
+      { "type": "feature", "text": "Printable mailing labels — generate Avery-format PDF label sheets from your invitations' addresses. Supports Avery 5160, 5161, 5163, and L7160 (A4). Includes a start-position input so you can reuse partially-used sheets." }
+    ]
+  },
+  {
     "version": "2.9.1",
     "date": "2026-04-17",
     "changes": [
