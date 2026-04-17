@@ -64,17 +64,46 @@ export default function SeatingPage() {
           });
         });
 
+        // An attending invitation contributes up to two sources of attendees:
+        //   1. primary guests the household selected (attendingGuests = JSON
+        //      array of Guest.id values we resolve against inv.guests), and
+        //   2. plus-ones the household filled in (plusOnes = JSON array of
+        //      { name, meal }).
+        // Both need to appear in the unseated list until they're assigned.
+        type InvitationFromApi = {
+          id: string;
+          guests: { id: string; name: string }[];
+          response?: {
+            attending: string;
+            attendingGuests: string | null;
+            plusOnes: string | null;
+          } | null;
+        };
+        const safeParse = <T,>(raw: string | null, fallback: T): T => {
+          if (!raw) return fallback;
+          try { return JSON.parse(raw) as T; } catch { return fallback; }
+        };
+
         const attendingGuests: Guest[] = [];
-        invitations.forEach((inv: { id: string; guests: { name: string }[]; responses?: { attending: boolean; guestName: string }[] }) => {
-          if (inv.responses) {
-            inv.responses
-              .filter((r: { attending: boolean }) => r.attending)
-              .forEach((r: { guestName: string }) => {
-                if (!assignedNames.has(r.guestName.toLowerCase())) {
-                  attendingGuests.push({ id: `${inv.id}-${r.guestName}`, name: r.guestName });
-                }
-              });
-          }
+        (invitations as InvitationFromApi[]).forEach((inv) => {
+          if (inv.response?.attending !== 'yes') return;
+
+          const guestsById = new Map(inv.guests.map((g) => [g.id, g.name]));
+          const attendingIds = safeParse<string[]>(inv.response.attendingGuests, []);
+          attendingIds.forEach((id) => {
+            const name = guestsById.get(id) ?? id;
+            if (!assignedNames.has(name.toLowerCase())) {
+              attendingGuests.push({ id: `${inv.id}-${id}`, name });
+            }
+          });
+
+          const pluses = safeParse<{ name: string }[]>(inv.response.plusOnes, []);
+          pluses.forEach((p, idx) => {
+            if (!p?.name) return;
+            if (!assignedNames.has(p.name.toLowerCase())) {
+              attendingGuests.push({ id: `${inv.id}-plusone-${idx}`, name: p.name });
+            }
+          });
         });
 
         setUnseatedGuests(attendingGuests);

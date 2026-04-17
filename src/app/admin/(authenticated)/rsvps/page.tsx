@@ -113,6 +113,8 @@ export default function RsvpsPage() {
     if (!selectedInvitation) return;
     setSaving(true);
     try {
+      // Pass plusOnes through unchanged so admin edits to other fields
+      // don't wipe the stored plus-one roster.
       const body = {
         attending: editAttending,
         guestCount: editGuestCount,
@@ -122,6 +124,7 @@ export default function RsvpsPage() {
         responses: selectedInvitation.response?.responses ? JSON.parse(selectedInvitation.response.responses) : {},
         guestMeals: selectedInvitation.response?.guestMeals ? JSON.parse(selectedInvitation.response.guestMeals) : null,
         attendingGuests: selectedInvitation.response?.attendingGuests ? JSON.parse(selectedInvitation.response.attendingGuests) : null,
+        plusOnes: selectedInvitation.response?.plusOnes ? JSON.parse(selectedInvitation.response.plusOnes) : null,
       };
       const res = await fetch(`/api/rsvp/${selectedInvitation.id}`, {
         method: 'PUT',
@@ -169,19 +172,63 @@ export default function RsvpsPage() {
   };
 
   const exportCsv = () => {
-    const headers = ['Household', 'Code', 'Email', 'Status', 'Guest Count', 'Guests', 'Message', 'Song Requests', 'Dietary Notes', 'Submitted At'];
-    const rows = invitations.map((inv) => [
-      inv.householdName,
-      inv.code,
-      inv.email || '',
-      inv.response ? inv.response.attending : 'pending',
-      inv.response ? inv.response.guestCount.toString() : '',
-      inv.guests.map((g) => g.name).join('; '),
-      inv.response?.message || '',
-      inv.response?.songRequests || '',
-      inv.response?.dietaryNotes || '',
-      inv.response?.submittedAt || '',
-    ]);
+    // One row per attendee (primary guests + plus-ones) so the caterer /
+    // seating chart / name-card workflows all get a complete roster with
+    // per-person meal choices. Households that haven't responded or declined
+    // still get a single row to make pending/declined visible.
+    const headers = ['Household', 'Code', 'Email', 'Status', 'Guest Count', 'Attendee', 'Attendee Type', 'Meal', 'Message', 'Song Requests', 'Dietary Notes', 'Submitted At'];
+    const rows: string[][] = [];
+    for (const inv of invitations) {
+      const baseCols = [
+        inv.householdName,
+        inv.code,
+        inv.email || '',
+        inv.response ? inv.response.attending : 'pending',
+        inv.response ? inv.response.guestCount.toString() : '',
+      ];
+      const tailCols = [
+        inv.response?.message || '',
+        inv.response?.songRequests || '',
+        inv.response?.dietaryNotes || '',
+        inv.response?.submittedAt || '',
+      ];
+
+      const parse = <T,>(raw: string | null | undefined, fallback: T): T => {
+        if (!raw) return fallback;
+        try { return JSON.parse(raw) as T; } catch { return fallback; }
+      };
+      const attendingIds = parse<string[]>(inv.response?.attendingGuests, []);
+      const guestMeals = parse<Record<string, string>>(inv.response?.guestMeals, {});
+      const plusOnes = parse<{ name: string; meal?: string }[]>(inv.response?.plusOnes, []);
+      const guestsById = new Map(inv.guests.map((g) => [g.id, g.name]));
+
+      // No response yet — single placeholder row so the household still shows.
+      if (!inv.response) {
+        rows.push([...baseCols, '', '', '', ...tailCols]);
+        continue;
+      }
+
+      // Declined — one row with empty attendee fields; the Status column carries the signal.
+      if (inv.response.attending !== 'yes') {
+        rows.push([...baseCols, '', '', '', ...tailCols]);
+        continue;
+      }
+
+      // Attending — one row per attending primary guest, then one per plus-one.
+      for (const id of attendingIds) {
+        const name = guestsById.get(id) ?? id;
+        rows.push([...baseCols, name, 'primary', guestMeals[id] || '', ...tailCols]);
+      }
+      for (const p of plusOnes) {
+        if (!p?.name) continue;
+        rows.push([...baseCols, p.name, 'plus-one', p.meal || '', ...tailCols]);
+      }
+      // Attending household with zero attendees recorded — still emit one row so the
+      // invitation doesn't drop out of the export entirely.
+      if (attendingIds.length === 0 && plusOnes.length === 0) {
+        rows.push([...baseCols, '', '', '', ...tailCols]);
+      }
+    }
     const csv = [headers, ...rows].map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
