@@ -103,3 +103,67 @@ describe('renderThemedEmailHtml', () => {
     expect(html).toContain('>https://example.com</a>');
   });
 });
+
+import { sendMail, _resetEmailTransportForTests } from './email';
+import nodemailer from 'nodemailer';
+
+describe('sendMail', () => {
+  const sendMailMock = vi.fn();
+  beforeEach(() => {
+    process.env.SMTP_HOST = 'smtp.test';
+    process.env.SMTP_PORT = '587';
+    process.env.SMTP_USER = 'sender@test';
+    process.env.SMTP_PASS = 'secret';
+    process.env.SMTP_FROM = 'sender@test';
+    _resetEmailTransportForTests();
+    sendMailMock.mockReset();
+    sendMailMock.mockResolvedValue({ messageId: 'fake' });
+    vi.spyOn(nodemailer, 'createTransport').mockReturnValue({
+      sendMail: sendMailMock,
+      verify: vi.fn().mockResolvedValue(true),
+    } as any);
+    // theme + site settings mocks (re-using the prisma mock pattern from earlier tests)
+    vi.spyOn(prisma.setting, 'findMany').mockResolvedValue([
+      { id: '1', key: 'site.coupleName1', value: 'Joe' },
+      { id: '2', key: 'site.coupleName2', value: 'Alex' },
+    ] as any);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('sends multipart/alternative with both html and text', async () => {
+    const result = await sendMail({ to: 'guest@test', subject: 'hi', body: 'hello world' });
+    expect(result.ok).toBe(true);
+    expect(sendMailMock).toHaveBeenCalledOnce();
+    const envelope = sendMailMock.mock.calls[0][0];
+    expect(envelope.to).toBe('guest@test');
+    expect(envelope.subject).toBe('hi');
+    expect(envelope.text).toBe('hello world');
+    expect(envelope.html).toContain('hello world');
+    expect(envelope.html).toContain('<!DOCTYPE html>');
+  });
+
+  it('uses configured fromName as the From display name', async () => {
+    await sendMail({ to: 'g@t', subject: 's', body: 'b', fromName: 'Joe & Alex' });
+    const envelope = sendMailMock.mock.calls[0][0];
+    expect(envelope.from).toBe('"Joe & Alex" <sender@test>');
+  });
+
+  it('uses replyTo when provided, otherwise no Reply-To header', async () => {
+    await sendMail({ to: 'g@t', subject: 's', body: 'b', replyTo: 'couple@example.com' });
+    expect(sendMailMock.mock.calls[0][0].replyTo).toBe('couple@example.com');
+
+    sendMailMock.mockClear();
+    await sendMail({ to: 'g@t', subject: 's', body: 'b' });
+    expect(sendMailMock.mock.calls[0][0].replyTo).toBeUndefined();
+  });
+
+  it('returns { ok: false, error } when transport throws', async () => {
+    sendMailMock.mockRejectedValueOnce(new Error('SMTP down'));
+    const result = await sendMail({ to: 'g@t', subject: 's', body: 'b' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('SMTP down');
+  });
+});

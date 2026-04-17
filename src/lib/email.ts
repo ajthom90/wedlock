@@ -44,6 +44,62 @@ function plainTextToHtmlBody(plain: string, linkColor: string): string {
   return linked.replace(/\n/g, '<br>');
 }
 
+import nodemailer, { Transporter } from 'nodemailer';
+
+let cachedTransport: Transporter | null = null;
+
+function getTransport(): Transporter {
+  if (cachedTransport) return cachedTransport;
+  cachedTransport = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: Number(process.env.SMTP_PORT) === 465,
+    auth: {
+      user: process.env.SMTP_USER!,
+      pass: process.env.SMTP_PASS!,
+    },
+    pool: true,         // amortize TLS handshake across consecutive sends
+    maxConnections: 1,
+  });
+  return cachedTransport;
+}
+
+// Test-only hook so tests don't reuse a mocked transport across describe blocks.
+export function _resetEmailTransportForTests() {
+  cachedTransport = null;
+}
+
+export interface SendMailArgs {
+  to: string;
+  subject: string;
+  body: string;          // plain text
+  replyTo?: string;
+  fromName?: string;
+}
+
+export type SendMailResult = { ok: true } | { ok: false; error: string };
+
+export async function sendMail(args: SendMailArgs): Promise<SendMailResult> {
+  try {
+    const html = await renderThemedEmailHtml(args.body);
+    const fromAddress = process.env.SMTP_FROM!;
+    const from = args.fromName
+      ? `"${args.fromName}" <${fromAddress}>`
+      : fromAddress;
+    await getTransport().sendMail({
+      from,
+      to: args.to,
+      subject: args.subject,
+      text: args.body,
+      html,
+      replyTo: args.replyTo,
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function renderThemedEmailHtml(plainBody: string): Promise<string> {
   const theme = await getTheme();
   const site = await getSiteSettings();
