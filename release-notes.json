@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.9.1",
+    "date": "2026-04-17",
+    "changes": [
+      { "type": "improvement", "text": "Invitation import preview — each row is now a collapsible card instead of a wide table. Much easier to scan and edit, and error rows auto-expand so you land on exactly what needs attention." }
+    ]
+  },
+  {
     "version": "2.9.0",
     "date": "2026-04-17",
     "changes": [
