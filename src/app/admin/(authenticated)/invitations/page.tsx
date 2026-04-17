@@ -27,10 +27,29 @@ interface Invitation {
   maxGuests: number;
   plusOnesAllowed: number;
   notes: string | null;
-  address: string | null;
+  address: string | null;  // deprecated free-text; kept for pre-2.9 rows
+  mailingAddress1: string | null;
+  mailingAddress2: string | null;
+  mailingCity: string | null;
+  mailingState: string | null;
+  mailingPostalCode: string | null;
   createdAt: string;
   guests: Guest[];
   response: RsvpResponse | null;
+}
+
+// Formats an invitation's address for display / CSV export, preferring the
+// structured mailing fields and falling back to the legacy free-text column
+// for invitations created before 2.9 (when the structured fields didn't exist).
+function formatInvitationAddress(inv: Invitation): string {
+  const line1 = inv.mailingAddress1?.trim();
+  const line2 = inv.mailingAddress2?.trim();
+  const cityState = [inv.mailingCity?.trim(), inv.mailingState?.trim()].filter(Boolean).join(', ');
+  const zip = inv.mailingPostalCode?.trim();
+  const structured = [line1, line2, [cityState, zip].filter(Boolean).join(' ').trim()]
+    .filter(Boolean)
+    .join('\n');
+  return structured || inv.address?.trim() || '';
 }
 
 export default function InvitationsPage() {
@@ -148,11 +167,12 @@ export default function InvitationsPage() {
   };
 
   const exportAddresses = () => {
-    // CSV export of mailing addresses collected via the RSVP flow. Useful for
-    // mail-merging save-the-dates or thank-you cards.
+    // CSV export of mailing addresses collected via the RSVP flow or the bulk
+    // import. Useful for mail-merging save-the-dates or thank-you cards.
     const rows = invitations
-      .filter((inv) => inv.address?.trim())
-      .map((inv) => [inv.householdName, inv.address as string]);
+      .map((inv) => ({ name: inv.householdName, addr: formatInvitationAddress(inv) }))
+      .filter((r) => r.addr !== '')
+      .map((r) => [r.name, r.addr]);
     if (rows.length === 0) {
       alert('No mailing addresses collected yet.');
       return;
@@ -247,7 +267,9 @@ export default function InvitationsPage() {
                     <CardTitle>{inv.householdName}</CardTitle>
                     <p className="text-sm text-gray-500 mt-1">Code: <span className="font-mono font-semibold">{inv.code}</span></p>
                     {inv.email && <p className="text-sm text-gray-500">{inv.email}</p>}
-                    {inv.address && <p className="text-xs text-gray-500 mt-1 whitespace-pre-line">📬 {inv.address}</p>}
+                    {formatInvitationAddress(inv) && (
+                      <p className="text-xs text-gray-500 mt-1 whitespace-pre-line">📬 {formatInvitationAddress(inv)}</p>
+                    )}
                   </div>
                   {getStatusBadge(inv)}
                 </div>
