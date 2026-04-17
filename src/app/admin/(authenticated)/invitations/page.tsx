@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -223,6 +224,9 @@ export default function InvitationsPage() {
           <Button variant="outline" onClick={handleDownloadPdf} disabled={downloading}>
             {downloading ? 'Generating...' : 'Download PDF'}
           </Button>
+          <Link href="/admin/invitations/import">
+            <Button variant="outline">Import from Excel</Button>
+          </Link>
           <Button onClick={openCreate}>Create Invitation</Button>
         </div>
       </div>
