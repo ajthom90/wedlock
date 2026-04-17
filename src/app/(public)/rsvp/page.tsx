@@ -26,6 +26,7 @@ function RSVPForm() {
   const [dietaryNotes, setDietaryNotes] = useState('');
   const [message, setMessage] = useState('');
   const [address, setAddress] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -45,6 +46,7 @@ function RSVPForm() {
       if (!res.ok) { setError(data.error || 'Invitation not found'); return; }
       setInvitation(data.invitation); setRsvpOptions(data.rsvpOptions || []); setSettings(data.settings || {}); setFeatures(data.features || {});
       setAddress(data.invitation.address || '');
+      setContactEmail(data.invitation.contactEmail || '');
       const slotCount = data.invitation.plusOnesAllowed || 0;
       const emptySlots = Array.from({ length: slotCount }, () => ({ name: '', meal: '' }));
       if (data.invitation.response) {
@@ -119,7 +121,7 @@ function RSVPForm() {
     try {
       const namedPlusOnes = plusOnes.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), meal: p.meal }));
       const totalAttending = features.perGuestSelection ? attendingGuests.length + namedPlusOnes.length : guestCount;
-      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && features.perGuestSelection ? guestMeals : undefined, attendingGuests: attending === 'yes' && features.perGuestSelection ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, address: address.trim() || undefined }) });
+      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && features.perGuestSelection ? guestMeals : undefined, attendingGuests: attending === 'yes' && features.perGuestSelection ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, address: address.trim() || undefined, contactEmail }) });
       const data = await res.json();
       if (res.ok) { setShowConfirm(false); setSubmitted(true); }
       else setSubmitError(data.error || 'Failed to submit RSVP');
@@ -208,6 +210,21 @@ function RSVPForm() {
           {features.songRequests && <Textarea label="Song Requests" value={songRequests} onChange={(e) => setSongRequests(e.target.value)} placeholder="Any songs you'd like to hear?" rows={2} />}
         </>)}
         {attending && features.rsvpAddress !== false && <Textarea label="Mailing address (optional — for save-the-dates and thank-you cards)" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, Springfield, IL 62704" rows={2} />}
+        {attending && (features.rsvpConfirmationEmails || features.dayOfBroadcasts) && (
+          <div className="mt-4">
+            <label className="block text-sm font-medium mb-1">Stay in the loop (optional)</label>
+            <p className="text-xs text-gray-600 mb-2">
+              Want emails from us about your RSVP and day-of updates (ceremony timing, shuttle delays, etc.)?
+              Drop an email here. Leave it blank if you&apos;d rather not hear from us.
+            </p>
+            <Input
+              type="email"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              placeholder="you@example.com"
+            />
+          </div>
+        )}
         {attending && <Textarea label="Message for the Couple (optional)" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Share your thoughts..." rows={3} />}
         {validationError && <p className="text-red-600 text-sm">{validationError}</p>}
         {attending && <Button type="submit" className="w-full">{invitation.response ? 'Update RSVP' : 'Submit RSVP'}</Button>}

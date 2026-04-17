@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getSiteSettings, getFeatures } from '@/lib/settings';
 import { parseRsvpChoices } from '@/lib/rsvpChoices';
 import { cookies } from 'next/headers';
+import { getEmailConfig, sendRsvpConfirmation } from '@/lib/email';
 
 export async function GET(request: Request) {
   try {
@@ -33,6 +34,8 @@ export async function GET(request: Request) {
         songRequests: features.songRequests,
         dietaryNotes: features.dietaryNotes,
         rsvpAddress: features.rsvpAddress,
+        rsvpConfirmationEmails: features.rsvpConfirmationEmails,
+        dayOfBroadcasts: features.dayOfBroadcasts,
       },
     });
   } catch (error) {
@@ -43,7 +46,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { code, attending, guestCount, responses, guestMeals, message, attendingGuests, plusOnes, songRequests, dietaryNotes, address } = await request.json();
+    const { code, attending, guestCount, responses, guestMeals, message, attendingGuests, plusOnes, songRequests, dietaryNotes, address, contactEmail } = await request.json();
     if (!code) return NextResponse.json({ error: 'Invitation code is required' }, { status: 400 });
     const settings = await getSiteSettings();
     if (settings.rsvpDeadline && settings.rsvpCloseAfterDeadline) {
@@ -53,12 +56,21 @@ export async function POST(request: Request) {
     }
     const invitation = await prisma.invitation.findUnique({ where: { code } });
     if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
+    const features = await getFeatures();
     // Persist the mailing address on the invitation if the guest provided one.
     // Stored separately from the RsvpResponse so it survives RSVP changes.
     if (typeof address === 'string' && address.trim()) {
       await prisma.invitation.update({
         where: { id: invitation.id },
         data: { address: address.trim() },
+      });
+    }
+    // Persist contactEmail on the invitation. Empty string clears the opt-in.
+    if (typeof contactEmail === 'string') {
+      const trimmed = contactEmail.trim();
+      await prisma.invitation.update({
+        where: { id: invitation.id },
+        data: { contactEmail: trimmed || null },
       });
     }
     const existing = await prisma.rsvpResponse.findUnique({ where: { invitationId: invitation.id } });
@@ -83,15 +95,24 @@ export async function POST(request: Request) {
       songRequests: songRequests || null, dietaryNotes: dietaryNotes || null,
       message: message || null,
     });
+    let response;
     if (existing) {
-      const response = await prisma.rsvpResponse.update({ where: { id: existing.id }, data: { ...data, submittedAt: new Date() } });
-      await prisma.rsvpChangeLog.create({ data: { invitationId: invitation.id, source: 'guest', details: logDetails } });
-      await prisma.notification.create({ data: { type: 'rsvp', title: 'New RSVP', message: `${invitation.householdName} has ${attending === 'yes' ? 'accepted' : 'declined'} the invitation` } });
-      return NextResponse.json({ success: true, response });
+      response = await prisma.rsvpResponse.update({ where: { id: existing.id }, data: { ...data, submittedAt: new Date() } });
+    } else {
+      response = await prisma.rsvpResponse.create({ data: { invitationId: invitation.id, ...data } });
     }
-    const response = await prisma.rsvpResponse.create({ data: { invitationId: invitation.id, ...data } });
     await prisma.rsvpChangeLog.create({ data: { invitationId: invitation.id, source: 'guest', details: logDetails } });
     await prisma.notification.create({ data: { type: 'rsvp', title: 'New RSVP', message: `${invitation.householdName} has ${attending === 'yes' ? 'accepted' : 'declined'} the invitation` } });
+    // Fire-and-forget RSVP confirmation. Errors are logged, not surfaced —
+    // the guest's RSVP succeeded regardless.
+    if (features.rsvpConfirmationEmails && getEmailConfig().configured) {
+      // Reload the invitation to pick up the just-saved contactEmail.
+      const fresh = await prisma.invitation.findUnique({ where: { id: invitation.id } });
+      if (fresh?.contactEmail) {
+        sendRsvpConfirmation(fresh, response, { isUpdate: !!existing })
+          .catch((err) => console.error('RSVP confirmation send failed:', err));
+      }
+    }
     return NextResponse.json({ success: true, response });
   } catch (error) {
     console.error('Error submitting RSVP:', error);
