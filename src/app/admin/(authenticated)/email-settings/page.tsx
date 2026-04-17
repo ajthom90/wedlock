@@ -32,7 +32,7 @@ export default function EmailSettingsPage() {
       if (statusRes.ok) setStatus(await statusRes.json());
       if (settingsRes.ok) {
         const s = await settingsRes.json();
-        setReplyTo(s.replyToEmail || '');
+        setReplyTo(s.site?.replyToEmail || '');
       }
     })();
   }, []);
@@ -44,7 +44,7 @@ export default function EmailSettingsPage() {
       const res = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ replyToEmail: replyTo.trim() }),
+        body: JSON.stringify({ site: { replyToEmail: replyTo.trim() } }),
       });
       setReplyMessage(res.ok ? 'Saved' : 'Save failed');
     } finally {
