@@ -63,3 +63,95 @@ describe('validateRow', () => {
     expect(v.errors).toEqual([]);
   });
 });
+
+import ExcelJS from 'exceljs';
+import { parseWorkbook, WORKBOOK_COLUMNS } from './invitationImport';
+
+async function makeBuffer(build: (sheet: ExcelJS.Worksheet) => void, sheetName = 'Invitations'): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  const sheet = wb.addWorksheet(sheetName);
+  build(sheet);
+  const ab = await wb.xlsx.writeBuffer();
+  return Buffer.from(ab as ArrayBuffer);
+}
+
+describe('parseWorkbook', () => {
+  it('parses two data rows with correct rowNumber and normalized values', async () => {
+    const buf = await makeBuffer((s) => {
+      s.addRow(WORKBOOK_COLUMNS);
+      s.addRow(['The Smiths', 'a@b.com', '', '123 Main', '', 'Springfield', 'IL', '62704', 1, '', 'Alice', 'Bob', '', '', '', '', '', '', '', '']);
+      s.addRow(['The Joneses', '', '', '', '', '', '', '', 0, '', 'Carol', '', '', '', '', '', '', '', '', '']);
+    });
+    const rows = await parseWorkbook(buf);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].rowNumber).toBe(2);
+    expect(rows[0].normalized.householdName).toBe('The Smiths');
+    expect(rows[0].normalized.email).toBe('a@b.com');
+    expect(rows[0].normalized.mailingAddress1).toBe('123 Main');
+    expect(rows[0].normalized.plusOnesAllowed).toBe(1);
+    expect(rows[0].normalized.guestNames).toEqual(['Alice', 'Bob']);
+    expect(rows[1].rowNumber).toBe(3);
+    expect(rows[1].normalized.guestNames).toEqual(['Carol']);
+  });
+
+  it('returns empty array for a header-only sheet', async () => {
+    const buf = await makeBuffer((s) => s.addRow(WORKBOOK_COLUMNS));
+    const rows = await parseWorkbook(buf);
+    expect(rows).toEqual([]);
+  });
+
+  it('drops trailing blank rows', async () => {
+    const buf = await makeBuffer((s) => {
+      s.addRow(WORKBOOK_COLUMNS);
+      s.addRow(['The Smiths', '', '', '', '', '', '', '', 0, '', '', '', '', '', '', '', '', '', '', '']);
+      s.addRow(['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+      s.addRow(['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    });
+    const rows = await parseWorkbook(buf);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('trims whitespace from text fields', async () => {
+    const buf = await makeBuffer((s) => {
+      s.addRow(WORKBOOK_COLUMNS);
+      s.addRow(['  The Smiths  ', '  a@b.com  ', '', '', '', '', '', '', 0, '', '  Alice  ', '', '', '', '', '', '', '', '', '']);
+    });
+    const rows = await parseWorkbook(buf);
+    expect(rows[0].normalized.householdName).toBe('The Smiths');
+    expect(rows[0].normalized.email).toBe('a@b.com');
+    expect(rows[0].normalized.guestNames).toEqual(['Alice']);
+  });
+
+  it('treats Guest columns with gaps (empty slot before a filled one) correctly', async () => {
+    const buf = await makeBuffer((s) => {
+      s.addRow(WORKBOOK_COLUMNS);
+      // Guest 1 blank, Guest 2 filled.
+      s.addRow(['The Smiths', '', '', '', '', '', '', '', 0, '', '', 'Alice', '', '', '', '', '', '', '', '']);
+    });
+    const rows = await parseWorkbook(buf);
+    // Gap-filling: only non-empty guest columns, in order.
+    expect(rows[0].normalized.guestNames).toEqual(['Alice']);
+  });
+
+  it('throws a recognizable error when the header row is missing or wrong', async () => {
+    const buf = await makeBuffer((s) => {
+      s.addRow(['Not', 'The', 'Right', 'Headers']);
+      s.addRow(['ignored']);
+    });
+    await expect(parseWorkbook(buf)).rejects.toThrow(/header/i);
+  });
+
+  it('reads "Invitations" sheet by name even when there are other sheets', async () => {
+    const wb = new ExcelJS.Workbook();
+    const inst = wb.addWorksheet('Instructions');
+    inst.addRow(['this sheet should be ignored']);
+    const data = wb.addWorksheet('Invitations');
+    data.addRow(WORKBOOK_COLUMNS);
+    data.addRow(['The Smiths', '', '', '', '', '', '', '', 0, '', '', '', '', '', '', '', '', '', '', '']);
+    const ab = await wb.xlsx.writeBuffer();
+    const buf = Buffer.from(ab as ArrayBuffer);
+    const rows = await parseWorkbook(buf);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].normalized.householdName).toBe('The Smiths');
+  });
+});
