@@ -19,14 +19,14 @@
   },
   {
     "version": "2.7.2",
-    "date": "2026-04-10",
+    "date": "2026-04-16",
     "changes": [
       { "type": "feature", "text": "Drag-to-reorder within wedding-party groups — rearrange bridesmaids / groomsmen / other role groups by dragging, without retyping the order numbers." }
     ]
   },
   {
     "version": "2.7.1",
-    "date": "2026-03-28",
+    "date": "2026-04-16",
     "changes": [
       { "type": "fix", "text": "Stability improvements." }
     ]
