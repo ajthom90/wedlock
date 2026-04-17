@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.9.0",
+    "date": "2026-04-17",
+    "changes": [
+      { "type": "feature", "text": "Bulk invitation import — upload an Excel sheet to create dozens of invitations at once. Download the included template from the Import page to share with your partner while building the guest list." },
+      { "type": "feature", "text": "Structured mailing address — each invitation now has separate fields for Address Line 1, Line 2, City, State, and Postal Code. Ready to drive printable mailing labels later." },
+      { "type": "improvement", "text": "RSVP form mailing address is now 5 separate inputs that pre-fill from whatever the admin imported. Saves the same structured data back on submit." }
+    ]
+  },
+  {
     "version": "2.8.0",
     "date": "2026-04-17",
     "changes": [
