@@ -167,3 +167,110 @@ describe('sendMail', () => {
     if (!result.ok) expect(result.error).toContain('SMTP down');
   });
 });
+
+import { sendRsvpConfirmation } from './email';
+
+describe('sendRsvpConfirmation', () => {
+  const sendMailMock = vi.fn();
+  beforeEach(() => {
+    process.env.SMTP_HOST = 'smtp.test';
+    process.env.SMTP_PORT = '587';
+    process.env.SMTP_USER = 'sender@test';
+    process.env.SMTP_PASS = 'secret';
+    process.env.SMTP_FROM = 'sender@test';
+    process.env.PUBLIC_SITE_URL = 'https://wedding.example.com';
+    sendMailMock.mockReset();
+    sendMailMock.mockResolvedValue({ messageId: 'fake' });
+    vi.spyOn(nodemailer, 'createTransport').mockReturnValue({
+      sendMail: sendMailMock,
+      verify: vi.fn().mockResolvedValue(true),
+    } as any);
+    vi.spyOn(prisma.setting, 'findMany').mockResolvedValue([
+      { id: '1', key: 'site.coupleName1', value: 'Joe' },
+      { id: '2', key: 'site.coupleName2', value: 'Alex' },
+      { id: '3', key: 'site.rsvpDeadline', value: '2026-08-01' },
+      { id: '4', key: 'site.replyToEmail', value: 'joeandalex@example.com' },
+    ] as any);
+    _resetEmailTransportForTests();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const baseInvitation = {
+    id: 'inv-1',
+    code: 'ABC123',
+    householdName: 'The Smiths',
+    contactEmail: 'smiths@test',
+  };
+  const baseResponse = {
+    attending: 'yes',
+    guestCount: 2,
+    attendingGuests: JSON.stringify(['Alice Smith', 'Bob Smith']),
+    guestMeals: null,
+    plusOnes: null,
+    songRequests: null,
+    dietaryNotes: null,
+    message: null,
+  };
+
+  it('uses "RSVP confirmed" subject on first submission', async () => {
+    await sendRsvpConfirmation(baseInvitation as any, baseResponse as any, { isUpdate: false });
+    expect(sendMailMock.mock.calls[0][0].subject).toContain('RSVP confirmed');
+  });
+
+  it('uses "RSVP updated" subject on edit', async () => {
+    await sendRsvpConfirmation(baseInvitation as any, baseResponse as any, { isUpdate: true });
+    expect(sendMailMock.mock.calls[0][0].subject).toContain('RSVP updated');
+  });
+
+  it('includes the magic link with PUBLIC_SITE_URL and invitation code', async () => {
+    await sendRsvpConfirmation(baseInvitation as any, baseResponse as any, { isUpdate: false });
+    const text: string = sendMailMock.mock.calls[0][0].text;
+    expect(text).toContain('https://wedding.example.com/rsvp?code=ABC123');
+  });
+
+  it('renders attending status, guest count, and attending names', async () => {
+    await sendRsvpConfirmation(baseInvitation as any, baseResponse as any, { isUpdate: false });
+    const text: string = sendMailMock.mock.calls[0][0].text;
+    expect(text).toContain('Attending: Yes');
+    expect(text).toContain('Guests: 2');
+    expect(text).toContain('Alice Smith');
+    expect(text).toContain('Bob Smith');
+  });
+
+  it('renders "Attending: No" when declined', async () => {
+    await sendRsvpConfirmation(baseInvitation as any, { ...baseResponse, attending: 'no', guestCount: 0 } as any, { isUpdate: false });
+    const text: string = sendMailMock.mock.calls[0][0].text;
+    expect(text).toContain('Attending: No');
+    expect(text).not.toContain('Guests: 0');  // no recap of guest list when declining
+  });
+
+  it('omits optional sections when their fields are null', async () => {
+    await sendRsvpConfirmation(baseInvitation as any, baseResponse as any, { isUpdate: false });
+    const text: string = sendMailMock.mock.calls[0][0].text;
+    expect(text).not.toContain('Dietary notes:');
+    expect(text).not.toContain('Song requests:');
+    expect(text).not.toContain('Your message:');
+  });
+
+  it('includes optional sections when their fields are present', async () => {
+    const response = { ...baseResponse, dietaryNotes: 'no peanuts', songRequests: 'Disco Inferno', message: 'Cannot wait!' };
+    await sendRsvpConfirmation(baseInvitation as any, response as any, { isUpdate: false });
+    const text: string = sendMailMock.mock.calls[0][0].text;
+    expect(text).toContain('Dietary notes: no peanuts');
+    expect(text).toContain('Song requests: Disco Inferno');
+    expect(text).toContain('Your message: Cannot wait!');
+  });
+
+  it('uses replyToEmail as the Reply-To header', async () => {
+    await sendRsvpConfirmation(baseInvitation as any, baseResponse as any, { isUpdate: false });
+    expect(sendMailMock.mock.calls[0][0].replyTo).toBe('joeandalex@example.com');
+  });
+
+  it('uses couple names as the From display name', async () => {
+    await sendRsvpConfirmation(baseInvitation as any, baseResponse as any, { isUpdate: false });
+    expect(sendMailMock.mock.calls[0][0].from).toBe('"Joe & Alex" <sender@test>');
+  });
+});

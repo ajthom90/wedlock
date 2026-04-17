@@ -100,6 +100,115 @@ export async function sendMail(args: SendMailArgs): Promise<SendMailResult> {
   }
 }
 
+import type { Invitation, RsvpResponse } from '@prisma/client';
+
+function formatDeadline(deadline: string): string {
+  if (!deadline) return '';
+  // Date strings come from settings as YYYY-MM-DD; render as a friendly date
+  // without forcing a timezone parse. Falls back to the raw string if Date
+  // construction fails.
+  const d = new Date(deadline + 'T00:00:00');
+  if (isNaN(d.getTime())) return deadline;
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function buildRsvpRecapBody(args: {
+  householdName: string;
+  attending: string;
+  guestCount: number;
+  attendingGuests: string[] | null;
+  plusOnes: { name: string; meal?: string }[] | null;
+  guestMeals: Record<string, string> | null;
+  songRequests: string | null;
+  dietaryNotes: string | null;
+  message: string | null;
+  rsvpDeadline: string;
+  magicLink: string;
+  coupleNames: string;
+}): string {
+  const lines: string[] = [];
+  lines.push(`Hi ${args.householdName},`);
+  lines.push('');
+  lines.push("Thanks for your RSVP! Here's what we got:");
+  lines.push('');
+  lines.push(`  Attending: ${args.attending === 'yes' ? 'Yes' : 'No'}`);
+
+  if (args.attending === 'yes' && args.guestCount > 0) {
+    lines.push(`  Guests: ${args.guestCount}`);
+    if (args.attendingGuests && args.attendingGuests.length) {
+      for (const name of args.attendingGuests) {
+        const meal = args.guestMeals?.[name];
+        lines.push(meal ? `    - ${name} (${meal})` : `    - ${name}`);
+      }
+    }
+    if (args.plusOnes && args.plusOnes.length) {
+      for (const p of args.plusOnes) {
+        lines.push(p.meal ? `    - ${p.name} (${p.meal})` : `    - ${p.name}`);
+      }
+    }
+  }
+
+  lines.push('');
+  if (args.dietaryNotes) lines.push(`Dietary notes: ${args.dietaryNotes}`, '');
+  if (args.songRequests) lines.push(`Song requests: ${args.songRequests}`, '');
+  if (args.message) lines.push(`Your message: ${args.message}`, '');
+
+  const deadlineCopy = args.rsvpDeadline
+    ? `before ${formatDeadline(args.rsvpDeadline)}`
+    : 'anytime';
+  lines.push(`Need to make a change ${deadlineCopy}? Update your RSVP here:`);
+  lines.push(args.magicLink);
+  lines.push('');
+  lines.push('Looking forward to it!');
+  lines.push(args.coupleNames);
+
+  return lines.join('\n');
+}
+
+function safeJsonParse<T>(raw: string | null | undefined, fallback: T): T {
+  if (!raw) return fallback;
+  try { return JSON.parse(raw) as T; } catch { return fallback; }
+}
+
+export async function sendRsvpConfirmation(
+  invitation: Invitation,
+  response: RsvpResponse,
+  opts: { isUpdate: boolean },
+): Promise<SendMailResult> {
+  if (!invitation.contactEmail) return { ok: false, error: 'No contactEmail on invitation' };
+
+  const site = await getSiteSettings();
+  const config = getEmailConfig();
+  const coupleNames = `${site.coupleName1} & ${site.coupleName2}`;
+  const subject = opts.isUpdate
+    ? `RSVP updated — ${coupleNames}'s wedding`
+    : `RSVP confirmed — ${coupleNames}'s wedding`;
+  const magicLink = `${config.publicSiteUrl ?? ''}/rsvp?code=${invitation.code}`;
+
+  const body = buildRsvpRecapBody({
+    householdName: invitation.householdName,
+    attending: response.attending,
+    guestCount: response.guestCount,
+    attendingGuests: safeJsonParse<string[] | null>(response.attendingGuests, null),
+    plusOnes: safeJsonParse<{ name: string; meal?: string }[] | null>(response.plusOnes, null),
+    guestMeals: safeJsonParse<Record<string, string> | null>(response.guestMeals, null),
+    songRequests: response.songRequests,
+    dietaryNotes: response.dietaryNotes,
+    message: response.message,
+    rsvpDeadline: site.rsvpDeadline,
+    magicLink,
+    coupleNames,
+  });
+
+  return sendMail({
+    to: invitation.contactEmail,
+    subject,
+    body,
+    fromName: coupleNames,
+    replyTo: site.replyToEmail || undefined,
+  });
+}
+
 export async function renderThemedEmailHtml(plainBody: string): Promise<string> {
   const theme = await getTheme();
   const site = await getSiteSettings();
