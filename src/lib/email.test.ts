@@ -203,12 +203,17 @@ describe('sendRsvpConfirmation', () => {
     code: 'ABC123',
     householdName: 'The Smiths',
     contactEmail: 'smiths@test',
+    guests: [
+      { id: 'g-alice', name: 'Alice Smith' },
+      { id: 'g-bob', name: 'Bob Smith' },
+    ],
   };
   const baseResponse = {
     attending: 'yes',
     guestCount: 2,
-    attendingGuests: JSON.stringify(['Alice Smith', 'Bob Smith']),
-    guestMeals: null,
+    // Matches how the form actually stores them — guest IDs from Invitation.guests.
+    attendingGuests: JSON.stringify(['g-alice', 'g-bob']),
+    guestMeals: JSON.stringify({ 'g-alice': 'Chicken', 'g-bob': 'Fish' }),
     plusOnes: null,
     songRequests: null,
     dietaryNotes: null,
@@ -231,13 +236,38 @@ describe('sendRsvpConfirmation', () => {
     expect(text).toContain('https://wedding.example.com/rsvp?code=ABC123');
   });
 
-  it('renders attending status, guest count, and attending names', async () => {
+  it('resolves attending guest IDs to names via invitation.guests', async () => {
     await sendRsvpConfirmation(baseInvitation as any, baseResponse as any, { isUpdate: false });
     const text: string = sendMailMock.mock.calls[0][0].text;
     expect(text).toContain('Attending: Yes');
     expect(text).toContain('Guests: 2');
-    expect(text).toContain('Alice Smith');
-    expect(text).toContain('Bob Smith');
+    expect(text).toContain('Alice Smith (Chicken)');
+    expect(text).toContain('Bob Smith (Fish)');
+    // Raw IDs must not leak into the rendered email.
+    expect(text).not.toContain('g-alice');
+    expect(text).not.toContain('g-bob');
+  });
+
+  it('falls back to the raw ID when a guest ID is not in invitation.guests', async () => {
+    const invitation = { ...baseInvitation, guests: [{ id: 'g-alice', name: 'Alice Smith' }] };
+    await sendRsvpConfirmation(invitation as any, baseResponse as any, { isUpdate: false });
+    const text: string = sendMailMock.mock.calls[0][0].text;
+    expect(text).toContain('Alice Smith (Chicken)');
+    expect(text).toContain('g-bob');  // unresolved ID renders raw so data isn't silently dropped
+  });
+
+  it('strips a leading "The " from the household name in the greeting', async () => {
+    await sendRsvpConfirmation(baseInvitation as any, baseResponse as any, { isUpdate: false });
+    const text: string = sendMailMock.mock.calls[0][0].text;
+    expect(text).toContain('Hi Smiths,');
+    expect(text).not.toContain('Hi The Smiths,');
+  });
+
+  it('leaves household names not starting with "The" alone', async () => {
+    const invitation = { ...baseInvitation, householdName: 'Smith Family' };
+    await sendRsvpConfirmation(invitation as any, baseResponse as any, { isUpdate: false });
+    const text: string = sendMailMock.mock.calls[0][0].text;
+    expect(text).toContain('Hi Smith Family,');
   });
 
   it('renders "Attending: No" when declined', async () => {

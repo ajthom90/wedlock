@@ -116,7 +116,10 @@ function buildRsvpRecapBody(args: {
   householdName: string;
   attending: string;
   guestCount: number;
+  // attendingGuests stores guest IDs from Invitation.guests — we resolve
+  // them against guestNameById below. Unknown IDs render raw as a fallback.
   attendingGuests: string[] | null;
+  guestNameById: Record<string, string>;
   plusOnes: { name: string; meal?: string }[] | null;
   guestMeals: Record<string, string> | null;
   songRequests: string | null;
@@ -127,7 +130,10 @@ function buildRsvpRecapBody(args: {
   coupleNames: string;
 }): string {
   const lines: string[] = [];
-  lines.push(`Hi ${args.householdName},`);
+  // Strip a leading "The " from the household name so "The Johnson Family"
+  // reads naturally as "Hi Johnson Family," not "Hi The Johnson Family,".
+  const greetingName = args.householdName.replace(/^the\s+/i, '');
+  lines.push(`Hi ${greetingName},`);
   lines.push('');
   lines.push("Thanks for your RSVP! Here's what we got:");
   lines.push('');
@@ -136,8 +142,9 @@ function buildRsvpRecapBody(args: {
   if (args.attending === 'yes' && args.guestCount > 0) {
     lines.push(`  Guests: ${args.guestCount}`);
     if (args.attendingGuests && args.attendingGuests.length) {
-      for (const name of args.attendingGuests) {
-        const meal = args.guestMeals?.[name];
+      for (const id of args.attendingGuests) {
+        const name = args.guestNameById[id] ?? id;
+        const meal = args.guestMeals?.[id];
         lines.push(meal ? `    - ${name} (${meal})` : `    - ${name}`);
       }
     }
@@ -171,7 +178,9 @@ function safeJsonParse<T>(raw: string | null | undefined, fallback: T): T {
 }
 
 export async function sendRsvpConfirmation(
-  invitation: Invitation,
+  // Caller should pass an invitation with its `guests` relation loaded; we
+  // use it to translate stored guest IDs back to display names in the recap.
+  invitation: Invitation & { guests?: { id: string; name: string }[] },
   response: RsvpResponse,
   opts: { isUpdate: boolean },
 ): Promise<SendMailResult> {
@@ -184,12 +193,16 @@ export async function sendRsvpConfirmation(
     ? `RSVP updated — ${coupleNames}'s wedding`
     : `RSVP confirmed — ${coupleNames}'s wedding`;
   const magicLink = `${config.publicSiteUrl ?? ''}/rsvp?code=${invitation.code}`;
+  const guestNameById: Record<string, string> = Object.fromEntries(
+    (invitation.guests ?? []).map((g) => [g.id, g.name]),
+  );
 
   const body = buildRsvpRecapBody({
     householdName: invitation.householdName,
     attending: response.attending,
     guestCount: response.guestCount,
     attendingGuests: safeJsonParse<string[] | null>(response.attendingGuests, null),
+    guestNameById,
     plusOnes: safeJsonParse<{ name: string; meal?: string }[] | null>(response.plusOnes, null),
     guestMeals: safeJsonParse<Record<string, string> | null>(response.guestMeals, null),
     songRequests: response.songRequests,

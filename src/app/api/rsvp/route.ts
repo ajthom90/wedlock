@@ -106,8 +106,12 @@ export async function POST(request: Request) {
     // Fire-and-forget RSVP confirmation. Errors are logged, not surfaced —
     // the guest's RSVP succeeded regardless.
     if (features.rsvpConfirmationEmails && getEmailConfig().configured) {
-      // Reload the invitation to pick up the just-saved contactEmail.
-      const fresh = await prisma.invitation.findUnique({ where: { id: invitation.id } });
+      // Reload the invitation to pick up the just-saved contactEmail, and
+      // include guests so the confirmation recap can resolve IDs to names.
+      const fresh = await prisma.invitation.findUnique({
+        where: { id: invitation.id },
+        include: { guests: true },
+      });
       if (fresh?.contactEmail) {
         sendRsvpConfirmation(fresh, response, { isUpdate: !!existing })
           .catch((err) => console.error('RSVP confirmation send failed:', err));
