@@ -170,3 +170,65 @@ describe('computeLabelPositions', () => {
     expect(positions[6].yInchesFromTop).toBeCloseTo(format5160.marginTop);
   });
 });
+
+import { renderLabelsPdf } from './mailingLabelsPdf';
+import { PDFDocument } from 'pdf-lib';
+
+describe('renderLabelsPdf', () => {
+  it('returns a valid PDF buffer (starts with %PDF)', async () => {
+    const bytes = await renderLabelsPdf({
+      format: format5160,
+      startPosition: 1,
+      labels: [{ lines: ['The Smiths', '123 Main St', 'Springfield, IL 62704'] }],
+    });
+    expect(bytes.byteLength).toBeGreaterThan(0);
+    const header = new TextDecoder().decode(bytes.slice(0, 4));
+    expect(header).toBe('%PDF');
+  });
+
+  it('creates one page for a small label set that fits on one sheet', async () => {
+    const bytes = await renderLabelsPdf({
+      format: format5160,
+      startPosition: 1,
+      labels: Array.from({ length: 5 }, (_, i) => ({ lines: [`Row ${i}`] })),
+    });
+    const doc = await PDFDocument.load(bytes);
+    expect(doc.getPageCount()).toBe(1);
+  });
+
+  it('creates multiple pages when labels overflow a single sheet', async () => {
+    const bytes = await renderLabelsPdf({
+      format: format5160,
+      startPosition: 1,
+      labels: Array.from({ length: 40 }, (_, i) => ({ lines: [`Row ${i}`] })),
+    });
+    const doc = await PDFDocument.load(bytes);
+    expect(doc.getPageCount()).toBe(2);
+  });
+
+  it('produces a page of the expected size for the given format', async () => {
+    const bytes = await renderLabelsPdf({
+      format: format5160,
+      startPosition: 1,
+      labels: [{ lines: ['Solo'] }],
+    });
+    const doc = await PDFDocument.load(bytes);
+    const page = doc.getPage(0);
+    // pdf-lib uses points (1 inch = 72 points). 8.5 × 11 inch → 612 × 792 points.
+    expect(page.getWidth()).toBeCloseTo(format5160.pageWidth * 72);
+    expect(page.getHeight()).toBeCloseTo(format5160.pageHeight * 72);
+  });
+
+  it('startPosition=5 places labels starting at slot 5 on the first page', async () => {
+    // 5 empty slots + 3 labels → still all on page 1, page count still 1.
+    const bytes = await renderLabelsPdf({
+      format: format5160,
+      startPosition: 5,
+      labels: [
+        { lines: ['A'] }, { lines: ['B'] }, { lines: ['C'] },
+      ],
+    });
+    const doc = await PDFDocument.load(bytes);
+    expect(doc.getPageCount()).toBe(1);
+  });
+});
