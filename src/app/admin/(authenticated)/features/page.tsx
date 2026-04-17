@@ -22,6 +22,8 @@ interface FeatureSettings {
   vendorContacts: boolean;
   budgetTracker: boolean;
   sitePasswordEnabled: boolean;
+  rsvpConfirmationEmails: boolean;
+  dayOfBroadcasts: boolean;
 }
 
 type BoolFeature = Exclude<keyof FeatureSettings, 'guestBook'>;
@@ -43,6 +45,8 @@ const DEFAULTS: FeatureSettings = {
   vendorContacts: true,
   budgetTracker: true,
   sitePasswordEnabled: false,
+  rsvpConfirmationEmails: false,
+  dayOfBroadcasts: false,
 };
 
 interface ToggleDescriptor {
@@ -93,6 +97,13 @@ const ADMIN_TOOLS: ToggleDescriptor[] = [
 const SITE_ACCESS: ToggleDescriptor[] = [
   { key: 'sitePasswordEnabled', label: 'Site password',
     description: 'Require visitors to enter a password before viewing the public site (configure the password in Settings).' },
+];
+
+const EMAIL_FEATURES: ToggleDescriptor[] = [
+  { key: 'rsvpConfirmationEmails', label: 'RSVP confirmation emails',
+    description: 'Send each guest a confirmation email after every RSVP submit/edit, with a recap and a magic link to update before the deadline. Requires SMTP env vars to be configured.' },
+  { key: 'dayOfBroadcasts', label: 'Day-of broadcasts',
+    description: 'Enable the Broadcasts admin page so you can send timely email updates to invitations that opted in (e.g., shuttle delays, ceremony timing). Requires SMTP env vars to be configured.' },
 ];
 
 export default function FeaturesPage() {
@@ -184,6 +195,7 @@ export default function FeaturesPage() {
 
       <Section title="Admin tools" features={features} toggles={ADMIN_TOOLS} onToggle={toggle} />
       <Section title="Site access" features={features} toggles={SITE_ACCESS} onToggle={toggle} />
+      <Section title="Email features" features={features} toggles={EMAIL_FEATURES} onToggle={toggle} />
 
       <div className="flex items-center gap-4 justify-end sticky bottom-4">
         {saved && <span className="text-sm text-green-600">✓ Saved</span>}

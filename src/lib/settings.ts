@@ -31,6 +31,7 @@ export interface SiteSettings {
   venueLng: string;
   eventsDisplayStyle: 'list' | 'timeline';
   weddingPartyLeftSide: 'bride' | 'groom';
+  replyToEmail: string;
 }
 
 export interface FeatureSettings {
@@ -59,6 +60,10 @@ export interface FeatureSettings {
 
   // Site access
   sitePasswordEnabled: boolean;
+
+  // Email features — both default OFF because they require SMTP env vars.
+  rsvpConfirmationEmails: boolean;
+  dayOfBroadcasts: boolean;
 }
 
 const defaultTheme: ThemeSettings = {
@@ -96,6 +101,7 @@ const defaultSite: SiteSettings = {
   venueLng: '',
   eventsDisplayStyle: 'list',
   weddingPartyLeftSide: 'bride',
+  replyToEmail: '',
 };
 
 const defaultFeatures: FeatureSettings = {
@@ -123,6 +129,10 @@ const defaultFeatures: FeatureSettings = {
   budgetTracker: true,
 
   sitePasswordEnabled: false,
+
+  // Email features — both default OFF because they require SMTP env vars.
+  rsvpConfirmationEmails: false,
+  dayOfBroadcasts: false,
 };
 
 async function setSetting(key: string, value: string) {
