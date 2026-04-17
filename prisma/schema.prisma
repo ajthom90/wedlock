@@ -31,7 +31,12 @@ model Invitation {
   maxGuests       Int      @default(2)
   plusOnesAllowed Int      @default(0) // number of unnamed extras this household may bring; guest fills names at RSVP time
   notes           String?
-  address         String?  // mailing address for save-the-date, thank-you cards
+  address         String?  // deprecated — use mailingAddress1..mailingPostalCode for new writes; kept for backward compat with pre-2.9 invitations
+  mailingAddress1   String?
+  mailingAddress2   String?
+  mailingCity       String?
+  mailingState      String?
+  mailingPostalCode String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
