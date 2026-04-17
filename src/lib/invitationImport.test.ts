@@ -155,3 +155,107 @@ describe('parseWorkbook', () => {
     expect(rows[0].normalized.householdName).toBe('The Smiths');
   });
 });
+
+import { dupeKey, bucketRows } from './invitationImport';
+import type { NormalizedRow } from './invitationImport';
+
+describe('dupeKey', () => {
+  it('normalizes name + address components case-insensitively', () => {
+    const k1 = dupeKey({
+      householdName: 'The Smiths',
+      email: null, contactEmail: null,
+      mailingAddress1: '123 Main St', mailingAddress2: null,
+      mailingCity: 'Springfield', mailingState: 'IL', mailingPostalCode: '62704',
+      plusOnesAllowed: 0, notes: null, guestNames: [],
+    });
+    const k2 = dupeKey({
+      householdName: '  the smiths  ',
+      email: null, contactEmail: null,
+      mailingAddress1: '123 MAIN ST', mailingAddress2: null,
+      mailingCity: 'springfield', mailingState: 'il', mailingPostalCode: '62704',
+      plusOnesAllowed: 0, notes: null, guestNames: [],
+    });
+    expect(k1).toBe(k2);
+  });
+
+  it('produces different keys when addresses differ', () => {
+    const k1 = dupeKey({
+      householdName: 'The Smiths', email: null, contactEmail: null,
+      mailingAddress1: '123 Main St', mailingAddress2: null,
+      mailingCity: null, mailingState: null, mailingPostalCode: null,
+      plusOnesAllowed: 0, notes: null, guestNames: [],
+    });
+    const k2 = dupeKey({
+      householdName: 'The Smiths', email: null, contactEmail: null,
+      mailingAddress1: '456 Oak Ave', mailingAddress2: null,
+      mailingCity: null, mailingState: null, mailingPostalCode: null,
+      plusOnesAllowed: 0, notes: null, guestNames: [],
+    });
+    expect(k1).not.toBe(k2);
+  });
+
+  it('matches on name alone when both sides have empty address', () => {
+    const empty = {
+      householdName: 'The Smiths',
+      email: null, contactEmail: null,
+      mailingAddress1: null, mailingAddress2: null,
+      mailingCity: null, mailingState: null, mailingPostalCode: null,
+      plusOnesAllowed: 0, notes: null, guestNames: [],
+    };
+    expect(dupeKey(empty)).toBe(dupeKey(empty));
+  });
+});
+
+describe('bucketRows', () => {
+  const mk = (rowNumber: number, overrides: Partial<NormalizedRow> = {}): ParsedRow => ({
+    rowNumber,
+    raw: {},
+    normalized: {
+      householdName: `Row ${rowNumber}`,
+      email: null, contactEmail: null,
+      mailingAddress1: null, mailingAddress2: null,
+      mailingCity: null, mailingState: null, mailingPostalCode: null,
+      plusOnesAllowed: 0, notes: null, guestNames: [],
+      ...overrides,
+    },
+  });
+
+  it('puts clean rows in ready', () => {
+    const result = bucketRows([mk(2), mk(3)], new Set<string>());
+    expect(result.ready).toHaveLength(2);
+    expect(result.duplicate).toHaveLength(0);
+    expect(result.error).toHaveLength(0);
+  });
+
+  it('puts error rows in error with their reasons', () => {
+    const bad = mk(2, { householdName: '' });
+    const result = bucketRows([bad], new Set<string>());
+    expect(result.error).toHaveLength(1);
+    expect(result.error[0].errors[0]).toMatch(/household/i);
+  });
+
+  it('flags rows whose key matches an existing DB key as duplicates', () => {
+    const r = mk(2, { householdName: 'The Thom Family' });
+    const existingKey = dupeKey(r.normalized);
+    const result = bucketRows([r], new Set([existingKey]));
+    expect(result.duplicate).toHaveLength(1);
+    expect(result.ready).toHaveLength(0);
+  });
+
+  it('flags duplicates within the same uploaded sheet', () => {
+    const r1 = mk(2, { householdName: 'The Thom Family' });
+    const r2 = mk(3, { householdName: 'The Thom Family' });
+    const result = bucketRows([r1, r2], new Set<string>());
+    // Both rows end up in the duplicate bucket (marked as in-sheet match).
+    expect(result.duplicate).toHaveLength(2);
+    expect(result.ready).toHaveLength(0);
+  });
+
+  it('does not double-bucket: error rows never appear in duplicate', () => {
+    const bad = mk(2, { householdName: '' });
+    const existingKey = dupeKey(bad.normalized);
+    const result = bucketRows([bad], new Set([existingKey]));
+    expect(result.error).toHaveLength(1);
+    expect(result.duplicate).toHaveLength(0);
+  });
+});

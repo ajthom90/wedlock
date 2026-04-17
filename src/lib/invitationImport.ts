@@ -91,6 +91,69 @@ function parseInt10(s: string): number {
   return Number.isFinite(n) ? n : NaN;
 }
 
+// Canonical key used for duplicate detection. Matching keys = same household
+// at the same mailing address (or same name when neither side has address
+// data). Intentionally case-insensitive and trim-tolerant.
+export function dupeKey(n: NormalizedRow): string {
+  const name = n.householdName.trim().toLowerCase();
+  const addressParts = [
+    n.mailingAddress1, n.mailingAddress2,
+    n.mailingCity, n.mailingState, n.mailingPostalCode,
+  ].map((p) => (p ?? '').trim().toLowerCase()).filter((p) => p !== '');
+  return `${name}|${addressParts.join('|')}`;
+}
+
+export type DuplicateMeta = {
+  matchedExisting: boolean;
+  matchedInSheet: boolean;
+};
+
+export type BucketedRows = {
+  ready: ParsedRow[];
+  duplicate: Array<ParsedRow & DuplicateMeta>;
+  error: Array<ParsedRow & { errors: string[] }>;
+};
+
+// Single pass over the parsed rows: validate, then assign to a bucket.
+// error > duplicate > ready in precedence — an error row is never also
+// reported as a duplicate (the admin has to fix the error first).
+export function bucketRows(
+  rows: ParsedRow[],
+  existingKeys: Set<string>,
+): BucketedRows {
+  const ready: ParsedRow[] = [];
+  const duplicate: Array<ParsedRow & DuplicateMeta> = [];
+  const error: Array<ParsedRow & { errors: string[] }> = [];
+
+  // First pass: compute keys and track in-sheet collisions.
+  const keyCounts = new Map<string, number>();
+  const rowKeys: string[] = [];
+  for (const r of rows) {
+    const k = dupeKey(r.normalized);
+    rowKeys.push(k);
+    keyCounts.set(k, (keyCounts.get(k) ?? 0) + 1);
+  }
+
+  // Second pass: validate, bucket.
+  rows.forEach((r, i) => {
+    const validation = validateRow(r);
+    if (validation.errors.length > 0) {
+      error.push({ ...r, errors: validation.errors });
+      return;
+    }
+    const k = rowKeys[i];
+    const matchedExisting = existingKeys.has(k);
+    const matchedInSheet = (keyCounts.get(k) ?? 0) > 1;
+    if (matchedExisting || matchedInSheet) {
+      duplicate.push({ ...r, matchedExisting, matchedInSheet });
+    } else {
+      ready.push(r);
+    }
+  });
+
+  return { ready, duplicate, error };
+}
+
 export async function parseWorkbook(buffer: Buffer): Promise<ParsedRow[]> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer as unknown as ArrayBuffer);
