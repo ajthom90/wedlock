@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.11.1",
+    "date": "2026-05-05",
+    "changes": [
+      { "type": "fix", "text": "Submitting an invitation code on the Schedule page now reliably refreshes the page so wedding-party events appear. Previously router.refresh() could race with Next.js's RSC cache on the renamed/catch-all route and leave the access form on screen." }
+    ]
+  },
+  {
     "version": "2.11.0",
     "date": "2026-05-05",
     "changes": [

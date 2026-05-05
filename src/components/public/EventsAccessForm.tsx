@@ -1,10 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export function EventsAccessForm() {
-  const router = useRouter();
   const [codeInput, setCodeInput] = useState('');
   const [codeError, setCodeError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -18,13 +16,15 @@ export function EventsAccessForm() {
       const res = await fetch(`/api/events?code=${encodeURIComponent(codeInput.trim())}`);
       if (!res.ok) {
         setCodeError('Invalid invitation code. Please try again.');
+        setSubmitting(false);
         return;
       }
-      // Cookie is set server-side by /api/events; refresh to pick up wedding-party events.
-      router.refresh();
+      // Cookie was set server-side. Hard reload guarantees the page re-renders
+      // with the new cookie — router.refresh() can race with Next.js's RSC
+      // cache on dynamic catch-all routes, leaving the form on screen.
+      window.location.reload();
     } catch {
       setCodeError('Could not verify code. Please try again.');
-    } finally {
       setSubmitting(false);
     }
   };
