@@ -31,6 +31,7 @@ interface SiteSettings {
   venueLng: string;
   eventsDisplayStyle: 'list' | 'timeline';
   weddingPartyLeftSide: 'bride' | 'groom';
+  weddingPartySupportingLabel: string;
 }
 
 export default function SettingsPage() {
@@ -55,6 +56,7 @@ export default function SettingsPage() {
     venueLng: '',
     eventsDisplayStyle: 'list',
     weddingPartyLeftSide: 'bride',
+    weddingPartySupportingLabel: 'Special Roles',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -265,30 +267,41 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle>Wedding Party Layout</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-sm text-gray-500">Pick which side appears on the left of the two-column layout on the public Wedding Party page. Supporting Cast (officiant, ring bearer, flower girl, etc.) always renders full-width below.</p>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="weddingPartyLeftSide"
-              value="bride"
-              checked={settings.weddingPartyLeftSide === 'bride'}
-              onChange={() => update('weddingPartyLeftSide', 'bride')}
-              className="h-4 w-4"
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-sm text-gray-500">Pick which side appears on the left of the two-column layout on the public Wedding Party page. The third group (officiant, ring bearer, flower girl, etc.) always renders full-width below.</p>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="weddingPartyLeftSide"
+                value="bride"
+                checked={settings.weddingPartyLeftSide === 'bride'}
+                onChange={() => update('weddingPartyLeftSide', 'bride')}
+                className="h-4 w-4"
+              />
+              <span className="text-sm">Bride on left, Groom on right</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="weddingPartyLeftSide"
+                value="groom"
+                checked={settings.weddingPartyLeftSide === 'groom'}
+                onChange={() => update('weddingPartyLeftSide', 'groom')}
+                className="h-4 w-4"
+              />
+              <span className="text-sm">Groom on left, Bride on right</span>
+            </label>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Third group heading</label>
+            <Input
+              value={settings.weddingPartySupportingLabel}
+              onChange={(e) => update('weddingPartySupportingLabel', e.target.value)}
+              placeholder="Special Roles"
             />
-            <span className="text-sm">Bride on left, Groom on right</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="weddingPartyLeftSide"
-              value="groom"
-              checked={settings.weddingPartyLeftSide === 'groom'}
-              onChange={() => update('weddingPartyLeftSide', 'groom')}
-              className="h-4 w-4"
-            />
-            <span className="text-sm">Groom on left, Bride on right</span>
-          </label>
+            <p className="text-xs text-gray-500 mt-1">Heading shown above officiant, ring bearer, flower girl, etc. Defaults to &ldquo;Special Roles&rdquo; if blank.</p>
+          </div>
         </CardContent>
       </Card>
 

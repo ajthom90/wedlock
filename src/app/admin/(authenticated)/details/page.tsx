@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
+import { formatDate, formatTime } from '@/lib/utils';
 
 interface Event {
   id: string;
@@ -244,8 +245,9 @@ export default function DetailsPage() {
                       )}
                     </div>
                     <p className="text-sm text-gray-500 mt-1">
-                      {event.date} {event.time && `at ${event.time}`}
-                      {event.endTime && ` - ${event.endTime}`}
+                      {event.date && formatDate(event.date)}
+                      {event.time && `${event.date ? ' at ' : ''}${formatTime(event.time)}`}
+                      {event.endTime && ` – ${formatTime(event.endTime)}`}
                     </p>
                   </div>
                   <div className="flex gap-2 shrink-0 ml-4">

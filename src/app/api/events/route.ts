@@ -10,14 +10,16 @@ export async function GET(request: Request) {
     const cookieStore = await cookies();
     const rsvpCookie = cookieStore.get('rsvp_code');
 
-    let hasValidCode = false;
+    // Admins always see every event so they can manage wedding-party-only
+    // entries from the Details admin page.
+    let canSeeAll = await isAuthenticated();
 
     // Check if a code was provided via query param or cookie
     const codeToValidate = code || rsvpCookie?.value;
-    if (codeToValidate) {
+    if (!canSeeAll && codeToValidate) {
       const invitation = await prisma.invitation.findUnique({ where: { code: codeToValidate } });
       if (invitation) {
-        hasValidCode = true;
+        canSeeAll = true;
         // If code came via query param, set the cookie for future visits
         if (code) {
           cookieStore.set('rsvp_code', code, {
@@ -32,7 +34,7 @@ export async function GET(request: Request) {
     }
 
     const events = await prisma.event.findMany({
-      where: hasValidCode ? undefined : { visibility: 'public' },
+      where: canSeeAll ? undefined : { visibility: 'public' },
       orderBy: { order: 'asc' },
     });
     return NextResponse.json(events);

@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.10.1",
+    "date": "2026-05-05",
+    "changes": [
+      { "type": "feature", "text": "Wedding party — the third group heading (officiant, ring bearer, flower girl, etc.) is now editable from Settings → Wedding Party Layout. Defaults to \"Special Roles\"." },
+      { "type": "fix", "text": "Wedding-party-only events now appear in the Details admin list — previously they saved but were filtered out by the same visibility check used for guests." },
+      { "type": "fix", "text": "Admin Details page formats event dates and times in US style (e.g., \"Saturday, May 5, 2026 at 6:00 PM\") instead of raw YYYY-MM-DD with 24-hour time." }
+    ]
+  },
+  {
     "version": "2.10.0",
     "date": "2026-04-17",
     "changes": [

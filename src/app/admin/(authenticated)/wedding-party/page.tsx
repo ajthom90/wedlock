@@ -27,13 +27,9 @@ import { Framed } from '@/components/public/Framed';
 
 type Side = 'bride' | 'groom' | 'supporting-cast';
 
-// Defines the render order of groups in the admin list. Public page layout
-// is still two-column bride+groom + supporting cast below, controlled
-// independently by the weddingPartyLeftSide setting.
-const GROUPS: { side: Side; label: string }[] = [
+const FIXED_GROUPS: { side: Side; label: string }[] = [
   { side: 'bride', label: "Bride's Party" },
   { side: 'groom', label: "Groom's Party" },
-  { side: 'supporting-cast', label: 'Supporting Cast' },
 ];
 
 interface WeddingPartyMember {
@@ -117,6 +113,7 @@ function SortableMemberRow({
 
 export default function WeddingPartyPage() {
   const [members, setMembers] = useState<WeddingPartyMember[]>([]);
+  const [supportingLabel, setSupportingLabel] = useState('Special Roles');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -142,10 +139,19 @@ export default function WeddingPartyPage() {
 
   const fetchMembers = useCallback(async () => {
     try {
-      const res = await fetch('/api/wedding-party');
-      if (res.ok) {
-        const data = await res.json();
+      const [membersRes, settingsRes] = await Promise.all([
+        fetch('/api/wedding-party'),
+        fetch('/api/settings'),
+      ]);
+      if (membersRes.ok) {
+        const data = await membersRes.json();
         setMembers(data);
+      }
+      if (settingsRes.ok) {
+        const data = await settingsRes.json();
+        if (data.site?.weddingPartySupportingLabel) {
+          setSupportingLabel(data.site.weddingPartySupportingLabel);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch wedding party:', error);
@@ -157,6 +163,11 @@ export default function WeddingPartyPage() {
   useEffect(() => {
     fetchMembers();
   }, [fetchMembers]);
+
+  const groups: { side: Side; label: string }[] = [
+    ...FIXED_GROUPS,
+    { side: 'supporting-cast', label: supportingLabel },
+  ];
 
   const resetForm = () => {
     setName('');
@@ -305,7 +316,7 @@ export default function WeddingPartyPage() {
         </Card>
       ) : (
         <div className="space-y-8">
-          {GROUPS.map((group) => {
+          {groups.map((group) => {
             const inGroup = members.filter((m) => m.side === group.side).sort((a, b) => a.order - b.order);
             return (
               <section key={group.side}>
@@ -359,7 +370,7 @@ export default function WeddingPartyPage() {
                 >
                   <option value="bride">Bride</option>
                   <option value="groom">Groom</option>
-                  <option value="supporting-cast">Supporting Cast</option>
+                  <option value="supporting-cast">{supportingLabel}</option>
                 </select>
               </div>
               <div>

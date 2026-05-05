@@ -31,6 +31,7 @@ export interface SiteSettings {
   venueLng: string;
   eventsDisplayStyle: 'list' | 'timeline';
   weddingPartyLeftSide: 'bride' | 'groom';
+  weddingPartySupportingLabel: string;
   replyToEmail: string;
   // Optional overrides for the themed email wrapper. Blank falls back to
   // couple names (heading) and "Sent from the … wedding site." (footer).
@@ -107,6 +108,7 @@ const defaultSite: SiteSettings = {
   venueLng: '',
   eventsDisplayStyle: 'list',
   weddingPartyLeftSide: 'bride',
+  weddingPartySupportingLabel: 'Special Roles',
   replyToEmail: '',
   emailHeading: '',
   emailFooter: '',

@@ -54,7 +54,7 @@ export default async function WeddingPartyPage() {
           )}
           {supportingCast.length > 0 && (
             <section>
-              <h2 className="text-3xl font-heading font-semibold text-center mb-8">Supporting Cast</h2>
+              <h2 className="text-3xl font-heading font-semibold text-center mb-8">{settings.weddingPartySupportingLabel || 'Special Roles'}</h2>
               {supportingCast.length === 1 ? (
                 <div className="max-w-xs mx-auto">
                   <MemberCard member={supportingCast[0]} />
