@@ -21,6 +21,7 @@ interface FeatureSettings {
   guestBook: string;
   vendorContacts: boolean;
   budgetTracker: boolean;
+  customPages: boolean;
   sitePasswordEnabled: boolean;
   rsvpConfirmationEmails: boolean;
   dayOfBroadcasts: boolean;
@@ -44,6 +45,7 @@ const DEFAULTS: FeatureSettings = {
   guestBook: 'off',
   vendorContacts: true,
   budgetTracker: true,
+  customPages: true,
   sitePasswordEnabled: false,
   rsvpConfirmationEmails: false,
   dayOfBroadcasts: false,
@@ -92,6 +94,8 @@ const ADMIN_TOOLS: ToggleDescriptor[] = [
     description: 'Keep the private Vendors admin page. Turning this off just hides the sidebar item — data is preserved.' },
   { key: 'budgetTracker', label: 'Budget tracker',
     description: 'Keep the private Budget admin page. Data is preserved when hidden.' },
+  { key: 'customPages', label: 'Custom pages',
+    description: 'Allow creating fully custom pages (title + WYSIWYG body) from the Pages admin. Built-in title/URL editing stays available either way.' },
 ];
 
 const SITE_ACCESS: ToggleDescriptor[] = [

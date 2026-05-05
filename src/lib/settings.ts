@@ -65,6 +65,10 @@ export interface FeatureSettings {
   vendorContacts: boolean;
   budgetTracker: boolean;
 
+  // Custom pages — when off, the Pages admin still lets the couple edit
+  // built-in titles/URLs, but the "+ New custom page" button is hidden.
+  customPages: boolean;
+
   // Site access
   sitePasswordEnabled: boolean;
 
@@ -137,6 +141,8 @@ const defaultFeatures: FeatureSettings = {
   // Admin-side tools — default ON so the nav icons appear until hidden.
   vendorContacts: true,
   budgetTracker: true,
+
+  customPages: true,
 
   sitePasswordEnabled: false,
 

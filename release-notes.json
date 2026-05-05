@@ -1,5 +1,16 @@
 [
   {
+    "version": "2.11.0",
+    "date": "2026-05-05",
+    "changes": [
+      { "type": "feature", "text": "Custom pages — create fully custom pages with a WYSIWYG body from the new Pages admin. Optionally drop them straight into the public navigation menu when creating." },
+      { "type": "feature", "text": "Editable page titles for every public page. Want \"Their Story\" instead of \"Our Story\"? Update it from Pages." },
+      { "type": "feature", "text": "Editable URLs for Our Story, Wedding Details, Travel, and FAQ. Rename /details to /schedule and the old URL permanently redirects to the new one — bookmarks and printed save-the-dates keep working. Nav items pointing at the old URL are auto-rewritten too." },
+      { "type": "improvement", "text": "Admin sidebar split: \"Pages\" (titles, URLs, custom pages) and \"Content\" (Our Story / Travel content blobs) are now separate items so each one has a clearer purpose." },
+      { "type": "improvement", "text": "RSVP page now shows \"An invitation code will be accompanying your formal invitation.\" under the code input so guests know to check their mail." }
+    ]
+  },
+  {
     "version": "2.10.2",
     "date": "2026-05-05",
     "changes": [

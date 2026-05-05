@@ -15,11 +15,17 @@ model Setting {
 }
 
 model Page {
-  id        String   @id @default(uuid())
-  slug      String   @unique
-  title     String
-  content   String
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(uuid())
+  slug            String   @unique // current URL path (no leading slash). Defaults to canonicalRoute for built-ins; admin can change.
+  title           String
+  content         String   // legacy JSON-blob field used by built-ins (e.g. {"dressCode": "..."} on Details)
+  // Built-in pages set canonicalRoute to the original folder name ('details',
+  // 'our-story', etc.) so the catch-all route knows which content component to
+  // render after a slug rename. Custom pages leave it null and use bodyHtml.
+  canonicalRoute  String?
+  bodyHtml        String?  // WYSIWYG body for custom pages; null for built-ins
+  visible         Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
 }
 
 model Invitation {
