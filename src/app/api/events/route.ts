@@ -14,12 +14,15 @@ export async function GET(request: Request) {
     // entries from the Details admin page.
     let canSeeAll = await isAuthenticated();
 
-    // Check if a code was provided via query param or cookie
+    // Check if a code was provided via query param or cookie. Any valid code
+    // sets the cookie (so the guest can come back without re-entering it),
+    // but only invitations flagged isWeddingParty bypass the visibility
+    // filter — plain guests still see only public events.
     const codeToValidate = code || rsvpCookie?.value;
     if (!canSeeAll && codeToValidate) {
       const invitation = await prisma.invitation.findUnique({ where: { code: codeToValidate } });
       if (invitation) {
-        canSeeAll = true;
+        if (invitation.isWeddingParty) canSeeAll = true;
         // If code came via query param, set the cookie for future visits
         if (code) {
           cookieStore.set('rsvp_code', code, {

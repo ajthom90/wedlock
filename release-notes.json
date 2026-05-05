@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.10.2",
+    "date": "2026-05-05",
+    "changes": [
+      { "type": "feature", "text": "Mark a household as the wedding party from the Invitations admin — flagged households see Wedding-Party-Only events on the public schedule once they enter their RSVP code; everyone else still only sees public events." },
+      { "type": "fix", "text": "Wedding-party-only events are no longer accidentally exposed to every guest with a valid RSVP code. Only households flagged as wedding party can see them." }
+    ]
+  },
+  {
     "version": "2.10.1",
     "date": "2026-05-05",
     "changes": [

@@ -31,7 +31,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const { householdName, email, maxGuests, plusOnesAllowed, notes, guestNames } = await request.json();
+    const { householdName, email, maxGuests, plusOnesAllowed, notes, guestNames, isWeddingParty } = await request.json();
     if (!householdName) return NextResponse.json({ error: 'Household name is required' }, { status: 400 });
     const code = await generateUniqueCode();
     const invitation = await prisma.invitation.create({
@@ -39,6 +39,7 @@ export async function POST(request: Request) {
         code, householdName, email: email || null, maxGuests: maxGuests || 2,
         plusOnesAllowed: Math.max(0, parseInt(plusOnesAllowed) || 0),
         notes: notes || null,
+        isWeddingParty: Boolean(isWeddingParty),
         guests: { create: guestNames?.map((name: string, i: number) => ({ name, isPrimary: i === 0 })) || [] },
       },
       include: { guests: true },

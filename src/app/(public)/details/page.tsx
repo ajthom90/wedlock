@@ -14,17 +14,24 @@ export default async function DetailsPage() {
   const cookieStore = await cookies();
   const rsvpCookie = cookieStore.get('rsvp_code');
 
+  // Only invitations flagged isWeddingParty unlock wedding-party-only events.
+  // hasValidCode tracks whether the cookie matches a real invitation (used to
+  // hide the access form once unlocked); canSeeAll governs the event filter.
   let hasValidCode = false;
+  let canSeeAll = false;
   if (rsvpCookie?.value) {
     const invitation = await prisma.invitation.findUnique({ where: { code: rsvpCookie.value } });
-    if (invitation) hasValidCode = true;
+    if (invitation) {
+      hasValidCode = true;
+      if (invitation.isWeddingParty) canSeeAll = true;
+    }
   }
 
   const [settings, page, events] = await Promise.all([
     getSiteSettings(),
     prisma.page.findUnique({ where: { slug: 'details' } }),
     prisma.event.findMany({
-      where: hasValidCode ? undefined : { visibility: 'public' },
+      where: canSeeAll ? undefined : { visibility: 'public' },
       orderBy: { order: 'asc' },
     }),
   ]);

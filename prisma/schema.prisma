@@ -37,6 +37,10 @@ model Invitation {
   mailingCity       String?
   mailingState      String?
   mailingPostalCode String?
+  // Households flagged here can see events with visibility="wedding-party" on the
+  // public Details page after entering their RSVP code. Plain guests only see
+  // public events.
+  isWeddingParty  Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

@@ -33,6 +33,7 @@ interface Invitation {
   mailingCity: string | null;
   mailingState: string | null;
   mailingPostalCode: string | null;
+  isWeddingParty: boolean;
   createdAt: string;
   guests: Guest[];
   response: RsvpResponse | null;
@@ -68,6 +69,7 @@ export default function InvitationsPage() {
   const [plusOnesAllowed, setPlusOnesAllowed] = useState(0);
   const [notes, setNotes] = useState('');
   const [guestNames, setGuestNames] = useState<string[]>(['']);
+  const [isWeddingParty, setIsWeddingParty] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const fetchInvitations = useCallback(async () => {
@@ -95,6 +97,7 @@ export default function InvitationsPage() {
     setPlusOnesAllowed(0);
     setNotes('');
     setGuestNames(['']);
+    setIsWeddingParty(false);
     setEditingId(null);
   };
 
@@ -111,6 +114,7 @@ export default function InvitationsPage() {
     setPlusOnesAllowed(inv.plusOnesAllowed || 0);
     setNotes(inv.notes || '');
     setGuestNames(inv.guests.length > 0 ? inv.guests.map((g) => g.name) : ['']);
+    setIsWeddingParty(Boolean(inv.isWeddingParty));
     setShowModal(true);
   };
 
@@ -125,6 +129,7 @@ export default function InvitationsPage() {
         plusOnesAllowed,
         notes: notes.trim() || null,
         guestNames: guestNames.filter((n) => n.trim()),
+        isWeddingParty,
       };
       const url = editingId ? `/api/invitations/${editingId}` : '/api/invitations';
       const method = editingId ? 'PUT' : 'POST';
@@ -267,7 +272,12 @@ export default function InvitationsPage() {
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>
-                    <CardTitle>{inv.householdName}</CardTitle>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CardTitle>{inv.householdName}</CardTitle>
+                      {inv.isWeddingParty && (
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Wedding Party</span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500 mt-1">Code: <span className="font-mono font-semibold">{inv.code}</span></p>
                     {inv.email && <p className="text-sm text-gray-500">{inv.email}</p>}
                     {formatInvitationAddress(inv) && (
@@ -320,6 +330,20 @@ export default function InvitationsPage() {
                 <label className="block text-sm font-medium mb-1">Plus-ones allowed</label>
                 <Input type="number" min={0} max={10} value={plusOnesAllowed} onChange={(e) => setPlusOnesAllowed(Math.max(0, parseInt(e.target.value) || 0))} />
                 <p className="text-xs text-gray-500 mt-1">Unnamed extras the household can bring (e.g. 2 = can add up to 2 more guests at RSVP).</p>
+              </div>
+              <div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isWeddingParty}
+                    onChange={(e) => setIsWeddingParty(e.target.checked)}
+                    className="h-4 w-4 mt-0.5"
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium">Wedding party household</span>
+                    <span className="block text-xs text-gray-500">When this household enters their RSVP code, they&apos;ll see events marked &ldquo;Wedding Party Only&rdquo; on the public schedule.</span>
+                  </span>
+                </label>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Notes</label>
