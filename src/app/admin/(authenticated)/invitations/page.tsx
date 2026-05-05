@@ -70,6 +70,11 @@ export default function InvitationsPage() {
   const [notes, setNotes] = useState('');
   const [guestNames, setGuestNames] = useState<string[]>(['']);
   const [isWeddingParty, setIsWeddingParty] = useState(false);
+  const [mailingAddress1, setMailingAddress1] = useState('');
+  const [mailingAddress2, setMailingAddress2] = useState('');
+  const [mailingCity, setMailingCity] = useState('');
+  const [mailingState, setMailingState] = useState('');
+  const [mailingPostalCode, setMailingPostalCode] = useState('');
   const [saving, setSaving] = useState(false);
 
   const fetchInvitations = useCallback(async () => {
@@ -98,6 +103,11 @@ export default function InvitationsPage() {
     setNotes('');
     setGuestNames(['']);
     setIsWeddingParty(false);
+    setMailingAddress1('');
+    setMailingAddress2('');
+    setMailingCity('');
+    setMailingState('');
+    setMailingPostalCode('');
     setEditingId(null);
   };
 
@@ -115,6 +125,11 @@ export default function InvitationsPage() {
     setNotes(inv.notes || '');
     setGuestNames(inv.guests.length > 0 ? inv.guests.map((g) => g.name) : ['']);
     setIsWeddingParty(Boolean(inv.isWeddingParty));
+    setMailingAddress1(inv.mailingAddress1 || '');
+    setMailingAddress2(inv.mailingAddress2 || '');
+    setMailingCity(inv.mailingCity || '');
+    setMailingState(inv.mailingState || '');
+    setMailingPostalCode(inv.mailingPostalCode || '');
     setShowModal(true);
   };
 
@@ -130,6 +145,11 @@ export default function InvitationsPage() {
         notes: notes.trim() || null,
         guestNames: guestNames.filter((n) => n.trim()),
         isWeddingParty,
+        mailingAddress1: mailingAddress1.trim() || null,
+        mailingAddress2: mailingAddress2.trim() || null,
+        mailingCity: mailingCity.trim() || null,
+        mailingState: mailingState.trim() || null,
+        mailingPostalCode: mailingPostalCode.trim() || null,
       };
       const url = editingId ? `/api/invitations/${editingId}` : '/api/invitations';
       const method = editingId ? 'PUT' : 'POST';
@@ -344,6 +364,17 @@ export default function InvitationsPage() {
                     <span className="block text-xs text-gray-500">When this household enters their RSVP code, they&apos;ll see events marked &ldquo;Wedding Party Only&rdquo; on the public schedule.</span>
                   </span>
                 </label>
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Mailing address</label>
+                <p className="text-xs text-gray-500">Pre-populated on this household&apos;s RSVP form. Guests can update it if their address has changed.</p>
+                <Input value={mailingAddress1} onChange={(e) => setMailingAddress1(e.target.value)} placeholder="Address line 1" />
+                <Input value={mailingAddress2} onChange={(e) => setMailingAddress2(e.target.value)} placeholder="Address line 2 (apt, suite, etc.)" />
+                <div className="grid grid-cols-3 gap-2">
+                  <Input className="col-span-2" value={mailingCity} onChange={(e) => setMailingCity(e.target.value)} placeholder="City" />
+                  <Input value={mailingState} onChange={(e) => setMailingState(e.target.value)} placeholder="State" />
+                </div>
+                <Input value={mailingPostalCode} onChange={(e) => setMailingPostalCode(e.target.value)} placeholder="Postal code" />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Notes</label>

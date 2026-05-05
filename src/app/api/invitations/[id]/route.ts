@@ -18,7 +18,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   try {
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { id } = await params;
-    const { householdName, email, maxGuests, plusOnesAllowed, notes, guestNames, isWeddingParty } = await request.json();
+    const { householdName, email, maxGuests, plusOnesAllowed, notes, guestNames, isWeddingParty, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode } = await request.json();
     await prisma.guest.deleteMany({ where: { invitationId: id } });
     const invitation = await prisma.invitation.update({
       where: { id },
@@ -27,6 +27,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         plusOnesAllowed: Math.max(0, parseInt(plusOnesAllowed) || 0),
         notes: notes || null,
         isWeddingParty: Boolean(isWeddingParty),
+        mailingAddress1: mailingAddress1 || null,
+        mailingAddress2: mailingAddress2 || null,
+        mailingCity: mailingCity || null,
+        mailingState: mailingState || null,
+        mailingPostalCode: mailingPostalCode || null,
         guests: { create: guestNames?.map((name: string, i: number) => ({ name, isPrimary: i === 0 })) || [] },
       },
       include: { guests: true, response: true },

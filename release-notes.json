@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.11.2",
+    "date": "2026-05-05",
+    "changes": [
+      { "type": "feature", "text": "Mailing address on the Invitations admin form — capture an address when entering an invitation, and it pre-populates on that household's RSVP form so guests just confirm or update if needed." }
+    ]
+  },
+  {
     "version": "2.11.1",
     "date": "2026-05-05",
     "changes": [
