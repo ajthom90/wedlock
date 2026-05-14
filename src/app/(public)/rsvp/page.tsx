@@ -25,6 +25,7 @@ function RSVPForm() {
   const [songRequests, setSongRequests] = useState('');
   const [dietaryNotes, setDietaryNotes] = useState('');
   const [message, setMessage] = useState('');
+  const [correction, setCorrection] = useState('');
   const [mailingAddress1, setMailingAddress1] = useState('');
   const [mailingAddress2, setMailingAddress2] = useState('');
   const [mailingCity, setMailingCity] = useState('');
@@ -129,9 +130,9 @@ function RSVPForm() {
     try {
       const namedPlusOnes = plusOnes.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), meal: p.meal }));
       const totalAttending = features.perGuestSelection ? attendingGuests.length + namedPlusOnes.length : guestCount;
-      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && features.perGuestSelection ? guestMeals : undefined, attendingGuests: attending === 'yes' && features.perGuestSelection ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, contactEmail }) });
+      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && features.perGuestSelection ? guestMeals : undefined, attendingGuests: attending === 'yes' && features.perGuestSelection ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, contactEmail, correction: features.rsvpCorrections ? correction : undefined }) });
       const data = await res.json();
-      if (res.ok) { setShowConfirm(false); setSubmitted(true); }
+      if (res.ok) { setShowConfirm(false); setSubmitted(true); setCorrection(''); }
       else setSubmitError(data.error || 'Failed to submit RSVP');
     } catch { setSubmitError('An error occurred. Please try again.'); }
     finally { setSubmitting(false); }
@@ -268,6 +269,22 @@ function RSVPForm() {
           </div>
         )}
         {attending && <Textarea label="Message for the Couple (optional)" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Share your thoughts..." rows={3} />}
+        {attending && features.rsvpCorrections && (
+          <div className="rounded-md border border-primary/20 bg-primary/5 p-4 space-y-2">
+            <p className="font-medium">Spot a typo? Let us know.</p>
+            <p className="text-sm text-foreground/70">
+              We did our best to enter every name and detail correctly, but if something on this invitation
+              looks off — a misspelled name, the wrong household, an address typo — we&apos;re sorry! Note the
+              correction below and we&apos;ll fix it on our end.
+            </p>
+            <Textarea
+              value={correction}
+              onChange={(e) => setCorrection(e.target.value)}
+              placeholder="e.g. My partner's name is spelled Sarah, not Sara."
+              rows={5}
+            />
+          </div>
+        )}
         {validationError && <p className="text-red-600 text-sm">{validationError}</p>}
         {attending && <Button type="submit" className="w-full">{invitation.response ? 'Update RSVP' : 'Submit RSVP'}</Button>}
       </form></CardContent></Card>

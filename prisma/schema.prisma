@@ -56,6 +56,24 @@ model Invitation {
   shuttleSignups       ShuttleSignup[]
   changeLogs           RsvpChangeLog[]
   broadcastDeliveries  BroadcastDelivery[]
+  corrections          RsvpCorrection[]
+}
+
+// Guest-submitted corrections — typos in names, addresses, etc. flagged from
+// the RSVP form. The couple reads them on the admin Corrections page and
+// marks each as handled once the underlying data has been fixed. Each RSVP
+// submission with a non-empty corrections textarea adds a new row, so an
+// invitation can accumulate multiple over time.
+model RsvpCorrection {
+  id           String     @id @default(uuid())
+  invitationId String
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  message      String
+  handledAt    DateTime?
+  handledNotes String?
+  createdAt    DateTime   @default(now())
+
+  @@index([handledAt, createdAt])
 }
 
 // Audit trail of every RSVP submission (create + update). Each row is a full

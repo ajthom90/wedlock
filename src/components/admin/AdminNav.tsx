@@ -30,6 +30,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/admin/invitations', label: 'Invitations', icon: '💌' },
       { href: '/admin/rsvps', label: 'RSVPs', icon: '✓' },
+      { href: '/admin/rsvp-corrections', label: 'RSVP Corrections', icon: '✏️', feature: 'rsvpCorrections' },
       { href: '/admin/rsvp-config', label: 'RSVP Form', icon: '📝' },
       { href: '/admin/seating', label: 'Seating', icon: '🪑' },
       { href: '/admin/guestbook', label: 'Guest Book', icon: '📖', feature: 'guestBook' },

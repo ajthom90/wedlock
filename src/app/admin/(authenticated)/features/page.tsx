@@ -11,6 +11,7 @@ interface FeatureSettings {
   dietaryNotes: boolean;
   plusOnes: boolean;
   rsvpAddress: boolean;
+  rsvpCorrections: boolean;
   weatherWidget: boolean;
   storyTimeline: boolean;
   transportation: boolean;
@@ -35,6 +36,7 @@ const DEFAULTS: FeatureSettings = {
   dietaryNotes: true,
   plusOnes: false,
   rsvpAddress: true,
+  rsvpCorrections: true,
   weatherWidget: true,
   storyTimeline: true,
   transportation: true,
@@ -87,6 +89,8 @@ const RSVP_FIELDS: ToggleDescriptor[] = [
     description: 'Let guests add dietary restrictions or allergy notes.' },
   { key: 'rsvpAddress', label: 'Mailing address',
     description: 'Ask for a mailing address — useful for save-the-dates and thank-you cards.' },
+  { key: 'rsvpCorrections', label: 'Corrections box',
+    description: 'Show a "spot a typo?" textarea so guests can flag misspellings or wrong details. You manage submissions on the RSVP Corrections admin page.' },
 ];
 
 const ADMIN_TOOLS: ToggleDescriptor[] = [

@@ -34,6 +34,7 @@ export async function GET(request: Request) {
         songRequests: features.songRequests,
         dietaryNotes: features.dietaryNotes,
         rsvpAddress: features.rsvpAddress,
+        rsvpCorrections: features.rsvpCorrections,
         rsvpConfirmationEmails: features.rsvpConfirmationEmails,
         dayOfBroadcasts: features.dayOfBroadcasts,
       },
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { code, attending, guestCount, responses, guestMeals, message, attendingGuests, plusOnes, songRequests, dietaryNotes, contactEmail, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode } = await request.json();
+    const { code, attending, guestCount, responses, guestMeals, message, attendingGuests, plusOnes, songRequests, dietaryNotes, contactEmail, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, correction } = await request.json();
     if (!code) return NextResponse.json({ error: 'Invitation code is required' }, { status: 400 });
     const settings = await getSiteSettings();
     if (settings.rsvpDeadline && settings.rsvpCloseAfterDeadline) {
@@ -115,6 +116,13 @@ export async function POST(request: Request) {
     }
     await prisma.rsvpChangeLog.create({ data: { invitationId: invitation.id, source: 'guest', details: logDetails } });
     await prisma.notification.create({ data: { type: 'rsvp', title: 'New RSVP', message: `${invitation.householdName} has ${attending === 'yes' ? 'accepted' : 'declined'} the invitation` } });
+    // Persist a corrections note when the guest filled in the corrections
+    // textarea. Each submit adds a row — the couple marks them handled from
+    // the admin Corrections page.
+    if (features.rsvpCorrections && typeof correction === 'string' && correction.trim()) {
+      await prisma.rsvpCorrection.create({ data: { invitationId: invitation.id, message: correction.trim() } });
+      await prisma.notification.create({ data: { type: 'rsvp', title: 'RSVP correction submitted', message: `${invitation.householdName} flagged a correction on their RSVP` } });
+    }
     // Fire-and-forget RSVP confirmation. Errors are logged, not surfaced —
     // the guest's RSVP succeeded regardless.
     if (features.rsvpConfirmationEmails && getEmailConfig().configured) {

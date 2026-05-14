@@ -48,6 +48,7 @@ export interface FeatureSettings {
   dietaryNotes: boolean;
   plusOnes: boolean;
   rsvpAddress: boolean;
+  rsvpCorrections: boolean;
 
   // Public site modules
   weatherWidget: boolean;
@@ -125,6 +126,7 @@ const defaultFeatures: FeatureSettings = {
   dietaryNotes: true,
   plusOnes: false,
   rsvpAddress: true,
+  rsvpCorrections: true,
 
   // Public modules — default ON so the new roadmap features are discoverable;
   // the couple can turn each off when they decide not to use it.

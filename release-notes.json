@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.12.0",
+    "date": "2026-05-14",
+    "changes": [
+      { "type": "feature", "text": "Corrections box on the RSVP form — guests can flag typos in names or details (\"my partner's name is spelled Sarah, not Sara\") without being able to edit attendee names directly. Submissions land on the new RSVP Corrections admin page where you can read each one, jot internal notes, and mark it handled once you've fixed the data. Toggle in Features → In the RSVP form." }
+    ]
+  },
+  {
     "version": "2.11.3",
     "date": "2026-05-14",
     "changes": [
