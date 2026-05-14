@@ -675,9 +675,12 @@ export default function RsvpsPage() {
                   {Object.keys(parseJson(selectedInvitation.response.responses)).length > 0 && (
                     <div>
                       <p className="text-sm font-medium text-gray-500 mb-1">Responses</p>
-                      {Object.entries(parseJson(selectedInvitation.response.responses)).map(([key, value]) => (
-                        <p key={key} className="text-sm"><span className="font-medium">{key}:</span> {value}</p>
-                      ))}
+                      {Object.entries(parseJson(selectedInvitation.response.responses)).map(([key, value]) => {
+                        const label = rsvpOptions.find((o) => o.id === key)?.label || key;
+                        return (
+                          <p key={key} className="text-sm"><span className="font-medium">{label}:</span> {value}</p>
+                        );
+                      })}
                     </div>
                   )}
                   {Object.keys(parseJson(selectedInvitation.response.guestMeals)).length > 0 && (
