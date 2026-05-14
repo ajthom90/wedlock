@@ -45,12 +45,11 @@ Versions live in `package.json`. Registries are configured per-deployer in `.env
 ./scripts/docker.sh bump-major     # 1.0.0 → 2.0.0
 ```
 
-The script builds multi-arch (linux/arm64 + linux/amd64), pushes `:VERSION` + `:latest` to every entry in `DOCKER_REGISTRIES`, then writes the new version into `package.json`. It does **not** commit or tag — that's a separate step:
+The bump commands are one-shot: they rewrite `package.json`, commit as `Bump to vX.Y.Z`, tag `vX.Y.Z`, push `main` + tag to every git remote (which kicks off `.github/workflows/docker.yml` to build GHCR in parallel), then build multi-arch (linux/arm64 + linux/amd64) and push `:VERSION` + `:latest` to every entry in `DOCKER_REGISTRIES`. No separate commit step is needed.
 
-```
-git add package.json && git commit -m "Bump to vX.Y.Z"
-git push
-```
+**Add the release-notes.json entry BEFORE running bump-***: `release-notes.json` is copied into the Docker image at build time, so an entry added after the bump won't appear in the running container. If you forget, re-run `./scripts/docker.sh push` (no version change) to rebuild and overwrite the same tag with the corrected file.
+
+For non-version-bump rebuilds (e.g. correcting bundled assets without a new version), use `./scripts/docker.sh push` — same image build + registry push, no git changes.
 
 ## Testing before shipping
 
