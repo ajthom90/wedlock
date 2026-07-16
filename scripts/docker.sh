@@ -135,6 +135,7 @@ do_build() {
   docker buildx build \
     --platform "$PLATFORMS" \
     "${tags[@]}" \
+    --build-arg "APP_VERSION=$VERSION" \
     --cache-from "type=registry,ref=${cache_ref}" \
     --load \
     .
@@ -168,6 +169,7 @@ do_push() {
   docker buildx build \
     --platform "$PLATFORMS" \
     "${tags[@]}" \
+    --build-arg "APP_VERSION=$VERSION" \
     --cache-from "type=registry,ref=${cache_ref}" \
     --cache-to "type=registry,ref=${cache_ref},mode=max" \
     --provenance=false \

@@ -104,6 +104,13 @@ RUN ln -sf /data/uploads ./public/uploads
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
+# Real release version, passed by scripts/docker.sh. The builder stage compiles
+# with package.json stabilized to "0.0.0-build" (cache-stable COPY layer), so
+# the app reads this env var instead (src/lib/releaseNotes.ts). Declared last:
+# the ENV layer changes every release and must not bust the COPYs above.
+ARG APP_VERSION=""
+ENV APP_VERSION=$APP_VERSION
+
 USER nextjs
 
 EXPOSE 3000

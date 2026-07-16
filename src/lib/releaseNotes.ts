@@ -17,7 +17,12 @@ export interface ReleaseNote {
 // package.json is the source of truth for the current version; git tags are
 // always `v${version}`, so the two stay in lockstep as long as releases go
 // through ./scripts/docker.sh bump-*.
-export const CURRENT_VERSION: string = pkg.version;
+//
+// APP_VERSION takes precedence because docker.sh builds with package.json
+// stabilized to "0.0.0-build" (keeps the COPY layer cache-stable across
+// releases) and passes the real version as a build arg → runner-stage env.
+// Dev servers and GHCR Actions builds don't set it and fall back to pkg.version.
+export const CURRENT_VERSION: string = process.env.APP_VERSION || pkg.version;
 
 // Sorted newest-first by semver, so consumers can just take index 0 for the
 // "what's new in this release" banner.
