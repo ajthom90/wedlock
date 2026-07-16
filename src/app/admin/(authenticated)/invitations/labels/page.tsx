@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AVERY_FORMATS, type AveryFormat } from '@/lib/averyFormats';
-import { composeLabelLines, type LabelSource } from '@/lib/mailingLabelsPdf';
+import { composeLabelLines, composeCodeLabelLines, type LabelSource } from '@/lib/mailingLabelsPdf';
 
 interface InvitationForLabels {
   id: string;
+  code: string;
   householdName: string;
   mailingAddress1: string | null;
   mailingAddress2: string | null;
@@ -19,6 +20,8 @@ interface InvitationForLabels {
   address: string | null;
   response: { attending: string } | null;
 }
+
+type LabelType = 'address' | 'code';
 
 // Returns true if this invitation has anything we can turn into a label.
 // At minimum we need a household name AND either a structured line 1 or a
@@ -33,6 +36,7 @@ function hasAddress(inv: InvitationForLabels): boolean {
 export default function MailingLabelsPage() {
   const [invitations, setInvitations] = useState<InvitationForLabels[]>([]);
   const [loading, setLoading] = useState(true);
+  const [labelType, setLabelType] = useState<LabelType>('address');
   const [formatCode, setFormatCode] = useState<AveryFormat['code']>('5160');
   const [startPosition, setStartPosition] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -67,17 +71,36 @@ export default function MailingLabelsPage() {
     setStartPosition((p) => Math.min(p, format.labelsPerSheet));
   }, [format]);
 
-  const selectAllWithAddress = () => {
-    setSelectedIds(new Set(invitations.filter(hasAddress).map((i) => i.id)));
+  // Code labels only need the household's code, which every invitation has;
+  // address labels need something printable in composeLabelLines.
+  const canInclude = (inv: InvitationForLabels) =>
+    labelType === 'code' ? Boolean(inv.householdName.trim()) : hasAddress(inv);
+
+  const switchLabelType = (next: LabelType) => {
+    setLabelType(next);
+    // Drop selections that aren't valid under the new mode (e.g. address-less
+    // households selected in code mode, then switching to address mode).
+    setSelectedIds((prev) => {
+      const valid = new Set(
+        invitations
+          .filter((i) => (next === 'code' ? Boolean(i.householdName.trim()) : hasAddress(i)))
+          .map((i) => i.id),
+      );
+      return new Set([...prev].filter((id) => valid.has(id)));
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(invitations.filter(canInclude).map((i) => i.id)));
   };
   const selectAttending = () => {
     setSelectedIds(new Set(
-      invitations.filter((i) => hasAddress(i) && i.response?.attending === 'yes').map((i) => i.id),
+      invitations.filter((i) => canInclude(i) && i.response?.attending === 'yes').map((i) => i.id),
     ));
   };
   const selectPending = () => {
     setSelectedIds(new Set(
-      invitations.filter((i) => hasAddress(i) && !i.response).map((i) => i.id),
+      invitations.filter((i) => canInclude(i) && !i.response).map((i) => i.id),
     ));
   };
   const clearSelection = () => setSelectedIds(new Set());
@@ -99,7 +122,9 @@ export default function MailingLabelsPage() {
       const { renderLabelsPdf } = await import('@/lib/mailingLabelsPdf');
       const selected = invitations.filter((i) => selectedIds.has(i.id));
       const labels = selected.map((inv) => ({
-        lines: composeLabelLines(inv as LabelSource),
+        lines: labelType === 'code'
+          ? composeCodeLabelLines(inv)
+          : composeLabelLines(inv as LabelSource),
       }));
       const bytes = await renderLabelsPdf({ format, startPosition, labels });
       const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' });
@@ -107,7 +132,7 @@ export default function MailingLabelsPage() {
       const a = document.createElement('a');
       const today = new Date().toISOString().slice(0, 10);
       a.href = url;
-      a.download = `mailing-labels-${formatCode}-${today}.pdf`;
+      a.download = `${labelType === 'code' ? 'rsvp-code-labels' : 'mailing-labels'}-${formatCode}-${today}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -129,10 +154,11 @@ export default function MailingLabelsPage() {
     <div className="p-6 max-w-4xl space-y-4">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">Print Mailing Labels</h1>
+          <h1 className="text-2xl font-bold">Print Labels</h1>
           <p className="text-sm text-gray-500">
-            Generate a PDF of Avery-format mailing labels from the invitations&apos; addresses.
-            Pick a format and which invitations to include, then print the PDF onto a real sheet.
+            Generate a PDF of Avery-format labels — mailing addresses for envelopes, or RSVP codes
+            to stick onto invite cards. Pick a format and which invitations to include, then print
+            the PDF onto a real label sheet.
           </p>
         </div>
         <Link href="/admin/invitations" className="text-sm text-primary hover:underline">
@@ -143,6 +169,34 @@ export default function MailingLabelsPage() {
       <Card>
         <CardHeader><CardTitle>Label sheet</CardTitle></CardHeader>
         <CardContent className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium mb-1">Label type</label>
+            <div className="flex gap-4 text-sm">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="label-type"
+                  checked={labelType === 'address'}
+                  onChange={() => switchLabelType('address')}
+                />
+                Mailing address
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="label-type"
+                  checked={labelType === 'code'}
+                  onChange={() => switchLabelType('code')}
+                />
+                RSVP code
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {labelType === 'code'
+                ? 'Each label shows the household name with its RSVP code in bold — stick one onto each invite card.'
+                : 'Each label shows the household’s mailing address for envelopes.'}
+            </p>
+          </div>
           <div>
             <label className="block text-sm font-medium mb-1">Format</label>
             <select
@@ -183,7 +237,9 @@ export default function MailingLabelsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2 text-sm">
-            <Button size="sm" variant="outline" onClick={selectAllWithAddress}>Select all with address</Button>
+            <Button size="sm" variant="outline" onClick={selectAll}>
+              {labelType === 'code' ? 'Select all' : 'Select all with address'}
+            </Button>
             <Button size="sm" variant="outline" onClick={selectAttending}>Select attending</Button>
             <Button size="sm" variant="outline" onClick={selectPending}>Select pending</Button>
             <Button size="sm" variant="outline" onClick={clearSelection}>Clear selection</Button>
@@ -191,9 +247,10 @@ export default function MailingLabelsPage() {
 
           <div className="divide-y border border-gray-200 rounded">
             {invitations.map((inv) => {
-              const canInclude = hasAddress(inv);
-              const lines = canInclude ? composeLabelLines(inv as LabelSource) : [];
-              const previewAddress = lines.slice(1).join(' · ');
+              const includable = canInclude(inv);
+              const preview = labelType === 'code'
+                ? `RSVP code: ${inv.code}`
+                : composeLabelLines(inv as LabelSource).slice(1).join(' · ');
               const status = inv.response?.attending === 'yes'
                 ? { text: 'attending', className: 'bg-emerald-100 text-emerald-800' }
                 : inv.response?.attending === 'no'
@@ -202,20 +259,20 @@ export default function MailingLabelsPage() {
               return (
                 <label
                   key={inv.id}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm ${canInclude ? 'cursor-pointer' : 'opacity-60'}`}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm ${includable ? 'cursor-pointer' : 'opacity-60'}`}
                 >
                   <input
                     type="checkbox"
-                    disabled={!canInclude}
+                    disabled={!includable}
                     checked={selectedIds.has(inv.id)}
                     onChange={() => toggleRow(inv.id)}
                     className="h-4 w-4"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{inv.householdName}</div>
-                    {canInclude
-                      ? <div className="text-xs text-gray-500 truncate">{previewAddress}</div>
-                      : <div className="text-xs italic text-gray-400">no address on file</div>
+                    {includable
+                      ? <div className="text-xs text-gray-500 truncate">{preview}</div>
+                      : <div className="text-xs italic text-gray-400">{labelType === 'code' ? 'no household name' : 'no address on file'}</div>
                     }
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded ${status.className}`}>{status.text}</span>

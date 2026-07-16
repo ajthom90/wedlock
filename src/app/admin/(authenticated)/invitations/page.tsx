@@ -269,7 +269,7 @@ export default function InvitationsPage() {
             Export addresses
           </Button>
           <Link href="/admin/invitations/labels">
-            <Button variant="outline">Print mailing labels</Button>
+            <Button variant="outline">Print labels</Button>
           </Link>
           <Button variant="outline" onClick={handleDownloadPdf} disabled={downloading}>
             {downloading ? 'Generating...' : 'Download PDF'}
