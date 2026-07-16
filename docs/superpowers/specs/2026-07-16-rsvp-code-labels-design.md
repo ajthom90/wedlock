@@ -57,6 +57,27 @@ Nothing new: generation is client-side pdf-lib exactly like address labels;
 existing error banner covers failures. Auto-shrink + truncation cover absurdly
 long household names.
 
+## Amendment (2026-07-16, same day)
+
+User-requested refinements after the first release:
+
+- **Theme fonts**: labels render in the site's theme fonts — household name in
+  the heading font, everything else in the body font. Font loading is
+  extracted from the QR-card route into `src/lib/pdfFonts.ts` (custom fonts
+  from `/data/uploads`, Google Fonts per weight, cached) and exposed through
+  an admin-gated `GET /api/fonts/pdf?family=…&weight=400|700` returning raw
+  bytes; the labels page fetches heading@400 / body@400 / body@700 once and
+  passes them to the renderer. Any failure falls back to Helvetica — label
+  generation never blocks on fonts. A custom family with no bold file uses
+  its regular file for bold runs (the 1.4× size still carries emphasis).
+- **Bold only the code number**: `LabelLine` styled lines become run
+  sequences (`{ runs: [{ text, bold? }], scale?, font? }`), so
+  "RSVP code: " renders regular and only the number bold. Truncation trims
+  the last run, preserving the prefix.
+- **Third line**: `Please do not lose this code` at 0.85× scale, and
+  `fitFontSize` now also shrinks to fit the stacked line heights inside the
+  label box.
+
 ## Testing
 
 Extend `src/lib/mailingLabelsPdf.test.ts`:

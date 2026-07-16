@@ -5,53 +5,7 @@ import { getTheme, getSiteSettings } from '@/lib/settings';
 import { generateQRCode, buildRsvpUrl } from '@/lib/qr';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-import { readFile } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
-
-const googleFontMap: Record<string, string> = {
-  'Playfair Display': 'Playfair+Display', 'Cormorant Garamond': 'Cormorant+Garamond',
-  'Great Vibes': 'Great+Vibes', Lato: 'Lato', 'Open Sans': 'Open+Sans',
-  Roboto: 'Roboto', Merriweather: 'Merriweather', Montserrat: 'Montserrat',
-};
-const fontCache = new Map<string, Uint8Array>();
-
-async function loadCustomFont(filename: string): Promise<Uint8Array> {
-  const key = `custom:${filename}`;
-  if (fontCache.has(key)) return fontCache.get(key)!;
-  const filePath = path.join('/data/uploads', filename);
-  if (!existsSync(filePath)) throw new Error(`Custom font file not found: ${filename}`);
-  const data = new Uint8Array(await readFile(filePath));
-  fontCache.set(key, data);
-  return data;
-}
-
-async function loadGoogleFont(fontName: string): Promise<Uint8Array> {
-  const key = `google:${fontName}`;
-  if (fontCache.has(key)) return fontCache.get(key)!;
-  const encoded = googleFontMap[fontName];
-  if (!encoded) throw new Error(`Unknown Google Font: ${fontName}`);
-  const cssUrl = `https://fonts.googleapis.com/css2?family=${encoded}:wght@400;700&display=swap`;
-  const cssRes = await fetch(cssUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
-  if (!cssRes.ok) throw new Error(`Failed to fetch Google Font CSS: ${cssRes.statusText}`);
-  const css = await cssRes.text();
-  const match = css.match(/src:\s*url\(([^)]+)\)/);
-  if (!match) throw new Error(`Could not find font URL in CSS for ${fontName}`);
-  const fontUrl = match[1].replace(/['"]/g, '');
-  const fontRes = await fetch(fontUrl);
-  if (!fontRes.ok) throw new Error(`Failed to download font file: ${fontRes.statusText}`);
-  const data = new Uint8Array(await fontRes.arrayBuffer());
-  fontCache.set(key, data);
-  return data;
-}
-
-async function loadFont(fontName: string, customFonts: { family: string; filename: string }[]): Promise<Uint8Array> {
-  const custom = customFonts.find((f) => f.family === fontName);
-  if (custom) return loadCustomFont(custom.filename);
-  if (fontName in googleFontMap) return loadGoogleFont(fontName);
-  console.warn(`Font "${fontName}" not found, falling back to Lato`);
-  return loadGoogleFont('Lato');
-}
+import { loadPdfFont } from '@/lib/pdfFonts';
 
 function base64ToUint8Array(dataUrl: string): Uint8Array {
   const base64 = atob(dataUrl.split(',')[1]);
@@ -79,10 +33,11 @@ export async function GET(request: Request) {
     const pdf = await PDFDocument.create();
     pdf.registerFontkit(fontkit);
 
+    const customFontRefs = customFonts.map((f) => ({ family: f.family, filename: f.filename }));
     let headingFont, bodyFont;
-    try { headingFont = await pdf.embedFont(await loadFont(theme.headingFont, customFonts.map((f) => ({ family: f.family, filename: f.filename })))); }
+    try { headingFont = await pdf.embedFont(await loadPdfFont(theme.headingFont, 400, customFontRefs)); }
     catch { headingFont = await pdf.embedFont(StandardFonts.Helvetica); }
-    try { bodyFont = await pdf.embedFont(await loadFont(theme.bodyFont, customFonts.map((f) => ({ family: f.family, filename: f.filename })))); }
+    try { bodyFont = await pdf.embedFont(await loadPdfFont(theme.bodyFont, 400, customFontRefs)); }
     catch { bodyFont = await pdf.embedFont(StandardFonts.Helvetica); }
 
     let page: any = null;

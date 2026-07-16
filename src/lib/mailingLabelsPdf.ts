@@ -1,5 +1,6 @@
 import type { AveryFormat } from './averyFormats';
 import { PDFDocument, StandardFonts, type PDFFont } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 
 // Minimal invitation shape the label composer needs. Matches the subset of
 // fields Prisma returns on the admin /api/invitations endpoint.
@@ -43,30 +44,58 @@ export function composeLabelLines(src: LabelSource): string[] {
   return lines;
 }
 
-// A label line is plain text, or text flagged for emphasis. Emphasized lines
-// render in Helvetica-Bold at EMPHASIS_SCALE × the label's fitted base size —
-// used for the RSVP code so it reads at a glance on a 1" label.
-export type LabelLine = string | { text: string; emphasis?: boolean };
+// A label line is plain text (body font, base size) or a styled line: a
+// sequence of runs — so part of a line can be bold, e.g. only the code number
+// in "RSVP code: 483920" — with an optional size multiplier and font role.
+// Roles map to the site theme: 'heading' for the household name, 'body' for
+// everything else, mirroring the website's own hierarchy.
+export type LabelRun = { text: string; bold?: boolean };
+export type LabelLine =
+  | string
+  | { runs: LabelRun[]; scale?: number; font?: 'heading' | 'body' };
 
-const EMPHASIS_SCALE = 1.4;
-
-function lineText(line: LabelLine): string {
-  return typeof line === 'string' ? line : line.text;
+function lineRuns(line: LabelLine): LabelRun[] {
+  return typeof line === 'string' ? [{ text: line }] : line.runs;
 }
 
 function lineScale(line: LabelLine): number {
-  return typeof line !== 'string' && line.emphasis ? EMPHASIS_SCALE : 1;
+  return typeof line === 'string' ? 1 : (line.scale ?? 1);
 }
 
-// Produces the lines for an RSVP-code label: household name (regular) with
-// the code underneath in bold. The name is deliberate — codes are
-// per-household and an unlabeled sticker mixup sends guests into someone
-// else's RSVP.
+function lineFontRole(line: LabelLine): 'heading' | 'body' {
+  return typeof line === 'string' ? 'body' : (line.font ?? 'body');
+}
+
+// Theme font bytes for embedding (from /api/fonts/pdf). All optional — any
+// slot that's missing or fails to embed falls back gracefully so label
+// generation never depends on fonts resolving.
+export interface LabelFontBytes {
+  heading?: ArrayBuffer | Uint8Array;
+  body?: ArrayBuffer | Uint8Array;
+  bodyBold?: ArrayBuffer | Uint8Array;
+}
+
+interface ResolvedFonts {
+  heading: PDFFont;
+  body: PDFFont;
+  bodyBold: PDFFont;
+}
+
+function runFont(role: 'heading' | 'body', bold: boolean, fonts: ResolvedFonts): PDFFont {
+  if (bold) return fonts.bodyBold;
+  return role === 'heading' ? fonts.heading : fonts.body;
+}
+
+// Produces the lines for an RSVP-code label: household name (heading font)
+// with the code underneath — only the number itself bold — and a keep-this
+// note. The name is deliberate: codes are per-household and an unlabeled
+// sticker mixup sends guests into someone else's RSVP.
 export function composeCodeLabelLines(src: { householdName: string; code: string }): LabelLine[] {
   const lines: LabelLine[] = [];
   const hh = src.householdName.trim();
-  if (hh) lines.push(hh);
-  lines.push({ text: `RSVP code: ${src.code.trim()}`, emphasis: true });
+  if (hh) lines.push({ runs: [{ text: hh }], font: 'heading' });
+  lines.push({ runs: [{ text: 'RSVP code: ' }, { text: src.code.trim(), bold: true }], scale: 1.4 });
+  lines.push({ runs: [{ text: 'Please do not lose this code' }], scale: 0.85 });
   return lines;
 }
 
@@ -113,39 +142,60 @@ function baseFontSize(format: AveryFormat): number {
 
 const MIN_FONT_SIZE = 7;
 
+function lineWidthAt(line: LabelLine, baseSize: number, fonts: ResolvedFonts): number {
+  const effective = baseSize * lineScale(line);
+  const role = lineFontRole(line);
+  return lineRuns(line).reduce(
+    (sum, run) => sum + runFont(role, !!run.bold, fonts).widthOfTextAtSize(run.text, effective),
+    0,
+  );
+}
+
 // Returns the largest BASE font size ≤ desiredSize where every line fits the
-// box width at its own effective size (base × emphasis scale) and font.
-// Floors at MIN_FONT_SIZE; if even that doesn't fit, the caller truncates
-// with an ellipsis (handled in the draw loop below).
+// box width at its own effective size (base × line scale) and fonts, AND the
+// stacked lines fit the box height (each line consumes 1.2 × its effective
+// size). Floors at MIN_FONT_SIZE; if width still doesn't fit there, the draw
+// loop truncates the last run with an ellipsis.
 function fitFontSize(args: {
   lines: LabelLine[];
-  fonts: { regular: PDFFont; bold: PDFFont };
+  fonts: ResolvedFonts;
   maxWidthPt: number;
+  maxHeightPt: number;
   desiredSize: number;
 }): number {
-  const { lines, fonts, maxWidthPt, desiredSize } = args;
+  const { lines, fonts, maxWidthPt, maxHeightPt, desiredSize } = args;
+  const totalScale = lines.reduce((sum, l) => sum + lineScale(l), 0);
   let size = desiredSize;
   while (size > MIN_FONT_SIZE) {
-    const widest = Math.max(...lines.map((l) => {
-      const font = lineScale(l) > 1 ? fonts.bold : fonts.regular;
-      return font.widthOfTextAtSize(lineText(l), size * lineScale(l));
-    }));
-    if (widest <= maxWidthPt) return size;
+    const widest = Math.max(...lines.map((l) => lineWidthAt(l, size, fonts)));
+    const stackedHeight = totalScale * size * 1.2;
+    if (widest <= maxWidthPt && stackedHeight <= maxHeightPt) return size;
     size -= 0.5;
   }
   return MIN_FONT_SIZE;
 }
 
-// If the line still doesn't fit at the minimum font size, append "…" and
-// chop characters from the end until it does. Unlikely in practice with
-// real addresses; this is the last-resort fallback.
-function truncateToFit(line: string, font: PDFFont, size: number, maxWidthPt: number): string {
-  if (font.widthOfTextAtSize(line, size) <= maxWidthPt) return line;
-  let text = line;
-  while (text.length > 1 && font.widthOfTextAtSize(text + '…', size) > maxWidthPt) {
+// If the line still doesn't fit at the minimum font size, chop characters off
+// the END of the LAST run (with an ellipsis) until the whole line fits.
+// Earlier runs are preserved — for code labels the last run is the code
+// number / note text, and the "RSVP code: " prefix must survive intact.
+function truncateRunsToFit(
+  runs: LabelRun[],
+  role: 'heading' | 'body',
+  size: number,
+  fonts: ResolvedFonts,
+  maxWidthPt: number,
+): LabelRun[] {
+  const width = (rs: LabelRun[]) =>
+    rs.reduce((sum, r) => sum + runFont(role, !!r.bold, fonts).widthOfTextAtSize(r.text, size), 0);
+  if (width(runs) <= maxWidthPt) return runs;
+  const head = runs.slice(0, -1);
+  const last = runs[runs.length - 1];
+  let text = last.text;
+  while (text.length > 1 && width([...head, { ...last, text: text + '…' }]) > maxWidthPt) {
     text = text.slice(0, -1);
   }
-  return text + '…';
+  return [...head, { ...last, text: text + '…' }];
 }
 
 // Main entry point for the admin page. All args are plain data; nothing
@@ -154,11 +204,33 @@ export async function renderLabelsPdf(args: {
   format: AveryFormat;
   startPosition: number;
   labels: Array<{ lines: LabelLine[] }>;
+  // Optional theme font bytes. Missing/broken slots degrade: body → Helvetica,
+  // heading → body, bodyBold → the body font itself when a theme body loaded
+  // (a custom family usually has no separate bold file; the 1.4× code size
+  // still carries the emphasis) or Helvetica-Bold otherwise.
+  fonts?: LabelFontBytes;
 }): Promise<Uint8Array> {
-  const { format, startPosition, labels } = args;
+  const { format, startPosition, labels, fonts: fontBytes } = args;
   const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
+  if (fontBytes && (fontBytes.heading || fontBytes.body || fontBytes.bodyBold)) {
+    doc.registerFontkit(fontkit);
+  }
+  const helvetica = await doc.embedFont(StandardFonts.Helvetica);
+  let body = helvetica;
+  let usedThemeBody = false;
+  if (fontBytes?.body) {
+    try { body = await doc.embedFont(fontBytes.body); usedThemeBody = true; } catch { body = helvetica; }
+  }
+  let heading = body;
+  if (fontBytes?.heading) {
+    try { heading = await doc.embedFont(fontBytes.heading); } catch { heading = body; }
+  }
+  let bodyBold: PDFFont | null = null;
+  if (fontBytes?.bodyBold) {
+    try { bodyBold = await doc.embedFont(fontBytes.bodyBold); } catch { bodyBold = null; }
+  }
+  if (!bodyBold) bodyBold = usedThemeBody ? body : await doc.embedFont(StandardFonts.HelveticaBold);
+  const fonts: ResolvedFonts = { heading, body, bodyBold };
 
   const positions = computeLabelPositions({
     format,
@@ -196,8 +268,9 @@ export async function renderLabelsPdf(args: {
     const desiredSize = baseFontSize(format);
     const fontSize = fitFontSize({
       lines: label.lines,
-      fonts: { regular: font, bold: boldFont },
+      fonts,
       maxWidthPt: maxTextWidthPt,
+      maxHeightPt: labelHeightPt - paddingPt * 2,
       desiredSize,
     });
 
@@ -207,23 +280,23 @@ export async function renderLabelsPdf(args: {
     const boxBottomLimitPt = boxTopPt - labelHeightPt + paddingPt;
 
     // Per-line cursor: each line's leading (1.2×) derives from its own
-    // effective size, so a bold code line gets proportionally more room.
+    // effective size, so the larger code line gets proportionally more room.
     let cursorTopPt = boxTopPt - paddingPt;
     label.lines.forEach((rawLine) => {
       const scale = lineScale(rawLine);
+      const role = lineFontRole(rawLine);
       const effectiveSize = fontSize * scale;
-      const lineFont = scale > 1 ? boldFont : font;
-      const line = truncateToFit(lineText(rawLine), lineFont, effectiveSize, maxTextWidthPt);
+      const runs = truncateRunsToFit(lineRuns(rawLine), role, effectiveSize, fonts, maxTextWidthPt);
       const baselineY = cursorTopPt - effectiveSize;
       cursorTopPt = baselineY - effectiveSize * 0.2;
       // Don't draw lines that would fall below the label box.
       if (baselineY < boxBottomLimitPt) return;
-      page.drawText(line, {
-        x: boxLeftPt + paddingPt,
-        y: baselineY,
-        size: effectiveSize,
-        font: lineFont,
-      });
+      let x = boxLeftPt + paddingPt;
+      for (const run of runs) {
+        const rf = runFont(role, !!run.bold, fonts);
+        page.drawText(run.text, { x, y: baselineY, size: effectiveSize, font: rf });
+        x += rf.widthOfTextAtSize(run.text, effectiveSize);
+      }
     });
   });
 

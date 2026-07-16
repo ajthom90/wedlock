@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AVERY_FORMATS, type AveryFormat } from '@/lib/averyFormats';
-import { composeLabelLines, composeCodeLabelLines, type LabelSource } from '@/lib/mailingLabelsPdf';
+import { composeLabelLines, composeCodeLabelLines, type LabelSource, type LabelFontBytes } from '@/lib/mailingLabelsPdf';
 
 interface InvitationForLabels {
   id: string;
@@ -42,6 +42,39 @@ export default function MailingLabelsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Theme font bytes, fetched once on first generate and reused. Any failure
+  // leaves a slot undefined and the renderer falls back to Helvetica — label
+  // generation must work even offline from Google Fonts.
+  const fontBytesRef = useRef<LabelFontBytes | null>(null);
+
+  const loadThemeFontBytes = async (): Promise<LabelFontBytes> => {
+    if (fontBytesRef.current) return fontBytesRef.current;
+    let bytes: LabelFontBytes = {};
+    try {
+      const res = await fetch('/api/settings');
+      if (res.ok) {
+        const { theme } = await res.json();
+        const fetchFont = async (family: string, weight: 400 | 700) => {
+          try {
+            const r = await fetch(`/api/fonts/pdf?family=${encodeURIComponent(family)}&weight=${weight}`);
+            return r.ok ? await r.arrayBuffer() : undefined;
+          } catch {
+            return undefined;
+          }
+        };
+        const [heading, body, bodyBold] = await Promise.all([
+          fetchFont(theme.headingFont, 400),
+          fetchFont(theme.bodyFont, 400),
+          fetchFont(theme.bodyFont, 700),
+        ]);
+        bytes = { heading, body, bodyBold };
+      }
+    } catch {
+      bytes = {};
+    }
+    fontBytesRef.current = bytes;
+    return bytes;
+  };
 
   const format = useMemo(
     () => AVERY_FORMATS.find((f) => f.code === formatCode)!,
@@ -120,13 +153,14 @@ export default function MailingLabelsPage() {
       // Dynamic import so pdf-lib isn't pulled into any page that doesn't
       // actually use it.
       const { renderLabelsPdf } = await import('@/lib/mailingLabelsPdf');
+      const fonts = await loadThemeFontBytes();
       const selected = invitations.filter((i) => selectedIds.has(i.id));
       const labels = selected.map((inv) => ({
         lines: labelType === 'code'
           ? composeCodeLabelLines(inv)
           : composeLabelLines(inv as LabelSource),
       }));
-      const bytes = await renderLabelsPdf({ format, startPosition, labels });
+      const bytes = await renderLabelsPdf({ format, startPosition, labels, fonts });
       const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

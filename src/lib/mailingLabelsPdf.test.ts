@@ -247,26 +247,28 @@ describe('renderLabelsPdf', () => {
 });
 
 describe('composeCodeLabelLines', () => {
-  it('returns household name then an emphasized code line', () => {
+  it('returns heading name, a code line with only the number bold, and the keep-safe note', () => {
     expect(composeCodeLabelLines({ householdName: 'The Smiths', code: '483920' })).toEqual([
-      'The Smiths',
-      { text: 'RSVP code: 483920', emphasis: true },
+      { runs: [{ text: 'The Smiths' }], font: 'heading' },
+      { runs: [{ text: 'RSVP code: ' }, { text: '483920', bold: true }], scale: 1.4 },
+      { runs: [{ text: 'Please do not lose this code' }], scale: 0.85 },
     ]);
   });
 
   it('trims whitespace and omits an empty household name', () => {
     expect(composeCodeLabelLines({ householdName: '   ', code: ' 483920 ' })).toEqual([
-      { text: 'RSVP code: 483920', emphasis: true },
+      { runs: [{ text: 'RSVP code: ' }, { text: '483920', bold: true }], scale: 1.4 },
+      { runs: [{ text: 'Please do not lose this code' }], scale: 0.85 },
     ]);
   });
 });
 
-describe('renderLabelsPdf with emphasized lines', () => {
-  it('renders styled labels into a valid PDF that uses Helvetica-Bold on the page', async () => {
+describe('renderLabelsPdf with styled lines', () => {
+  it('uses Helvetica-Bold for bold runs when no theme fonts are provided', async () => {
     const bytes = await renderLabelsPdf({
       format: format5160,
       startPosition: 1,
-      labels: [{ lines: ['The Smiths', { text: 'RSVP code: 483920', emphasis: true }] }],
+      labels: [{ lines: composeCodeLabelLines({ householdName: 'The Smiths', code: '483920' }) }],
     });
     const header = new TextDecoder().decode(bytes.slice(0, 4));
     expect(header).toBe('%PDF');
@@ -275,15 +277,15 @@ describe('renderLabelsPdf with emphasized lines', () => {
     expect(fonts).toContain('/Helvetica-Bold');
   });
 
-  it('shrinks the base size until the emphasized line fits (no crash on long codes)', async () => {
+  it('fits all three code-label lines onto a 1-inch 5160 label (height-aware shrink)', async () => {
     const bytes = await renderLabelsPdf({
       format: format5160,
       startPosition: 1,
       labels: [{
-        lines: [
-          'A very long household name that will need shrinking to fit',
-          { text: 'RSVP code: 483920483920483920', emphasis: true },
-        ],
+        lines: composeCodeLabelLines({
+          householdName: 'A very long household name that will need shrinking to fit',
+          code: '483920483920483920',
+        }),
       }],
     });
     const doc = await PDFDocument.load(bytes);
@@ -298,7 +300,24 @@ describe('renderLabelsPdf with emphasized lines', () => {
     });
     const fonts = await pageBaseFonts(bytes);
     expect(fonts).toContain('/Helvetica');
-    // Bold is only pulled onto a page by an emphasized line.
+    // Bold is only pulled onto a page by a bold run.
     expect(fonts).not.toContain('/Helvetica-Bold');
+  });
+
+  it('truncates the LAST run with an ellipsis, preserving the prefix run', async () => {
+    // A code so long it can't fit at the 7pt floor — the "RSVP code: " prefix
+    // must survive; only the number gets chopped. Rendering must not throw.
+    const bytes = await renderLabelsPdf({
+      format: format5160,
+      startPosition: 1,
+      labels: [{
+        lines: [{
+          runs: [{ text: 'RSVP code: ' }, { text: '9'.repeat(300), bold: true }],
+          scale: 1.4,
+        }],
+      }],
+    });
+    const doc = await PDFDocument.load(bytes);
+    expect(doc.getPageCount()).toBe(1);
   });
 });
