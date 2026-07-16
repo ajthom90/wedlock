@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.13.1",
+    "date": "2026-07-16",
+    "changes": [
+      { "type": "fix", "text": "Admin RSVP details no longer show raw IDs for guests whose rows were replaced by a pre-2.13 household edit — they now read \"N removed guests\" in the attendee list, meal choices, change history, and CSV export. Opening Edit and saving an affected RSVP permanently cleans out the stale entries and corrects the guest count." },
+      { "type": "fix", "text": "Dashboard meal totals no longer count meal choices left behind by removed guests, and the guest-facing RSVP form no longer counts them when a household updates its response." }
+    ]
+  },
+  {
     "version": "2.13.0",
     "date": "2026-07-16",
     "changes": [
