@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { composeLabelLines, computeLabelPositions } from './mailingLabelsPdf';
+import { composeLabelLines, composeCodeLabelLines, computeLabelPositions } from './mailingLabelsPdf';
 import { AVERY_FORMATS } from './averyFormats';
 
 const format5160 = AVERY_FORMATS.find((f) => f.code === '5160')!;
@@ -172,7 +172,20 @@ describe('computeLabelPositions', () => {
 });
 
 import { renderLabelsPdf } from './mailingLabelsPdf';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFDict, PDFName } from 'pdf-lib';
+
+// pdf-lib writes compressed object streams, so font names aren't greppable in
+// the raw bytes — read the first page's font resources from the parsed PDF.
+async function pageBaseFonts(bytes: Uint8Array): Promise<string[]> {
+  const doc = await PDFDocument.load(bytes);
+  const resources = doc.getPage(0).node.Resources();
+  const fontDict = resources?.lookup(PDFName.of('Font'), PDFDict);
+  if (!fontDict) return [];
+  return fontDict.entries().map(([, value]) => {
+    const font = doc.context.lookup(value, PDFDict);
+    return font?.lookup(PDFName.of('BaseFont'))?.toString() ?? '';
+  });
+}
 
 describe('renderLabelsPdf', () => {
   it('returns a valid PDF buffer (starts with %PDF)', async () => {
@@ -230,5 +243,62 @@ describe('renderLabelsPdf', () => {
     });
     const doc = await PDFDocument.load(bytes);
     expect(doc.getPageCount()).toBe(1);
+  });
+});
+
+describe('composeCodeLabelLines', () => {
+  it('returns household name then an emphasized code line', () => {
+    expect(composeCodeLabelLines({ householdName: 'The Smiths', code: '483920' })).toEqual([
+      'The Smiths',
+      { text: 'RSVP code: 483920', emphasis: true },
+    ]);
+  });
+
+  it('trims whitespace and omits an empty household name', () => {
+    expect(composeCodeLabelLines({ householdName: '   ', code: ' 483920 ' })).toEqual([
+      { text: 'RSVP code: 483920', emphasis: true },
+    ]);
+  });
+});
+
+describe('renderLabelsPdf with emphasized lines', () => {
+  it('renders styled labels into a valid PDF that uses Helvetica-Bold on the page', async () => {
+    const bytes = await renderLabelsPdf({
+      format: format5160,
+      startPosition: 1,
+      labels: [{ lines: ['The Smiths', { text: 'RSVP code: 483920', emphasis: true }] }],
+    });
+    const header = new TextDecoder().decode(bytes.slice(0, 4));
+    expect(header).toBe('%PDF');
+    const fonts = await pageBaseFonts(bytes);
+    expect(fonts).toContain('/Helvetica');
+    expect(fonts).toContain('/Helvetica-Bold');
+  });
+
+  it('shrinks the base size until the emphasized line fits (no crash on long codes)', async () => {
+    const bytes = await renderLabelsPdf({
+      format: format5160,
+      startPosition: 1,
+      labels: [{
+        lines: [
+          'A very long household name that will need shrinking to fit',
+          { text: 'RSVP code: 483920483920483920', emphasis: true },
+        ],
+      }],
+    });
+    const doc = await PDFDocument.load(bytes);
+    expect(doc.getPageCount()).toBe(1);
+  });
+
+  it('still renders plain string lines in regular Helvetica only', async () => {
+    const bytes = await renderLabelsPdf({
+      format: format5160,
+      startPosition: 1,
+      labels: [{ lines: ['The Smiths', '123 Main St'] }],
+    });
+    const fonts = await pageBaseFonts(bytes);
+    expect(fonts).toContain('/Helvetica');
+    // Bold is only pulled onto a page by an emphasized line.
+    expect(fonts).not.toContain('/Helvetica-Bold');
   });
 });

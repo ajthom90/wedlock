@@ -43,6 +43,33 @@ export function composeLabelLines(src: LabelSource): string[] {
   return lines;
 }
 
+// A label line is plain text, or text flagged for emphasis. Emphasized lines
+// render in Helvetica-Bold at EMPHASIS_SCALE × the label's fitted base size —
+// used for the RSVP code so it reads at a glance on a 1" label.
+export type LabelLine = string | { text: string; emphasis?: boolean };
+
+const EMPHASIS_SCALE = 1.4;
+
+function lineText(line: LabelLine): string {
+  return typeof line === 'string' ? line : line.text;
+}
+
+function lineScale(line: LabelLine): number {
+  return typeof line !== 'string' && line.emphasis ? EMPHASIS_SCALE : 1;
+}
+
+// Produces the lines for an RSVP-code label: household name (regular) with
+// the code underneath in bold. The name is deliberate — codes are
+// per-household and an unlabeled sticker mixup sends guests into someone
+// else's RSVP.
+export function composeCodeLabelLines(src: { householdName: string; code: string }): LabelLine[] {
+  const lines: LabelLine[] = [];
+  const hh = src.householdName.trim();
+  if (hh) lines.push(hh);
+  lines.push({ text: `RSVP code: ${src.code.trim()}`, emphasis: true });
+  return lines;
+}
+
 export interface LabelPosition {
   pageIndex: number;
   xInches: number;           // left edge of the label on its page
@@ -86,19 +113,23 @@ function baseFontSize(format: AveryFormat): number {
 
 const MIN_FONT_SIZE = 7;
 
-// Returns the largest font size ≤ desiredSize where every line fits inside
-// the given pixel-width box. Floors at MIN_FONT_SIZE; if even that doesn't
-// fit, the caller truncates with an ellipsis (handled in drawLabel below).
+// Returns the largest BASE font size ≤ desiredSize where every line fits the
+// box width at its own effective size (base × emphasis scale) and font.
+// Floors at MIN_FONT_SIZE; if even that doesn't fit, the caller truncates
+// with an ellipsis (handled in the draw loop below).
 function fitFontSize(args: {
-  lines: string[];
-  font: PDFFont;
+  lines: LabelLine[];
+  fonts: { regular: PDFFont; bold: PDFFont };
   maxWidthPt: number;
   desiredSize: number;
 }): number {
-  const { lines, font, maxWidthPt, desiredSize } = args;
+  const { lines, fonts, maxWidthPt, desiredSize } = args;
   let size = desiredSize;
   while (size > MIN_FONT_SIZE) {
-    const widest = Math.max(...lines.map((l) => font.widthOfTextAtSize(l, size)));
+    const widest = Math.max(...lines.map((l) => {
+      const font = lineScale(l) > 1 ? fonts.bold : fonts.regular;
+      return font.widthOfTextAtSize(lineText(l), size * lineScale(l));
+    }));
     if (widest <= maxWidthPt) return size;
     size -= 0.5;
   }
@@ -122,11 +153,12 @@ function truncateToFit(line: string, font: PDFFont, size: number, maxWidthPt: nu
 export async function renderLabelsPdf(args: {
   format: AveryFormat;
   startPosition: number;
-  labels: Array<{ lines: string[] }>;
+  labels: Array<{ lines: LabelLine[] }>;
 }): Promise<Uint8Array> {
   const { format, startPosition, labels } = args;
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
 
   const positions = computeLabelPositions({
     format,
@@ -164,27 +196,33 @@ export async function renderLabelsPdf(args: {
     const desiredSize = baseFontSize(format);
     const fontSize = fitFontSize({
       lines: label.lines,
-      font,
+      fonts: { regular: font, bold: boldFont },
       maxWidthPt: maxTextWidthPt,
       desiredSize,
     });
-    const leading = fontSize * 1.2;
 
     // Label box top-left in PDF coordinates (origin = bottom-left of page).
     const boxLeftPt = pos.xInches * 72;
     const boxTopPt = pageHeightPt - pos.yInchesFromTop * 72;
+    const boxBottomLimitPt = boxTopPt - labelHeightPt + paddingPt;
 
-    label.lines.forEach((rawLine, lineIndex) => {
-      const line = truncateToFit(rawLine, font, fontSize, maxTextWidthPt);
-      // Baseline y = boxTop - padding - fontSize - lineIndex * leading.
-      const baselineY = boxTopPt - paddingPt - fontSize - lineIndex * leading;
+    // Per-line cursor: each line's leading (1.2×) derives from its own
+    // effective size, so a bold code line gets proportionally more room.
+    let cursorTopPt = boxTopPt - paddingPt;
+    label.lines.forEach((rawLine) => {
+      const scale = lineScale(rawLine);
+      const effectiveSize = fontSize * scale;
+      const lineFont = scale > 1 ? boldFont : font;
+      const line = truncateToFit(lineText(rawLine), lineFont, effectiveSize, maxTextWidthPt);
+      const baselineY = cursorTopPt - effectiveSize;
+      cursorTopPt = baselineY - effectiveSize * 0.2;
       // Don't draw lines that would fall below the label box.
-      if (baselineY < boxTopPt - labelHeightPt + paddingPt) return;
+      if (baselineY < boxBottomLimitPt) return;
       page.drawText(line, {
         x: boxLeftPt + paddingPt,
         y: baselineY,
-        size: fontSize,
-        font,
+        size: effectiveSize,
+        font: lineFont,
       });
     });
   });
