@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.14.0",
+    "date": "2026-07-16",
+    "changes": [
+      { "type": "feature", "text": "RSVP code labels — the Print Labels page (formerly Print Mailing Labels) now has a label-type switch. Pick \"RSVP code\" to generate Avery peel-and-stick labels showing each household's name with its RSVP code in bold, ready to stick straight onto pre-printed invite cards — no more printing and cutting the QR card sheets. Works with all the same label formats and the start-at-position option as address labels." }
+    ]
+  },
+  {
     "version": "2.13.1",
     "date": "2026-07-16",
     "changes": [
