@@ -4,6 +4,9 @@ import { isAuthenticated } from '@/lib/auth';
 
 export async function GET() {
   try {
+    // Admin-only: includes unapproved guest uploads and uploader names. The
+    // public wall polls /api/photos/wall; public pages query Prisma directly.
+    if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const photos = await prisma.photo.findMany({ orderBy: { order: 'asc' } });
     return NextResponse.json(photos);
   } catch (error) {

@@ -48,6 +48,11 @@ export async function POST(request: Request) {
       const converted = await heicConvert({ buffer: buffer as unknown as ArrayBufferLike, format: 'JPEG', quality: 0.9 });
       buffer = Buffer.from(converted);
       ext = 'jpg';
+      // The 10MB check above ran against the HEIC original; the converted
+      // JPEG can come out larger. Re-check before writing (mirrors /api/upload).
+      if (buffer.length > 10 * 1024 * 1024) {
+        return NextResponse.json({ error: 'Converted JPEG exceeds size limit of 10MB' }, { status: 400 });
+      }
     }
 
     const timestamp = Date.now();

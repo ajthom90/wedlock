@@ -64,6 +64,7 @@ export async function POST(request: Request) {
               create: r.guestNames.map((name, i) => ({
                 name: name.trim(),
                 isPrimary: i === 0,
+                order: i,
               })),
             },
           },

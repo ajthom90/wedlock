@@ -77,6 +77,16 @@ function RSVPForm() {
 
   useEffect(() => { if (codeFromUrl) lookupInvitation(codeFromUrl); }, [codeFromUrl]);
 
+  // Per-guest mode needs actual Guest rows to check off — a household with
+  // none can't use checkbox selection (validation would count selections that
+  // don't exist and "yes" could never be submitted). Plus-one rows appear
+  // whenever the couple allows extras and the flag is on; for a household
+  // with no named guests the plus-one rows ARE the party (plus-ones-only
+  // mode), so the head-count input is hidden to avoid double counting.
+  const perGuestMode = !!(features.perGuestSelection && invitation?.guests?.length);
+  const plusOnesActive = !!(features.rsvpPlusOnes && features.perGuestSelection && invitation?.plusOnesAllowed > 0);
+  const plusOnesOnlyMode = plusOnesActive && !perGuestMode;
+
   // Two-step submit: clicking "Submit RSVP" validates then opens a confirmation
   // modal. Only the modal's Confirm button actually POSTs. Accepting while
   // marking zero attendees is rejected — that's almost always a user mistake
@@ -98,20 +108,24 @@ function RSVPForm() {
   const handleReview = (e: React.FormEvent) => {
     e.preventDefault(); setValidationError('');
     if (attending === 'yes') {
-      const namedPlusOnes = plusOnes.filter((p) => p.name.trim());
-      const count = features.perGuestSelection
+      const namedPlusOnes = plusOnesActive ? plusOnes.filter((p) => p.name.trim()) : [];
+      const count = perGuestMode
         ? attendingGuests.length + namedPlusOnes.length
-        : guestCount;
+        : plusOnesOnlyMode
+          ? namedPlusOnes.length
+          : guestCount;
       if (count < 1) {
-        setValidationError(features.perGuestSelection
+        setValidationError(perGuestMode
           ? 'Please select at least one person who is attending, or choose Regretfully Decline.'
-          : 'Please enter at least one guest, or choose Regretfully Decline.');
+          : plusOnesOnlyMode
+            ? 'Please enter a name for at least one guest, or choose Regretfully Decline.'
+            : 'Please enter at least one guest, or choose Regretfully Decline.');
         return;
       }
       const mealOpt = rsvpOptions.find((o: any) => o.type === 'meal');
-      if (features.perGuestSelection && mealOpt?.required) {
-        const missing = attendingGuests.filter((id) => !guestMeals[id]);
-        const missingPlus = plusOnes.map((p, i) => (p.name.trim() && !p.meal ? i : -1)).filter((i) => i >= 0);
+      if ((perGuestMode || plusOnesOnlyMode) && mealOpt?.required) {
+        const missing = perGuestMode ? attendingGuests.filter((id) => !guestMeals[id]) : [];
+        const missingPlus = plusOnesActive ? plusOnes.map((p, i) => (p.name.trim() && !p.meal ? i : -1)).filter((i) => i >= 0) : [];
         if (missing.length > 0 || missingPlus.length > 0) {
           const regularNames = missing.map((id) => invitation.guests.find((g: any) => g.id === id)?.name || id);
           const plusNames = missingPlus.map((i) => plusOnes[i].name.trim());
@@ -128,9 +142,13 @@ function RSVPForm() {
   const confirmSubmit = async () => {
     setSubmitting(true); setSubmitError('');
     try {
-      const namedPlusOnes = plusOnes.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), meal: p.meal }));
-      const totalAttending = features.perGuestSelection ? attendingGuests.length + namedPlusOnes.length : guestCount;
-      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && features.perGuestSelection ? guestMeals : undefined, attendingGuests: attending === 'yes' && features.perGuestSelection ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, contactEmail, correction: features.rsvpCorrections ? correction : undefined }) });
+      const namedPlusOnes = plusOnesActive ? plusOnes.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), meal: p.meal })) : [];
+      const totalAttending = perGuestMode
+        ? attendingGuests.length + namedPlusOnes.length
+        : plusOnesOnlyMode
+          ? namedPlusOnes.length
+          : guestCount;
+      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && perGuestMode ? guestMeals : undefined, attendingGuests: attending === 'yes' && perGuestMode ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, contactEmail, correction: features.rsvpCorrections ? correction : undefined }) });
       const data = await res.json();
       if (res.ok) { setShowConfirm(false); setSubmitted(true); setCorrection(''); }
       else setSubmitError(data.error || 'Failed to submit RSVP');
@@ -171,7 +189,7 @@ function RSVPForm() {
               </ul>
             </div>
           )}
-          {features.perGuestSelection && invitation.guests?.length > 0 ? (
+          {perGuestMode ? (
             <div><p className="font-medium mb-3">Who will be attending?</p><div className="space-y-2">{invitation.guests.map((guest: any) => (
               <label key={guest.id} className="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-gray-50">
                 <input type="checkbox" checked={attendingGuests.includes(guest.id)} onChange={() => toggleGuest(guest.id)} className="h-4 w-4" />
@@ -179,8 +197,8 @@ function RSVPForm() {
                 {mealOption && attendingGuests.includes(guest.id) && <select className={`ml-auto border rounded px-2 py-1 text-sm ${missingMeals.includes(guest.id) ? 'border-red-500 ring-2 ring-red-500' : ''}`} value={guestMeals[guest.id] || ''} onChange={(e) => { setGuestMeals({...guestMeals, [guest.id]: e.target.value}); if (e.target.value) setMissingMeals(prev => prev.filter(id => id !== guest.id)); }}><option value="">Select meal...</option>{mealOption.choices.map((c: RsvpChoice) => <option key={c.name} value={c.name}>{c.name}</option>)}</select>}
               </label>
             ))}</div></div>
-          ) : <Input label="Number of Guests" type="number" min={1} max={invitation.maxGuests} value={guestCount || ''} onChange={(e) => setGuestCount(parseInt(e.target.value) || 0)} />}
-          {features.perGuestSelection && invitation.plusOnesAllowed > 0 && (
+          ) : plusOnesOnlyMode ? null : <Input label="Number of Guests" type="number" min={1} max={invitation.maxGuests} value={guestCount || ''} onChange={(e) => setGuestCount(parseInt(e.target.value) || 0)} />}
+          {plusOnesActive && (
             <div>
               <p className="font-medium mb-1">Additional guests (up to {invitation.plusOnesAllowed})</p>
               <p className="text-sm text-foreground/60 mb-3">Enter a name for each extra guest you&apos;d like to bring. Leave blank if unused.</p>
@@ -295,8 +313,8 @@ function RSVPForm() {
         guestCount={guestCount}
         attendingGuests={attendingGuests}
         guestMeals={guestMeals}
-        plusOnes={plusOnes.filter((p) => p.name.trim())}
-        perGuestSelection={features.perGuestSelection}
+        plusOnes={plusOnesActive ? plusOnes.filter((p) => p.name.trim()) : []}
+        perGuestSelection={perGuestMode || plusOnesOnlyMode}
         submitting={submitting}
         submitError={submitError}
         onCancel={() => { setShowConfirm(false); setSubmitError(''); }}

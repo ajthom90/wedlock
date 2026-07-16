@@ -46,7 +46,11 @@ export interface FeatureSettings {
   perGuestSelection: boolean;
   songRequests: boolean;
   dietaryNotes: boolean;
-  plusOnes: boolean;
+  // Named "rsvpPlusOnes" (not "plusOnes") on purpose: a "feature.plusOnes"
+  // key shipped inert for several versions with default false, so installs
+  // that ever saved /admin/features have a stored "false" that was never a
+  // real choice. Reading a fresh key ignores those rows; the old key is inert.
+  rsvpPlusOnes: boolean;
   rsvpAddress: boolean;
   rsvpCorrections: boolean;
 
@@ -124,7 +128,9 @@ const defaultFeatures: FeatureSettings = {
   perGuestSelection: true,
   songRequests: true,
   dietaryNotes: true,
-  plusOnes: false,
+  // Default ON: before 2.13 the RSVP form ignored the plus-one flag and
+  // always showed the rows, so on keeps existing installs looking the same.
+  rsvpPlusOnes: true,
   rsvpAddress: true,
   rsvpCorrections: true,
 

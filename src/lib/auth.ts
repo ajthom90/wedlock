@@ -1,8 +1,16 @@
 import prisma from './prisma';
 import bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 import { cookies } from 'next/headers';
 
 const COOKIE_NAME = 'admin_session';
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+
+// Only a hash of the session token touches the DB, so a leaked database copy
+// (the SQLite file is a plain bind-mounted file) can't be replayed as a cookie.
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 export async function initAdmin() {
   const envPassword = process.env.ADMIN_PASSWORD;
@@ -55,11 +63,19 @@ export async function login(password: string): Promise<{ success: boolean; error
 
   await prisma.adminAuth.update({ where: { id: auth.id }, data: { loginAttempts: 0, lockedUntil: null } });
   const token = crypto.randomUUID() + '-' + Date.now().toString(36);
+  await prisma.adminSession.create({
+    data: {
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000),
+    },
+  });
+  // Opportunistic cleanup so abandoned sessions don't accumulate forever.
+  await prisma.adminSession.deleteMany({ where: { expiresAt: { lt: new Date() } } });
   (await cookies()).set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.COOKIE_SECURE === 'true',
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: SESSION_MAX_AGE_SECONDS,
     path: '/',
   });
   return { success: true };
@@ -67,9 +83,16 @@ export async function login(password: string): Promise<{ success: boolean; error
 
 export async function isAuthenticated(): Promise<boolean> {
   const cookie = (await cookies()).get(COOKIE_NAME);
-  return !!cookie?.value;
+  if (!cookie?.value) return false;
+  const session = await prisma.adminSession.findUnique({ where: { tokenHash: hashToken(cookie.value) } });
+  return !!session && session.expiresAt > new Date();
 }
 
 export async function logout() {
-  (await cookies()).delete(COOKIE_NAME);
+  const store = await cookies();
+  const cookie = store.get(COOKIE_NAME);
+  if (cookie?.value) {
+    await prisma.adminSession.deleteMany({ where: { tokenHash: hashToken(cookie.value) } });
+  }
+  store.delete(COOKIE_NAME);
 }

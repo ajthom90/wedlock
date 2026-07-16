@@ -68,7 +68,9 @@ export default function InvitationsPage() {
   const [maxGuests, setMaxGuests] = useState(2);
   const [plusOnesAllowed, setPlusOnesAllowed] = useState(0);
   const [notes, setNotes] = useState('');
-  const [guestNames, setGuestNames] = useState<string[]>(['']);
+  // Each edit row carries the original guest id (null for newly added rows)
+  // so the API can tell a typo fix (same row, new name) from a replacement.
+  const [guestRows, setGuestRows] = useState<{ id: string | null; name: string }[]>([{ id: null, name: '' }]);
   const [isWeddingParty, setIsWeddingParty] = useState(false);
   const [mailingAddress1, setMailingAddress1] = useState('');
   const [mailingAddress2, setMailingAddress2] = useState('');
@@ -101,7 +103,7 @@ export default function InvitationsPage() {
     setMaxGuests(2);
     setPlusOnesAllowed(0);
     setNotes('');
-    setGuestNames(['']);
+    setGuestRows([{ id: null, name: '' }]);
     setIsWeddingParty(false);
     setMailingAddress1('');
     setMailingAddress2('');
@@ -123,7 +125,7 @@ export default function InvitationsPage() {
     setMaxGuests(inv.maxGuests);
     setPlusOnesAllowed(inv.plusOnesAllowed || 0);
     setNotes(inv.notes || '');
-    setGuestNames(inv.guests.length > 0 ? inv.guests.map((g) => g.name) : ['']);
+    setGuestRows(inv.guests.length > 0 ? inv.guests.map((g) => ({ id: g.id, name: g.name })) : [{ id: null, name: '' }]);
     setIsWeddingParty(Boolean(inv.isWeddingParty));
     setMailingAddress1(inv.mailingAddress1 || '');
     setMailingAddress2(inv.mailingAddress2 || '');
@@ -143,7 +145,7 @@ export default function InvitationsPage() {
         maxGuests,
         plusOnesAllowed,
         notes: notes.trim() || null,
-        guestNames: guestNames.filter((n) => n.trim()),
+        guests: guestRows.filter((r) => r.name.trim()).map((r) => ({ id: r.id, name: r.name.trim() })),
         isWeddingParty,
         mailingAddress1: mailingAddress1.trim() || null,
         mailingAddress2: mailingAddress2.trim() || null,
@@ -234,12 +236,12 @@ export default function InvitationsPage() {
     }
   };
 
-  const addGuestName = () => setGuestNames([...guestNames, '']);
-  const removeGuestName = (index: number) => setGuestNames(guestNames.filter((_, i) => i !== index));
+  const addGuestName = () => setGuestRows([...guestRows, { id: null, name: '' }]);
+  const removeGuestName = (index: number) => setGuestRows(guestRows.filter((_, i) => i !== index));
   const updateGuestName = (index: number, value: string) => {
-    const updated = [...guestNames];
-    updated[index] = value;
-    setGuestNames(updated);
+    const updated = [...guestRows];
+    updated[index] = { ...updated[index], name: value };
+    setGuestRows(updated);
   };
 
   const filtered = invitations.filter(
@@ -383,10 +385,10 @@ export default function InvitationsPage() {
               <div>
                 <label className="block text-sm font-medium mb-1">Guest Names</label>
                 <div className="space-y-2">
-                  {guestNames.map((name, i) => (
+                  {guestRows.map((row, i) => (
                     <div key={i} className="flex gap-2">
-                      <Input value={name} onChange={(e) => updateGuestName(i, e.target.value)} placeholder={`Guest ${i + 1}`} />
-                      {guestNames.length > 1 && (
+                      <Input value={row.name} onChange={(e) => updateGuestName(i, e.target.value)} placeholder={`Guest ${i + 1}`} />
+                      {guestRows.length > 1 && (
                         <Button size="sm" variant="danger" onClick={() => removeGuestName(i)}>Remove</Button>
                       )}
                     </div>

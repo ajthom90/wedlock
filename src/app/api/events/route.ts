@@ -33,6 +33,11 @@ export async function GET(request: Request) {
             path: '/',
           });
         }
+      } else if (code) {
+        // An explicitly submitted code that matches nothing is an error the
+        // access form must be able to show. A stale cookie is not — fall
+        // through to public events for that case.
+        return NextResponse.json({ error: 'Invalid invitation code' }, { status: 401 });
       }
     }
 

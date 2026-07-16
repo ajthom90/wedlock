@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { isAuthenticated } from '@/lib/auth';
 import { generateQRCode, buildRsvpUrl } from '@/lib/qr';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { id } = await params;
     const invitation = await prisma.invitation.findUnique({ where: { id } });
     if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });

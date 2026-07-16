@@ -68,7 +68,6 @@ Next.js 14 (App Router) · React 18 · Prisma · SQLite · Tailwind CSS · TipTa
 ```bash
 npm install
 npx prisma db push        # creates dev.db from the schema
-npx prisma db seed        # optional seed data
 npm run dev
 ```
 

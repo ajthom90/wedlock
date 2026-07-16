@@ -97,6 +97,9 @@ model Guest {
   invitationId String
   name         String
   isPrimary    Boolean    @default(false)
+  // Display position within the household — guest rows survive edits (see
+  // reconcileGuests), so insertion order no longer reflects the entered order.
+  order        Int        @default(0)
   invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
 }
 
@@ -168,6 +171,16 @@ model AdminAuth {
   passwordHash  String
   loginAttempts Int       @default(0)
   lockedUntil   DateTime?
+}
+
+// Server-side admin sessions. The admin_session cookie value must hash to a
+// live row here — cookie presence alone is not authentication. Rows are
+// pruned opportunistically on login; logout deletes the caller's row.
+model AdminSession {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 model CustomFont {

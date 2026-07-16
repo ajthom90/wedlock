@@ -100,7 +100,7 @@ export function validateSlug(slug: string): string | null {
   if (slug.startsWith('-') || slug.endsWith('-')) return 'Slug must not start or end with a dash';
   // Reserved top-level paths — these are handled by Next.js routes that aren't
   // pages, or by middleware. Keep them off-limits to avoid collisions.
-  const reserved = ['api', 'admin', '_next', 'public', '_custom', 'assets', 'favicon.ico'];
+  const reserved = ['api', 'admin', '_next', 'public', '_custom', 'assets', 'favicon.ico', 'uploads', 'wall'];
   if (reserved.includes(slug)) return `"${slug}" is a reserved path`;
   return null;
 }

@@ -4,6 +4,9 @@ import { getSiteSettings, getTheme, saveSiteSettings, saveTheme } from '@/lib/se
 
 export async function GET() {
   try {
+    // Admin-only: SiteSettings includes sitePassword. Public pages read
+    // settings server-side via getSiteSettings(), never through this route.
+    if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const [site, theme] = await Promise.all([getSiteSettings(), getTheme()]);
     return NextResponse.json({ site, theme });
   } catch (error) {

@@ -13,9 +13,10 @@ async function generateUniqueCode(): Promise<string> {
 
 export async function GET() {
   try {
+    if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const invitations = await prisma.invitation.findMany({
       include: {
-        guests: true,
+        guests: { orderBy: { order: 'asc' } },
         response: true,
         changeLogs: { orderBy: { createdAt: 'desc' } },
       },
@@ -45,9 +46,9 @@ export async function POST(request: Request) {
         mailingCity: mailingCity || null,
         mailingState: mailingState || null,
         mailingPostalCode: mailingPostalCode || null,
-        guests: { create: guestNames?.map((name: string, i: number) => ({ name, isPrimary: i === 0 })) || [] },
+        guests: { create: guestNames?.map((name: string, i: number) => ({ name, isPrimary: i === 0, order: i })) || [] },
       },
-      include: { guests: true },
+      include: { guests: { orderBy: { order: 'asc' } } },
     });
     return NextResponse.json(invitation);
   } catch (error) {

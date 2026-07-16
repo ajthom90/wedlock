@@ -9,7 +9,7 @@ interface FeatureSettings {
   perGuestSelection: boolean;
   songRequests: boolean;
   dietaryNotes: boolean;
-  plusOnes: boolean;
+  rsvpPlusOnes: boolean;
   rsvpAddress: boolean;
   rsvpCorrections: boolean;
   weatherWidget: boolean;
@@ -34,7 +34,7 @@ const DEFAULTS: FeatureSettings = {
   perGuestSelection: true,
   songRequests: true,
   dietaryNotes: true,
-  plusOnes: false,
+  rsvpPlusOnes: true,
   rsvpAddress: true,
   rsvpCorrections: true,
   weatherWidget: true,
@@ -81,8 +81,8 @@ const GUEST_FACING: ToggleDescriptor[] = [
 const RSVP_FIELDS: ToggleDescriptor[] = [
   { key: 'perGuestSelection', label: 'Per-guest meal selection',
     description: 'Let guests pick a meal choice for each attendee individually.' },
-  { key: 'plusOnes', label: 'Plus-one support',
-    description: 'Let guests add a plus-one not on the invitation.' },
+  { key: 'rsvpPlusOnes', label: 'Plus-one support',
+    description: 'Let guests add a plus-one not on the invitation. Shown when per-guest selection is on and the invitation allows extras.' },
   { key: 'songRequests', label: 'Song requests',
     description: 'Let guests suggest songs during the RSVP flow.' },
   { key: 'dietaryNotes', label: 'Dietary notes',

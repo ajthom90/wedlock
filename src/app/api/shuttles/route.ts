@@ -4,6 +4,9 @@ import { isAuthenticated } from '@/lib/auth';
 
 export async function GET() {
   try {
+    // Admin-only: signups include household names. The public transportation
+    // page queries Prisma server-side and never calls this route.
+    if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const shuttles = await prisma.shuttle.findMany({
       include: { signups: { include: { invitation: { select: { householdName: true } } } } },
       orderBy: [{ departDate: 'asc' }, { departTime: 'asc' }, { order: 'asc' }],

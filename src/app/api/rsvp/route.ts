@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getSiteSettings, getFeatures } from '@/lib/settings';
 import { parseRsvpChoices } from '@/lib/rsvpChoices';
+import { validateRsvpSubmission } from '@/lib/rsvpValidation';
 import { cookies } from 'next/headers';
 import { getEmailConfig, sendRsvpConfirmation } from '@/lib/email';
 
@@ -9,7 +10,7 @@ export async function GET(request: Request) {
   try {
     const code = new URL(request.url).searchParams.get('code');
     if (!code) return NextResponse.json({ error: 'Invitation code is required' }, { status: 400 });
-    const invitation = await prisma.invitation.findUnique({ where: { code }, include: { guests: true, response: true } });
+    const invitation = await prisma.invitation.findUnique({ where: { code }, include: { guests: { orderBy: { order: 'asc' } }, response: true } });
     if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
     const options = await prisma.rsvpOption.findMany({ orderBy: { order: 'asc' } });
     const settings = await getSiteSettings();
@@ -26,13 +27,30 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({
-      invitation,
+      // Explicit shape — the invitation row also carries internal admin fields
+      // (notes, admin-entered email, isWeddingParty) that guests must not see.
+      invitation: {
+        id: invitation.id,
+        code: invitation.code,
+        householdName: invitation.householdName,
+        maxGuests: invitation.maxGuests,
+        plusOnesAllowed: invitation.plusOnesAllowed,
+        contactEmail: invitation.contactEmail,
+        mailingAddress1: invitation.mailingAddress1,
+        mailingAddress2: invitation.mailingAddress2,
+        mailingCity: invitation.mailingCity,
+        mailingState: invitation.mailingState,
+        mailingPostalCode: invitation.mailingPostalCode,
+        guests: invitation.guests.map((g) => ({ id: g.id, name: g.name, isPrimary: g.isPrimary })),
+        response: invitation.response,
+      },
       rsvpOptions: options.map((o) => ({ ...o, choices: parseRsvpChoices(o.choices) })),
       settings: { rsvpDeadline: settings.rsvpDeadline, rsvpCloseAfterDeadline: settings.rsvpCloseAfterDeadline },
       features: {
         perGuestSelection: features.perGuestSelection,
         songRequests: features.songRequests,
         dietaryNotes: features.dietaryNotes,
+        rsvpPlusOnes: features.rsvpPlusOnes,
         rsvpAddress: features.rsvpAddress,
         rsvpCorrections: features.rsvpCorrections,
         rsvpConfirmationEmails: features.rsvpConfirmationEmails,
@@ -55,9 +73,22 @@ export async function POST(request: Request) {
       deadline.setHours(23, 59, 59, 999);
       if (new Date() > deadline) return NextResponse.json({ error: 'RSVP submissions are now closed' }, { status: 403 });
     }
-    const invitation = await prisma.invitation.findUnique({ where: { code } });
+    const invitation = await prisma.invitation.findUnique({ where: { code }, include: { guests: { select: { id: true } } } });
     if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
     const features = await getFeatures();
+    // Validate the attendance fields against this invitation's limits BEFORE
+    // writing anything, so a rejected submission leaves no partial state.
+    const validation = validateRsvpSubmission(
+      { attending, guestCount, attendingGuests, guestMeals, plusOnes },
+      {
+        maxGuests: invitation.maxGuests,
+        plusOnesAllowed: invitation.plusOnesAllowed,
+        guestIds: invitation.guests.map((g) => g.id),
+        plusOnesEnabled: features.rsvpPlusOnes,
+      },
+    );
+    if (!validation.ok) return NextResponse.json({ error: validation.error }, { status: 400 });
+    const submission = validation.data;
     // Persist structured mailing address on the invitation. Each field is
     // independently updated so clearing one field doesn't clobber the others.
     const addressPatch: {
@@ -87,24 +118,22 @@ export async function POST(request: Request) {
       });
     }
     const existing = await prisma.rsvpResponse.findUnique({ where: { invitationId: invitation.id } });
-    // Drop plus-ones with empty names; each remaining entry carries {name, meal?}.
-    const cleanPlusOnes = Array.isArray(plusOnes)
-      ? plusOnes.filter((p: any) => p && typeof p.name === 'string' && p.name.trim()).map((p: any) => ({ name: p.name.trim(), meal: p.meal || '' }))
-      : [];
+    const cleanResponses = responses && typeof responses === 'object' && !Array.isArray(responses) ? responses : {};
     const data = {
-      attending, guestCount: guestCount || 0, responses: JSON.stringify(responses || {}),
-      guestMeals: guestMeals ? JSON.stringify(guestMeals) : null,
-      attendingGuests: attendingGuests ? JSON.stringify(attendingGuests) : null,
-      plusOnes: cleanPlusOnes.length ? JSON.stringify(cleanPlusOnes) : null,
+      attending: submission.attending, guestCount: submission.guestCount, responses: JSON.stringify(cleanResponses),
+      guestMeals: Object.keys(submission.guestMeals).length ? JSON.stringify(submission.guestMeals) : null,
+      attendingGuests: submission.attendingGuests.length ? JSON.stringify(submission.attendingGuests) : null,
+      plusOnes: submission.plusOnes.length ? JSON.stringify(submission.plusOnes) : null,
       songRequests: songRequests || null, dietaryNotes: dietaryNotes || null, message: message || null,
     };
     // Snapshot of the submitted state for the change log. Stored as JSON so the
     // admin RSVPs page can reconstruct "what was RSVPed on this date" without
     // needing new columns when RsvpResponse gains fields.
     const logDetails = JSON.stringify({
-      attending, guestCount: guestCount || 0,
-      attendingGuests: attendingGuests || null, guestMeals: guestMeals || null,
-      plusOnes: cleanPlusOnes.length ? cleanPlusOnes : null,
+      attending: submission.attending, guestCount: submission.guestCount,
+      attendingGuests: submission.attendingGuests.length ? submission.attendingGuests : null,
+      guestMeals: Object.keys(submission.guestMeals).length ? submission.guestMeals : null,
+      plusOnes: submission.plusOnes.length ? submission.plusOnes : null,
       songRequests: songRequests || null, dietaryNotes: dietaryNotes || null,
       message: message || null,
     });
@@ -130,7 +159,7 @@ export async function POST(request: Request) {
       // include guests so the confirmation recap can resolve IDs to names.
       const fresh = await prisma.invitation.findUnique({
         where: { id: invitation.id },
-        include: { guests: true },
+        include: { guests: { orderBy: { order: 'asc' } } },
       });
       if (fresh?.contactEmail) {
         sendRsvpConfirmation(fresh, response, { isUpdate: !!existing })
