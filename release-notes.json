@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.14.1",
+    "date": "2026-07-16",
+    "changes": [
+      { "type": "improvement", "text": "Labels now print in your site's theme fonts — the household name in your heading font, everything else in your body font (falling back to Helvetica if a font can't load). RSVP code labels also got a polish: only the code number itself is bold, and a third line reads \"Please do not lose this code\"." }
+    ]
+  },
+  {
     "version": "2.14.0",
     "date": "2026-07-16",
     "changes": [
