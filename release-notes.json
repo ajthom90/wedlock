@@ -1,5 +1,18 @@
 [
   {
+    "version": "2.13.0",
+    "date": "2026-07-16",
+    "changes": [
+      { "type": "fix", "text": "Security hardening — admin API endpoints that listed invitations (guest names, codes, addresses, RSVP history), site settings (including the site password), photos, and shuttle signups no longer respond without an admin login. Admin sessions are now validated server-side instead of trusting the login cookie's presence, so everyone is signed out once after this upgrade — just log back in." },
+      { "type": "fix", "text": "Editing a household no longer breaks its existing RSVP. Fixing a typo in a guest's name or reordering guests keeps meal choices and attendance attached to the right person; removing a guest also removes them from the household's saved RSVP instead of leaving a phantom attendee behind." },
+      { "type": "fix", "text": "RSVP submissions are now validated on the server — head counts above the invitation's limit, extra plus-ones, and guests from other invitations are rejected instead of silently stored. The RSVP lookup also no longer includes your internal admin notes in what the browser receives." },
+      { "type": "fix", "text": "Entering the wrong site password or an invalid invitation code now shows an error message instead of silently reloading the page." },
+      { "type": "fix", "text": "Households with no named guests can RSVP again — previously, with per-guest selection on, they could never submit an acceptance. If they're allowed plus-ones they enter names; otherwise they give a head count." },
+      { "type": "improvement", "text": "The \"Plus-one support\" toggle in Features now actually controls the plus-one rows on the RSVP form (it previously did nothing). It has been reset to ON for all installs to match how the form always behaved — turn it off in Features if you don't want plus-ones." },
+      { "type": "improvement", "text": "Guest photo uploads converted from HEIC are re-checked against the 10MB limit after conversion, and \"uploads\"/\"wall\" can no longer be claimed as custom-page URLs." }
+    ]
+  },
+  {
     "version": "2.12.0",
     "date": "2026-05-14",
     "changes": [
