@@ -172,8 +172,14 @@ export default function RsvpsPage() {
       setEditMessage(inv.response.message || '');
       setEditSongRequests(inv.response.songRequests || '');
       setEditDietaryNotes(inv.response.dietaryNotes || '');
-      setEditAttendingGuests(safeParse<string[]>(inv.response.attendingGuests, []));
-      setEditGuestMeals(safeParse<Record<string, string>>(inv.response.guestMeals, {}));
+      // Drop stale guest IDs (rows deleted since the RSVP was stored) when
+      // seeding the edit form — saving then persists a clean roster and a
+      // recomputed count instead of writing the stale IDs back.
+      const validIds = new Set(inv.guests.map((g) => g.id));
+      setEditAttendingGuests(safeParse<string[]>(inv.response.attendingGuests, []).filter((id) => validIds.has(id)));
+      setEditGuestMeals(Object.fromEntries(
+        Object.entries(safeParse<Record<string, string>>(inv.response.guestMeals, {})).filter(([id]) => validIds.has(id)),
+      ));
       const loadedPluses = safeParse<{ name: string; meal: string }[]>(inv.response.plusOnes, []);
       setEditPlusOnes(plusOneSlots.map((slot, i) => loadedPluses[i] ? { name: loadedPluses[i].name || '', meal: loadedPluses[i].meal || '' } : slot));
       setEditResponses(safeParse<Record<string, string>>(inv.response.responses, {}));
@@ -318,7 +324,7 @@ export default function RsvpsPage() {
 
       // Attending — one row per attending primary guest, then one per plus-one.
       for (const id of attendingIds) {
-        const name = guestsById.get(id) ?? id;
+        const name = guestsById.get(id) ?? 'Removed guest';
         rows.push([...baseCols, name, 'primary', guestMeals[id] || '', ...tailCols]);
       }
       for (const p of plusOnes) {
@@ -357,6 +363,22 @@ export default function RsvpsPage() {
     } catch {
       return [];
     }
+  };
+
+  // Stored guest IDs can outlive their Guest rows (pre-2.13 household edits
+  // recreated rows under new IDs, and old submissions kept the stale ones).
+  // Resolve what we can and summarize the rest instead of leaking raw UUIDs.
+  // Editing + saving the RSVP drops the stale entries for good.
+  const resolveAttendeeNames = (guests: Guest[], ids: string[]): string[] => {
+    const names: string[] = [];
+    let removed = 0;
+    for (const id of ids) {
+      const name = guests.find((g) => g.id === id)?.name;
+      if (name) names.push(name);
+      else removed++;
+    }
+    if (removed > 0) names.push(`${removed} removed guest${removed === 1 ? '' : 's'}`);
+    return names;
   };
 
   if (loading) return <div className="flex justify-center py-12"><p className="text-gray-500">Loading RSVPs...</p></div>;
@@ -655,9 +677,7 @@ export default function RsvpsPage() {
                   {selectedInvitation.response.attendingGuests && (
                     <div>
                       <p className="text-sm font-medium text-gray-500">Attending Guests</p>
-                      <p>{parseList(selectedInvitation.response.attendingGuests)
-                        .map((id) => selectedInvitation.guests.find((g) => g.id === id)?.name || id)
-                        .join(', ')}</p>
+                      <p>{resolveAttendeeNames(selectedInvitation.guests, parseList(selectedInvitation.response.attendingGuests)).join(', ')}</p>
                     </div>
                   )}
                   {(() => {
@@ -687,7 +707,7 @@ export default function RsvpsPage() {
                     <div>
                       <p className="text-sm font-medium text-gray-500 mb-1">Meal Choices</p>
                       {Object.entries(parseJson(selectedInvitation.response.guestMeals)).map(([guestId, meal]) => (
-                        <p key={guestId} className="text-sm"><span className="font-medium">{selectedInvitation.guests.find((g) => g.id === guestId)?.name || guestId}:</span> {meal}</p>
+                        <p key={guestId} className="text-sm"><span className="font-medium">{selectedInvitation.guests.find((g) => g.id === guestId)?.name || 'Removed guest'}:</span> {meal}</p>
                       ))}
                     </div>
                   )}
@@ -740,7 +760,7 @@ export default function RsvpsPage() {
                           const count = typeof d.guestCount === 'number' ? d.guestCount : 0;
                           // attendingGuests stores guest IDs — resolve to names against the current guest list.
                           const ids = Array.isArray(d.attendingGuests) ? (d.attendingGuests as string[]) : null;
-                          const names = ids ? ids.map((id) => selectedInvitation.guests.find((g) => g.id === id)?.name || id) : null;
+                          const names = ids ? resolveAttendeeNames(selectedInvitation.guests, ids) : null;
                           return (
                             <li key={log.id} className="space-y-0.5">
                               <p className="font-medium text-gray-700">

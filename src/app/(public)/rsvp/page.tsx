@@ -62,8 +62,18 @@ function RSVPForm() {
         const r = data.invitation.response;
         setAttending(r.attending); setGuestCount(r.guestCount); setMessage(r.message || ''); setSongRequests(r.songRequests || ''); setDietaryNotes(r.dietaryNotes || '');
         try { setResponses(JSON.parse(r.responses || '{}')); } catch { setResponses({}); }
-        try { setGuestMeals(JSON.parse(r.guestMeals || '{}')); } catch { setGuestMeals({}); }
-        try { setAttendingGuests(JSON.parse(r.attendingGuests || '[]')); } catch { setAttendingGuests([]); }
+        // Stored guest IDs can be stale (guest rows edited since the RSVP was
+        // saved) — drop them at seed time so the checkbox count and the
+        // confirmation modal reflect people who actually exist.
+        const validIds = new Set((data.invitation.guests || []).map((g: Guest) => g.id));
+        try {
+          const meals: Record<string, string> = JSON.parse(r.guestMeals || '{}');
+          setGuestMeals(Object.fromEntries(Object.entries(meals).filter(([id]) => validIds.has(id))));
+        } catch { setGuestMeals({}); }
+        try {
+          const ids: string[] = JSON.parse(r.attendingGuests || '[]');
+          setAttendingGuests(ids.filter((id) => validIds.has(id)));
+        } catch { setAttendingGuests([]); }
         try {
           const loaded: PlusOne[] = JSON.parse(r.plusOnes || '[]');
           setPlusOnes(emptySlots.map((slot, i) => loaded[i] ? { name: loaded[i].name || '', meal: loaded[i].meal || '' } : slot));

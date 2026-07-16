@@ -66,7 +66,12 @@ export default function AdminDashboard() {
       try {
         const meals = JSON.parse(inv.response.guestMeals);
         if (meals && typeof meals === 'object') {
-          for (const meal of Object.values(meals)) bump(meal);
+          // Only count meals keyed to guests that still exist — stale IDs
+          // from pre-2.13 household edits would inflate the caterer totals.
+          const validIds = new Set(inv.guests.map((g) => g.id));
+          for (const [guestId, meal] of Object.entries(meals)) {
+            if (validIds.has(guestId)) bump(meal);
+          }
         }
       } catch { /* skip invalid JSON */ }
     }
