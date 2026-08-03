@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.15.0",
+    "date": "2026-08-03",
+    "changes": [
+      { "type": "feature", "text": "Admin RSVPs list — sort by RSVP date (newest or oldest) or household name (A–Z / Z–A). Date sorts use the latest submit or update, so a household that changes its response moves to the top when sorting by newest." },
+      { "type": "feature", "text": "Search box on the admin RSVPs page — filter by household name, guest name, email, or invitation code while keeping the attending / declined / pending filters." },
+      { "type": "feature", "text": "Notification bell in the admin sidebar finally opens a real panel. See RSVPs, guest-book entries, and honeymoon pledges; mark all read, dismiss individual items, or click through to the relevant admin page. The badge count was always tracking unread events — there just wasn't a UI for them before." }
+    ]
+  },
+  {
     "version": "2.14.1",
     "date": "2026-07-16",
     "changes": [
