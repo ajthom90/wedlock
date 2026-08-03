@@ -64,6 +64,11 @@ export default function RsvpsPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'attending' | 'declined' | 'pending'>('all');
+  // `submittedAt` is refreshed on every guest and admin save, so date sorts
+  // always use the latest RSVP activity. Pending rows (no date) fall after
+  // responded households when sorting by date.
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name-asc' | 'name-desc'>('newest');
+  const [search, setSearch] = useState('');
   const [selectedInvitation, setSelectedInvitation] = useState<Invitation | null>(null);
   const [editingResponse, setEditingResponse] = useState(false);
   const [editAttending, setEditAttending] = useState('');
@@ -123,13 +128,44 @@ export default function RsvpsPage() {
     })();
   }, []);
 
-  const filtered = invitations.filter((inv) => {
-    if (filter === 'all') return true;
-    if (filter === 'attending') return inv.response?.attending === 'yes';
-    if (filter === 'declined') return inv.response?.attending === 'no';
-    if (filter === 'pending') return !inv.response;
-    return true;
-  });
+  const searchQuery = search.trim().toLowerCase();
+
+  const filtered = invitations
+    .filter((inv) => {
+      if (filter === 'attending' && inv.response?.attending !== 'yes') return false;
+      if (filter === 'declined' && inv.response?.attending !== 'no') return false;
+      if (filter === 'pending' && inv.response) return false;
+      if (!searchQuery) return true;
+      // Match household, guest names, emails, and invitation code so finding a
+      // specific person is one search box away from any filter tab.
+      const haystack = [
+        inv.householdName,
+        inv.code,
+        inv.email,
+        inv.contactEmail,
+        ...inv.guests.map((g) => g.name),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(searchQuery);
+    })
+    .sort((a, b) => {
+      if (sortBy === 'name-asc' || sortBy === 'name-desc') {
+        const cmp = a.householdName.localeCompare(b.householdName, undefined, { sensitivity: 'base' });
+        return sortBy === 'name-asc' ? cmp : -cmp;
+      }
+      const aAt = a.response?.submittedAt ? new Date(a.response.submittedAt).getTime() : null;
+      const bAt = b.response?.submittedAt ? new Date(b.response.submittedAt).getTime() : null;
+      // Pending (no RSVP date) always after responded households when sorting by date.
+      if (aAt === null && bAt === null) {
+        return a.householdName.localeCompare(b.householdName, undefined, { sensitivity: 'base' });
+      }
+      if (aAt === null) return 1;
+      if (bAt === null) return -1;
+      const diff = aAt - bAt;
+      return sortBy === 'newest' ? -diff : diff;
+    });
 
   const stats = {
     total: invitations.length,
@@ -425,14 +461,45 @@ export default function RsvpsPage() {
         </Card>
       </div>
 
-      {filter !== 'all' && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">
-            Filtering: <span className="font-medium capitalize">{filter}</span>
-          </span>
-          <Button size="sm" variant="ghost" onClick={() => setFilter('all')}>Clear</Button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex-1 min-w-[200px] max-w-md">
+          <Input
+            type="search"
+            placeholder="Search household, guest, email, or code…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search RSVPs"
+          />
         </div>
-      )}
+        {filter !== 'all' && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">
+              Filtering: <span className="font-medium capitalize">{filter}</span>
+            </span>
+            <Button size="sm" variant="ghost" onClick={() => setFilter('all')}>Clear</Button>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          <span className="text-sm text-gray-500">Sort:</span>
+          {(
+            [
+              ['newest', 'Newest'],
+              ['oldest', 'Oldest'],
+              ['name-asc', 'Name A–Z'],
+              ['name-desc', 'Name Z–A'],
+            ] as const
+          ).map(([value, label]) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={sortBy === value ? 'primary' : 'outline'}
+              onClick={() => setSortBy(value)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+      </div>
 
       {stats.pending > 0 && (
         <Card>
@@ -464,7 +531,9 @@ export default function RsvpsPage() {
       <div className="space-y-3">
         {filtered.length === 0 ? (
           <Card>
-            <CardContent className="py-8 text-center text-gray-500">No RSVPs found</CardContent>
+            <CardContent className="py-8 text-center text-gray-500">
+              {searchQuery ? `No RSVPs match “${search.trim()}”` : 'No RSVPs found'}
+            </CardContent>
           </Card>
         ) : (
           filtered.map((inv) => (
@@ -487,7 +556,8 @@ export default function RsvpsPage() {
                     )}
                     {inv.response?.submittedAt && (
                       <p className="text-xs text-gray-400 mt-1">
-                        {new Date(inv.response.submittedAt).toLocaleDateString()}
+                        RSVP'd {new Date(inv.response.submittedAt).toLocaleDateString()}
+                        {(inv.changeLogs?.length ?? 0) > 1 ? ' (updated)' : ''}
                       </p>
                     )}
                   </div>
@@ -747,7 +817,9 @@ export default function RsvpsPage() {
                     </div>
                   )}
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Submitted</p>
+                    <p className="text-sm font-medium text-gray-500">
+                      {(selectedInvitation.changeLogs?.length ?? 0) > 1 ? 'Last updated' : 'Submitted'}
+                    </p>
                     <p className="text-sm">{new Date(selectedInvitation.response.submittedAt).toLocaleString()}</p>
                   </div>
                   {selectedInvitation.changeLogs && selectedInvitation.changeLogs.length > 0 && (
