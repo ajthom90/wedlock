@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { NewFeaturesBanner } from '@/components/admin/NewFeaturesBanner';
+import { countRsvpPeople } from '@/lib/rsvpCounts';
 
 interface Guest {
   id: string;
@@ -13,7 +14,9 @@ interface RsvpResponse {
   attending: string;
   guestCount: number;
   guestMeals?: string | null;
-  plusOnes?: string | null;  // JSON: [{ name, meal }]
+  attendingGuests: string | null;
+  plusOnes: string | null; // JSON: [{ name, meal }]
+  plusOneName?: string | null; // legacy single plus-one column
 }
 
 interface Invitation {
@@ -21,7 +24,7 @@ interface Invitation {
   householdName: string;
   guests: Guest[];
   plusOnesAllowed: number;
-  response?: RsvpResponse | null;
+  response: RsvpResponse | null | undefined;
 }
 
 export default function AdminDashboard() {
@@ -48,10 +51,20 @@ export default function AdminDashboard() {
   const attending = responded.filter((inv) => inv.response?.attending === 'yes');
   const declining = responded.filter((inv) => inv.response?.attending === 'no');
   const pending = invitations.filter((inv) => !inv.response);
-  const totalAttendingGuests = attending.reduce(
-    (sum, inv) => sum + (inv.response?.guestCount || 0),
-    0
+  // Same people-count logic as the RSVPs page (roster / numeric / legacy plus-ones).
+  const peopleCounts = invitations.map((inv) => countRsvpPeople(inv));
+  const totalAttendingGuests = peopleCounts.reduce((sum, c) => sum + c.attending, 0);
+  const totalDeclinedGuests = peopleCounts.reduce((sum, c) => sum + c.declined, 0);
+  // Pending households contribute 0/0 from countRsvpPeople; their people are
+  // the invitation's potential capacity (named guests + plus-one slots).
+  const pendingGuests = pending.reduce(
+    (sum, inv) => sum + inv.guests.length + (inv.plusOnesAllowed || 0),
+    0,
   );
+  // Segment sum for the Guest Status bars — not totalGuests capacity, since
+  // stale attending IDs and numeric-mode edge cases can make the three people
+  // segments not equal capacity.
+  const guestStatusTotal = totalAttendingGuests + totalDeclinedGuests + pendingGuests;
 
   // Meal totals span both named guests (guestMeals, a {guestId: meal} map) and
   // plus-ones (plusOnes, an array of {name, meal} entries) — either may be null.
@@ -133,6 +146,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-red-600">{declining.length}</p>
+            <p className="text-sm text-gray-500">{totalDeclinedGuests} guests</p>
           </CardContent>
         </Card>
       </div>
@@ -182,6 +196,61 @@ export default function AdminDashboard() {
                   style={{
                     width: totalInvitations
                       ? `${(pending.length / totalInvitations) * 100}%`
+                      : '0%',
+                  }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Guest Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Bar denominator is the segment sum (not totalGuests capacity) so
+                bars always total 100% even when stale IDs / numeric edge cases
+                make people segments disagree with invitation capacity. */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Attending</span>
+                <span className="font-semibold text-green-600">{totalAttendingGuests}</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-green-600 h-2 rounded-full"
+                  style={{
+                    width: guestStatusTotal
+                      ? `${(totalAttendingGuests / guestStatusTotal) * 100}%`
+                      : '0%',
+                  }}
+                />
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Declined</span>
+                <span className="font-semibold text-red-600">{totalDeclinedGuests}</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-red-600 h-2 rounded-full"
+                  style={{
+                    width: guestStatusTotal
+                      ? `${(totalDeclinedGuests / guestStatusTotal) * 100}%`
+                      : '0%',
+                  }}
+                />
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Pending</span>
+                <span className="font-semibold text-yellow-600">{pendingGuests}</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-yellow-600 h-2 rounded-full"
+                  style={{
+                    width: guestStatusTotal
+                      ? `${(pendingGuests / guestStatusTotal) * 100}%`
                       : '0%',
                   }}
                 />
