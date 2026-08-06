@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { countRsvpPeople } from '@/lib/rsvpCounts';
 
 interface Guest {
   id: string;
@@ -20,6 +21,7 @@ interface RsvpResponse {
   guestMeals: string | null;
   attendingGuests: string | null;
   plusOnes: string | null;
+  plusOneName: string | null;
   songRequests: string | null;
   dietaryNotes: string | null;
   message: string | null;
@@ -167,14 +169,16 @@ export default function RsvpsPage() {
       return sortBy === 'newest' ? -diff : diff;
     });
 
+  // People counts derived once per invitation so the attending/declined
+  // guest totals and per-row badges stay in sync.
+  const peopleByInvitation = invitations.map((inv) => countRsvpPeople(inv));
   const stats = {
     total: invitations.length,
     attending: invitations.filter((inv) => inv.response?.attending === 'yes').length,
     declined: invitations.filter((inv) => inv.response?.attending === 'no').length,
     pending: invitations.filter((inv) => !inv.response).length,
-    totalGuests: invitations
-      .filter((inv) => inv.response?.attending === 'yes')
-      .reduce((sum, inv) => sum + (inv.response?.guestCount || 0), 0),
+    totalGuests: peopleByInvitation.reduce((sum, c) => sum + c.attending, 0),
+    declinedGuests: peopleByInvitation.reduce((sum, c) => sum + c.declined, 0),
   };
 
   const openDetail = (inv: Invitation) => {
@@ -450,7 +454,7 @@ export default function RsvpsPage() {
         <Card className="cursor-pointer" onClick={() => setFilter('declined')}>
           <CardContent className="py-4 text-center">
             <p className="text-2xl font-bold text-red-600">{stats.declined}</p>
-            <p className="text-sm text-gray-500">Declined</p>
+            <p className="text-sm text-gray-500">Declined ({stats.declinedGuests} guests)</p>
           </CardContent>
         </Card>
         <Card className="cursor-pointer" onClick={() => setFilter('pending')}>
@@ -536,7 +540,9 @@ export default function RsvpsPage() {
             </CardContent>
           </Card>
         ) : (
-          filtered.map((inv) => (
+          filtered.map((inv) => {
+            const counts = countRsvpPeople(inv);
+            return (
             <Card key={inv.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => openDetail(inv)}>
               <CardContent className="py-4">
                 <div className="flex justify-between items-center">
@@ -547,9 +553,14 @@ export default function RsvpsPage() {
                   <div className="text-right">
                     {!inv.response && <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Pending</span>}
                     {inv.response?.attending === 'yes' && (
-                      <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                        Attending ({inv.response.guestCount})
-                      </span>
+                      <>
+                        <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                          Attending ({counts.attending})
+                        </span>
+                        {counts.declined > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">{counts.declined} not attending</p>
+                        )}
+                      </>
                     )}
                     {inv.response?.attending === 'no' && (
                       <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Declined</span>
@@ -564,7 +575,8 @@ export default function RsvpsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))
+            );
+          })
         )}
       </div>
 
