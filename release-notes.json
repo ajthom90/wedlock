@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.16.0",
+    "date": "2026-08-06",
+    "changes": [
+      { "type": "feature", "text": "Declined counts now count people, not just households. The Declined card on the admin RSVPs page shows how many individual guests aren't coming — including guests unchecked on a partially-attending RSVP and unused plus-one allowances — and attending rows show a \"N not attending\" hint when part of a household declined." },
+      { "type": "feature", "text": "Guest Status chart on the admin dashboard — the same attending / declined / pending breakdown as Response Status, but counted by guest instead of by invitation. The Declined stat card also gained a guest count to match the Attending card." },
+      { "type": "improvement", "text": "Attending guest totals on the RSVPs page and dashboard are now derived from the actual attendee roster instead of the stored head count, so plus-ones are always included — even on RSVPs submitted before plus-one support was reworked." }
+    ]
+  },
+  {
     "version": "2.15.0",
     "date": "2026-08-03",
     "changes": [
