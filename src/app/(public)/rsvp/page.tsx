@@ -2,6 +2,7 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, Button, Input, Textarea } from '@/components/ui';
+import { pruneGuestMeals } from '@/lib/rsvpMeals';
 
 type Guest = { id: string; name: string; isPrimary: boolean };
 type PlusOne = { name: string; meal: string };
@@ -158,7 +159,7 @@ function RSVPForm() {
         : plusOnesOnlyMode
           ? namedPlusOnes.length
           : guestCount;
-      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && perGuestMode ? guestMeals : undefined, attendingGuests: attending === 'yes' && perGuestMode ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, contactEmail, correction: features.rsvpCorrections ? correction : undefined }) });
+      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && perGuestMode ? pruneGuestMeals(guestMeals, attendingGuests) : undefined, attendingGuests: attending === 'yes' && perGuestMode ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, contactEmail, correction: features.rsvpCorrections ? correction : undefined }) });
       const data = await res.json();
       if (res.ok) { setShowConfirm(false); setSubmitted(true); setCorrection(''); }
       else setSubmitError(data.error || 'Failed to submit RSVP');

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isAuthenticated } from '@/lib/auth';
 import { parseRsvpChoices } from '@/lib/rsvpChoices';
+import { validateRsvpSubmission } from '@/lib/rsvpValidation';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ invitationId: string }> }) {
   try {
@@ -22,10 +23,24 @@ export async function PUT(request: Request, { params }: { params: Promise<{ invi
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { invitationId } = await params;
     const { attending, guestCount, responses, guestMeals, attendingGuests, plusOnes, songRequests, dietaryNotes, message, contactEmail, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode } = await request.json();
-    if (!(await prisma.invitation.findUnique({ where: { id: invitationId } }))) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
-    const cleanPlusOnes = Array.isArray(plusOnes)
-      ? plusOnes.filter((p: any) => p && typeof p.name === 'string' && p.name.trim()).map((p: any) => ({ name: p.name.trim(), meal: p.meal || '' }))
-      : [];
+    const invitation = await prisma.invitation.findUnique({
+      where: { id: invitationId },
+      include: { guests: { select: { id: true } } },
+    });
+    if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
+    // plusOnesEnabled is always true on the admin path so the couple can record
+    // a plus-one even when the public RSVP plus-ones toggle is off.
+    const validation = validateRsvpSubmission(
+      { attending, guestCount, attendingGuests, guestMeals, plusOnes },
+      {
+        maxGuests: invitation.maxGuests,
+        plusOnesAllowed: invitation.plusOnesAllowed,
+        guestIds: invitation.guests.map((g) => g.id),
+        plusOnesEnabled: true,
+      },
+    );
+    if (!validation.ok) return NextResponse.json({ error: validation.error }, { status: 400 });
+    const submission = validation.data;
     // address and contactEmail + structured mailing address live on Invitation,
     // not RsvpResponse; apply them here so admin edits stay in one round-trip.
     const invitationPatch: {
@@ -46,16 +61,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ invi
       await prisma.invitation.update({ where: { id: invitationId }, data: invitationPatch });
     }
     const data = {
-      attending, guestCount: guestCount || 0, responses: JSON.stringify(responses || {}),
-      guestMeals: guestMeals ? JSON.stringify(guestMeals) : null,
-      attendingGuests: attendingGuests ? JSON.stringify(attendingGuests) : null,
-      plusOnes: cleanPlusOnes.length ? JSON.stringify(cleanPlusOnes) : null,
+      attending: submission.attending, guestCount: submission.guestCount, responses: JSON.stringify(responses || {}),
+      guestMeals: Object.keys(submission.guestMeals).length ? JSON.stringify(submission.guestMeals) : null,
+      attendingGuests: submission.attendingGuests.length ? JSON.stringify(submission.attendingGuests) : null,
+      plusOnes: submission.plusOnes.length ? JSON.stringify(submission.plusOnes) : null,
       songRequests: songRequests || null, dietaryNotes: dietaryNotes || null, message: message || null,
     };
     const logDetails = JSON.stringify({
-      attending, guestCount: guestCount || 0,
-      attendingGuests: attendingGuests || null, guestMeals: guestMeals || null,
-      plusOnes: cleanPlusOnes.length ? cleanPlusOnes : null,
+      attending: submission.attending, guestCount: submission.guestCount,
+      attendingGuests: submission.attendingGuests.length ? submission.attendingGuests : null,
+      guestMeals: Object.keys(submission.guestMeals).length ? submission.guestMeals : null,
+      plusOnes: submission.plusOnes.length ? submission.plusOnes : null,
       songRequests: songRequests || null, dietaryNotes: dietaryNotes || null,
       message: message || null,
     });

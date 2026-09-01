@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { countRsvpPeople } from '@/lib/rsvpCounts';
+import { pruneGuestMeals } from '@/lib/rsvpMeals';
 
 interface Guest {
   id: string;
@@ -93,6 +94,7 @@ export default function RsvpsPage() {
   const [dietaryCopied, setDietaryCopied] = useState(false);
   const [emailsCopied, setEmailsCopied] = useState(false);
   const [showPending, setShowPending] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const fetchInvitations = useCallback(async () => {
     try {
@@ -184,6 +186,7 @@ export default function RsvpsPage() {
   const openDetail = (inv: Invitation) => {
     setSelectedInvitation(inv);
     setEditingResponse(false);
+    setSaveError('');
 
     // Mailing address and contactEmail live on the invitation and persist across
     // RSVP changes, so seed them whether or not a response exists yet.
@@ -247,6 +250,7 @@ export default function RsvpsPage() {
   const handleSaveResponse = async () => {
     if (!selectedInvitation) return;
     setSaving(true);
+    setSaveError('');
     try {
       // Derive guestCount from the per-guest selections when accepting, so
       // the stored count always matches the actual attendee roster. When
@@ -255,6 +259,7 @@ export default function RsvpsPage() {
       const computedGuestCount = editAttending === 'yes'
         ? editAttendingGuests.length + namedPlusOnes.length
         : 0;
+      const prunedMeals = pruneGuestMeals(editGuestMeals, editAttendingGuests);
 
       const body = {
         attending: editAttending,
@@ -263,7 +268,7 @@ export default function RsvpsPage() {
         songRequests: editSongRequests.trim() || null,
         dietaryNotes: editDietaryNotes.trim() || null,
         responses: editResponses,
-        guestMeals: Object.keys(editGuestMeals).length > 0 ? editGuestMeals : null,
+        guestMeals: Object.keys(prunedMeals).length > 0 ? prunedMeals : null,
         attendingGuests: editAttendingGuests.length > 0 ? editAttendingGuests : null,
         plusOnes: namedPlusOnes.map((p) => ({ name: p.name.trim(), meal: p.meal || '' })),
         // Invitation-level fields (persisted by the PUT route to the Invitation, not RsvpResponse).
@@ -283,9 +288,17 @@ export default function RsvpsPage() {
         setEditingResponse(false);
         setSelectedInvitation(null);
         await fetchInvitations();
+      } else {
+        let message = 'Failed to save response';
+        try {
+          const data = await res.json();
+          if (typeof data?.error === 'string' && data.error) message = data.error;
+        } catch { /* keep fallback */ }
+        setSaveError(message);
       }
     } catch (error) {
       console.error('Failed to save response:', error);
+      setSaveError('Failed to save response');
     } finally {
       setSaving(false);
     }
@@ -785,14 +798,30 @@ export default function RsvpsPage() {
                       })}
                     </div>
                   )}
-                  {Object.keys(parseJson(selectedInvitation.response.guestMeals)).length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium text-gray-500 mb-1">Meal Choices</p>
-                      {Object.entries(parseJson(selectedInvitation.response.guestMeals)).map(([guestId, meal]) => (
-                        <p key={guestId} className="text-sm"><span className="font-medium">{selectedInvitation.guests.find((g) => g.id === guestId)?.name || 'Removed guest'}:</span> {meal}</p>
-                      ))}
-                    </div>
-                  )}
+                  {(() => {
+                    const meals = parseJson(selectedInvitation.response.guestMeals);
+                    let attendingIds: string[] | null = null;
+                    if (selectedInvitation.response.attendingGuests) {
+                      try {
+                        const parsed = JSON.parse(selectedInvitation.response.attendingGuests);
+                        if (Array.isArray(parsed)) {
+                          attendingIds = parsed.filter((id): id is string => typeof id === 'string');
+                        }
+                      } catch { /* numeric fallback: list stored meals as-is */ }
+                    }
+                    const entries = Object.entries(meals).filter(
+                      ([guestId]) => attendingIds === null || attendingIds.includes(guestId),
+                    );
+                    if (entries.length === 0) return null;
+                    return (
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 mb-1">Meal Choices</p>
+                        {entries.map(([guestId, meal]) => (
+                          <p key={guestId} className="text-sm"><span className="font-medium">{selectedInvitation.guests.find((g) => g.id === guestId)?.name || 'Removed guest'}:</span> {meal}</p>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   {selectedInvitation.response.songRequests && (
                     <div>
                       <p className="text-sm font-medium text-gray-500">Song Requests</p>
@@ -864,6 +893,9 @@ export default function RsvpsPage() {
                 </>
               )}
             </CardContent>
+            {saveError && (
+              <p className="text-sm text-red-600 px-6 pb-2">{saveError}</p>
+            )}
             <CardFooter className="gap-2 justify-end">
               {selectedInvitation.response && !editingResponse && (
                 <Button variant="outline" onClick={() => setEditingResponse(true)}>Edit</Button>
