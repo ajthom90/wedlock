@@ -229,7 +229,7 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
             <AdminNotificationBell />
             <button
               type="button"
-              className="md:hidden p-1 text-gray-300 hover:text-white"
+              className="md:hidden p-2 -mr-2 text-lg leading-none text-gray-300 hover:text-white"
               aria-label="Close menu"
               onClick={onClose}
             >

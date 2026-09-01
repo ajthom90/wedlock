@@ -47,7 +47,7 @@ export function pruneGuestMeals(guestMeals: unknown, attendingGuestIds: string[]
   const attending = new Set(attendingGuestIds);
   const kept: Record<string, string> = {};
   for (const [id, meal] of Object.entries(guestMeals)) {
-    if (attending.has(id) && typeof meal === 'string' && meal !== '') {
+    if (attending.has(id) && typeof meal === 'string' && meal.trim() !== '') {
       kept[id] = meal;
     }
   }

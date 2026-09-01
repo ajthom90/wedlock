@@ -201,6 +201,7 @@ export default function RsvpsPage() {
     declinedGuests: peopleByInvitation.reduce((sum, c) => sum + c.declined, 0),
   };
   const showMealCard = Object.keys(mealCounts).length > 0 || stats.totalGuests > 0;
+  const guestsLabel = (n: number) => `${n} ${n === 1 ? 'guest' : 'guests'}`;
 
   const openDetail = (inv: Invitation) => {
     setSelectedInvitation(inv);
@@ -275,8 +276,11 @@ export default function RsvpsPage() {
       // the stored count always matches the actual attendee roster. When
       // declining, force it to zero so stale counts don't linger in reports.
       const namedPlusOnes = editPlusOnes.filter((p) => p.name.trim());
+      // Guest-less households send the numeric Guest Count input; otherwise count from the roster + named plus-ones.
       const computedGuestCount = editAttending === 'yes'
-        ? editAttendingGuests.length + namedPlusOnes.length
+        ? (selectedInvitation.guests.length === 0
+            ? Math.max(0, Math.floor(editGuestCount) || 0)
+            : editAttendingGuests.length + namedPlusOnes.length)
         : 0;
       const prunedMeals = pruneGuestMeals(editGuestMeals, editAttendingGuests);
 
@@ -482,19 +486,19 @@ export default function RsvpsPage() {
         <Card className="cursor-pointer" onClick={() => setFilter('attending')}>
           <CardContent className="py-4 text-center">
             <p className="text-2xl font-bold text-green-600">{stats.attending}</p>
-            <p className="text-sm text-gray-500">Attending ({stats.totalGuests} guests)</p>
+            <p className="text-sm text-gray-500">Attending ({guestsLabel(stats.totalGuests)})</p>
           </CardContent>
         </Card>
         <Card className="cursor-pointer" onClick={() => setFilter('declined')}>
           <CardContent className="py-4 text-center">
             <p className="text-2xl font-bold text-red-600">{stats.declined}</p>
-            <p className="text-sm text-gray-500">Declined ({stats.declinedGuests} guests)</p>
+            <p className="text-sm text-gray-500">Declined ({guestsLabel(stats.declinedGuests)})</p>
           </CardContent>
         </Card>
         <Card className="cursor-pointer" onClick={() => setFilter('pending')}>
           <CardContent className="py-4 text-center">
             <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-            <p className="text-sm text-gray-500">Pending ({pendingGuests} guests)</p>
+            <p className="text-sm text-gray-500">Pending ({guestsLabel(pendingGuests)})</p>
           </CardContent>
         </Card>
       </div>

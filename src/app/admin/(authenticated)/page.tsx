@@ -69,6 +69,7 @@ export default function AdminDashboard() {
   const guestStatusTotal = totalAttendingGuests + totalDeclinedGuests + pendingGuests;
 
   const mealCounts = countMealChoices(invitations);
+  const guestsLabel = (n: number) => `${n} ${n === 1 ? 'guest' : 'guests'}`;
 
   if (loading) {
     return (
@@ -108,7 +109,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-green-600">{attending.length}</p>
-            <p className="text-sm text-gray-500">{totalAttendingGuests} guests</p>
+            <p className="text-sm text-gray-500">{guestsLabel(totalAttendingGuests)}</p>
           </CardContent>
         </Card>
 
@@ -118,7 +119,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-red-600">{declining.length}</p>
-            <p className="text-sm text-gray-500">{totalDeclinedGuests} guests</p>
+            <p className="text-sm text-gray-500">{guestsLabel(totalDeclinedGuests)}</p>
           </CardContent>
         </Card>
       </div>

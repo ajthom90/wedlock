@@ -46,11 +46,11 @@ function no(partial: {
 }
 
 describe('pruneGuestMeals', () => {
-  it('keeps attending IDs only; drops non-attending, unknown, non-string values, and empty strings', () => {
+  it('keeps attending IDs only; drops non-attending, unknown, non-string values, empty strings, and whitespace-only meals', () => {
     expect(
       pruneGuestMeals(
-        { g1: 'Beef', g2: 'Kids', unknown: 'Fish', g3: 12, g4: '', g5: null },
-        ['g1', 'g4', 'g5', 'g3'],
+        { g1: 'Beef', g2: 'Kids', unknown: 'Fish', g3: 12, g4: '', g5: null, g6: '   ' },
+        ['g1', 'g4', 'g5', 'g3', 'g6'],
       ),
     ).toEqual({ g1: 'Beef' });
   });
