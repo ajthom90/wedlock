@@ -4,6 +4,8 @@
 // open). Unknown guest IDs are filtered rather than rejected so an RSVP
 // survives the admin editing the household mid-flight; hard limits reject.
 
+import { pruneGuestMeals } from './rsvpMeals';
+
 export interface RsvpValidationContext {
   maxGuests: number;
   plusOnesAllowed: number;
@@ -42,13 +44,7 @@ export function validateRsvpSubmission(body: any, ctx: RsvpValidationContext): R
     ...new Set(rawAttending.filter((id): id is string => typeof id === 'string' && knownIds.has(id))),
   ];
 
-  const attendingSet = new Set(attendingGuests);
-  const guestMeals: Record<string, string> = {};
-  if (body?.guestMeals && typeof body.guestMeals === 'object' && !Array.isArray(body.guestMeals)) {
-    for (const [id, meal] of Object.entries(body.guestMeals)) {
-      if (attendingSet.has(id) && typeof meal === 'string') guestMeals[id] = meal;
-    }
-  }
+  const guestMeals = pruneGuestMeals(body?.guestMeals, attendingGuests);
 
   const rawPlusOnes = Array.isArray(body?.plusOnes) ? body.plusOnes : [];
   const plusOnes = rawPlusOnes
