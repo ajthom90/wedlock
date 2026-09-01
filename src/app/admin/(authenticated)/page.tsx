@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { NewFeaturesBanner } from '@/components/admin/NewFeaturesBanner';
 import { countRsvpPeople } from '@/lib/rsvpCounts';
+import { countMealChoices } from '@/lib/rsvpMeals';
 
 interface Guest {
   id: string;
@@ -13,10 +14,11 @@ interface Guest {
 interface RsvpResponse {
   attending: string;
   guestCount: number;
-  guestMeals?: string | null;
+  guestMeals: string | null;
   attendingGuests: string | null;
   plusOnes: string | null; // JSON: [{ name, meal }]
   plusOneName?: string | null; // legacy single plus-one column
+  plusOneMeal?: string | null;
 }
 
 interface Invitation {
@@ -66,37 +68,7 @@ export default function AdminDashboard() {
   // segments not equal capacity.
   const guestStatusTotal = totalAttendingGuests + totalDeclinedGuests + pendingGuests;
 
-  // Meal totals span both named guests (guestMeals, a {guestId: meal} map) and
-  // plus-ones (plusOnes, an array of {name, meal} entries) — either may be null.
-  const mealCounts: Record<string, number> = {};
-  const bump = (meal: unknown) => {
-    if (typeof meal === 'string' && meal) {
-      mealCounts[meal] = (mealCounts[meal] || 0) + 1;
-    }
-  };
-  for (const inv of attending) {
-    if (inv.response?.guestMeals) {
-      try {
-        const meals = JSON.parse(inv.response.guestMeals);
-        if (meals && typeof meals === 'object') {
-          // Only count meals keyed to guests that still exist — stale IDs
-          // from pre-2.13 household edits would inflate the caterer totals.
-          const validIds = new Set(inv.guests.map((g) => g.id));
-          for (const [guestId, meal] of Object.entries(meals)) {
-            if (validIds.has(guestId)) bump(meal);
-          }
-        }
-      } catch { /* skip invalid JSON */ }
-    }
-    if (inv.response?.plusOnes) {
-      try {
-        const pluses = JSON.parse(inv.response.plusOnes);
-        if (Array.isArray(pluses)) {
-          for (const p of pluses) bump(p?.meal);
-        }
-      } catch { /* skip invalid JSON */ }
-    }
-  }
+  const mealCounts = countMealChoices(invitations);
 
   if (loading) {
     return (
