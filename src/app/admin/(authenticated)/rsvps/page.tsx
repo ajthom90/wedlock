@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { countRsvpPeople } from '@/lib/rsvpCounts';
-import { pruneGuestMeals } from '@/lib/rsvpMeals';
+import { countMealChoices, pruneGuestMeals } from '@/lib/rsvpMeals';
 
 interface Guest {
   id: string;
@@ -23,6 +23,7 @@ interface RsvpResponse {
   attendingGuests: string | null;
   plusOnes: string | null;
   plusOneName: string | null;
+  plusOneMeal?: string | null;
   songRequests: string | null;
   dietaryNotes: string | null;
   message: string | null;
@@ -49,6 +50,7 @@ interface Invitation {
   contactEmail: string | null;
   maxGuests: number;
   plusOnesAllowed: number;
+  isWeddingParty: boolean;
   guests: Guest[];
   response: RsvpResponse | null;
   changeLogs?: ChangeLog[];
@@ -67,6 +69,7 @@ export default function RsvpsPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'attending' | 'declined' | 'pending'>('all');
+  const [partyScope, setPartyScope] = useState<'all' | 'wedding-party'>('all');
   // `submittedAt` is refreshed on every guest and admin save, so date sorts
   // always use the latest RSVP activity. Pending rows (no date) fall after
   // responded households when sorting by date.
@@ -94,6 +97,7 @@ export default function RsvpsPage() {
   const [dietaryCopied, setDietaryCopied] = useState(false);
   const [emailsCopied, setEmailsCopied] = useState(false);
   const [showPending, setShowPending] = useState(false);
+  const [showMeals, setShowMeals] = useState(true);
   const [saveError, setSaveError] = useState('');
 
   const fetchInvitations = useCallback(async () => {
@@ -114,6 +118,12 @@ export default function RsvpsPage() {
     fetchInvitations();
   }, [fetchInvitations]);
 
+  useEffect(() => {
+    if (partyScope === 'wedding-party' && !invitations.some((i) => i.isWeddingParty)) {
+      setPartyScope('all');
+    }
+  }, [invitations, partyScope]);
+
   // Fetch RSVP options once so the edit modal can render the same fields
   // the public form does (per-guest meal selects, custom household-level
   // questions). `choices` comes back as a JSON string — parse it here.
@@ -133,8 +143,10 @@ export default function RsvpsPage() {
   }, []);
 
   const searchQuery = search.trim().toLowerCase();
+  const hasWeddingParty = invitations.some((i) => i.isWeddingParty);
+  const scoped = partyScope === 'wedding-party' ? invitations.filter((inv) => inv.isWeddingParty) : invitations;
 
-  const filtered = invitations
+  const filtered = scoped
     .filter((inv) => {
       if (filter === 'attending' && inv.response?.attending !== 'yes') return false;
       if (filter === 'declined' && inv.response?.attending !== 'no') return false;
@@ -172,16 +184,23 @@ export default function RsvpsPage() {
     });
 
   // People counts derived once per invitation so the attending/declined
-  // guest totals and per-row badges stay in sync.
-  const peopleByInvitation = invitations.map((inv) => countRsvpPeople(inv));
+  // guest totals and per-row badges stay in sync. All four stat cards, the
+  // pending accordion, meal card, and exports respect `scoped`.
+  const peopleByInvitation = scoped.map((inv) => countRsvpPeople(inv));
+  const mealCounts = countMealChoices(scoped);
+  const mealTotal = Object.values(mealCounts).reduce((sum, n) => sum + n, 0);
+  const pendingGuests = scoped
+    .filter((inv) => !inv.response)
+    .reduce((sum, inv) => sum + inv.guests.length + (inv.plusOnesAllowed || 0), 0);
   const stats = {
-    total: invitations.length,
-    attending: invitations.filter((inv) => inv.response?.attending === 'yes').length,
-    declined: invitations.filter((inv) => inv.response?.attending === 'no').length,
-    pending: invitations.filter((inv) => !inv.response).length,
+    total: scoped.length,
+    attending: scoped.filter((inv) => inv.response?.attending === 'yes').length,
+    declined: scoped.filter((inv) => inv.response?.attending === 'no').length,
+    pending: scoped.filter((inv) => !inv.response).length,
     totalGuests: peopleByInvitation.reduce((sum, c) => sum + c.attending, 0),
     declinedGuests: peopleByInvitation.reduce((sum, c) => sum + c.declined, 0),
   };
+  const showMealCard = Object.keys(mealCounts).length > 0 || stats.totalGuests > 0;
 
   const openDetail = (inv: Invitation) => {
     setSelectedInvitation(inv);
@@ -307,7 +326,7 @@ export default function RsvpsPage() {
   const copyDietarySummary = async () => {
     // One-line-per-guest rollup of every dietary restriction captured in the
     // RSVP flow. Formatted for the caterer.
-    const lines = invitations
+    const lines = scoped
       .filter((inv) => inv.response?.dietaryNotes?.trim())
       .map((inv) => `${inv.householdName}: ${inv.response!.dietaryNotes!.trim()}`);
     if (lines.length === 0) {
@@ -320,7 +339,7 @@ export default function RsvpsPage() {
   };
 
   const copyPendingEmails = async () => {
-    const emails = invitations
+    const emails = scoped
       .filter((inv) => !inv.response && inv.email)
       .map((inv) => inv.email as string);
     if (emails.length === 0) {
@@ -339,7 +358,7 @@ export default function RsvpsPage() {
     // still get a single row to make pending/declined visible.
     const headers = ['Household', 'Code', 'Email', 'Status', 'Guest Count', 'Attendee', 'Attendee Type', 'Meal', 'Message', 'Song Requests', 'Dietary Notes', 'Submitted At'];
     const rows: string[][] = [];
-    for (const inv of invitations) {
+    for (const inv of scoped) {
       const baseCols = [
         inv.householdName,
         inv.code,
@@ -395,7 +414,7 @@ export default function RsvpsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'rsvp-responses.csv';
+    a.download = partyScope === 'wedding-party' ? 'rsvp-responses-wedding-party.csv' : 'rsvp-responses.csv';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -447,7 +466,9 @@ export default function RsvpsPage() {
           <Button variant="outline" onClick={copyPendingEmails}>
             {emailsCopied ? 'Copied ✓' : 'Copy pending emails'}
           </Button>
-          <Button variant="outline" onClick={exportCsv}>Export CSV</Button>
+          <Button variant="outline" onClick={exportCsv}>
+            Export CSV{partyScope === 'wedding-party' ? ' (wedding party)' : ''}
+          </Button>
         </div>
       </div>
 
@@ -473,7 +494,7 @@ export default function RsvpsPage() {
         <Card className="cursor-pointer" onClick={() => setFilter('pending')}>
           <CardContent className="py-4 text-center">
             <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-            <p className="text-sm text-gray-500">Pending</p>
+            <p className="text-sm text-gray-500">Pending ({pendingGuests} guests)</p>
           </CardContent>
         </Card>
       </div>
@@ -495,6 +516,24 @@ export default function RsvpsPage() {
             </span>
             <Button size="sm" variant="ghost" onClick={() => setFilter('all')}>Clear</Button>
           </div>
+        )}
+        {partyScope === 'wedding-party' && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">
+              Filtering: <span className="font-medium">Wedding party</span>
+            </span>
+            <Button size="sm" variant="ghost" onClick={() => setPartyScope('all')}>Clear</Button>
+          </div>
+        )}
+        {hasWeddingParty && (
+          <Button
+            size="sm"
+            variant={partyScope === 'wedding-party' ? 'primary' : 'outline'}
+            aria-pressed={partyScope === 'wedding-party'}
+            onClick={() => setPartyScope((s) => (s === 'wedding-party' ? 'all' : 'wedding-party'))}
+          >
+            Wedding party
+          </Button>
         )}
         <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
           <span className="text-sm text-gray-500">Sort:</span>
@@ -531,7 +570,7 @@ export default function RsvpsPage() {
           {showPending && (
             <CardContent>
               <ul className="text-sm space-y-1">
-                {invitations
+                {scoped
                   .filter((inv) => !inv.response)
                   .map((inv) => (
                     <li key={inv.id} className="flex justify-between gap-4">
@@ -540,6 +579,41 @@ export default function RsvpsPage() {
                     </li>
                   ))}
               </ul>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {showMealCard && (
+        <Card>
+          <CardHeader className="cursor-pointer" onClick={() => setShowMeals((s) => !s)}>
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-base">Meal choices</CardTitle>
+              <span className="text-sm text-gray-500">{showMeals ? '▲ Hide' : '▼ Show'}</span>
+            </div>
+          </CardHeader>
+          {showMeals && (
+            <CardContent>
+              {Object.keys(mealCounts).length > 0 ? (
+                <div className="space-y-2">
+                  {Object.entries(mealCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([meal, count]) => (
+                      <div key={meal} className="flex justify-between items-center">
+                        <span className="text-sm capitalize">{meal}</span>
+                        <span className="font-semibold">{count}</span>
+                      </div>
+                    ))}
+                  {mealTotal < stats.totalGuests && (
+                    <div className="flex justify-between items-center text-gray-500">
+                      <span className="text-sm">No meal selected</span>
+                      <span className="font-semibold">{stats.totalGuests - mealTotal}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No meal selections yet</p>
+              )}
             </CardContent>
           )}
         </Card>
@@ -560,7 +634,12 @@ export default function RsvpsPage() {
               <CardContent className="py-4">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="font-semibold">{inv.householdName}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold">{inv.householdName}</p>
+                      {inv.isWeddingParty && (
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Wedding Party</span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500">{inv.guests.map((g) => g.name).join(', ')}</p>
                   </div>
                   <div className="text-right">
