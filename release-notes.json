@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.17.2",
+    "date": "2026-10-17",
+    "changes": [
+      { "type": "fix", "text": "Guests uploading to the photo wall can now pick an existing photo from their phone's photo library. Previously the upload button went straight to the camera with no way to choose a saved photo." }
+    ]
+  },
+  {
     "version": "2.17.1",
     "date": "2026-10-17",
     "changes": [
