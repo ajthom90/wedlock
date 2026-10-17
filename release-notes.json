@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.17.1",
+    "date": "2026-10-17",
+    "changes": [
+      { "type": "fix", "text": "The \"Allow guests to upload photos\" checkbox on the admin Photo Wall page now actually saves. Previously the change was silently dropped and the box reverted to unchecked on reload." },
+      { "type": "fix", "text": "The photo wall QR code now links to your site's public address instead of the server's internal IP. It uses PUBLIC_SITE_URL when set, otherwise the domain passed through by your reverse proxy." }
+    ]
+  },
+  {
     "version": "2.17.0",
     "date": "2026-09-01",
     "changes": [
