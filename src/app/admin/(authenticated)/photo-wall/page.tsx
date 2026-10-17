@@ -25,7 +25,7 @@ export default function PhotoWallPage() {
       const [qrRes, photosRes, featRes] = await Promise.all([
         fetch('/api/photos/wall/qr'),
         fetch('/api/photos'),
-        fetch('/api/settings'),
+        fetch('/api/features'),
       ]);
       if (qrRes.ok) setQr(await qrRes.json());
       if (photosRes.ok) {
@@ -38,8 +38,8 @@ export default function PhotoWallPage() {
         );
       }
       if (featRes.ok) {
-        const data = await featRes.json();
-        setGuestUploadEnabled(!!data.features?.guestPhotoUpload);
+        const features = await featRes.json();
+        setGuestUploadEnabled(!!features.guestPhotoUpload);
       }
     } finally {
       setLoading(false);
@@ -51,12 +51,15 @@ export default function PhotoWallPage() {
   const toggleGuestUpload = async () => {
     setToggling(true);
     try {
-      await fetch('/api/settings', {
+      const res = await fetch('/api/features', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ features: { guestPhotoUpload: !guestUploadEnabled } }),
+        body: JSON.stringify({ guestPhotoUpload: !guestUploadEnabled }),
       });
-      setGuestUploadEnabled(!guestUploadEnabled);
+      if (res.ok) {
+        const features = await res.json();
+        setGuestUploadEnabled(!!features.guestPhotoUpload);
+      }
     } finally {
       setToggling(false);
     }
