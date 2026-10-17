@@ -74,12 +74,11 @@ export function WallUploadForm() {
         <input
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={(e) => setFile(e.target.files?.[0] || null)}
           className="block w-full text-sm"
           required
         />
-        <p className="text-xs text-foreground/60 mt-1">Your phone camera works great.</p>
+        <p className="text-xs text-foreground/60 mt-1">Take a new photo or pick one from your library.</p>
       </div>
       <div>
         <label className="block text-sm font-medium mb-1">Caption (optional)</label>
