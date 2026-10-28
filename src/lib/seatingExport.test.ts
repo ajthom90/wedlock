@@ -20,9 +20,9 @@ const lees: SeatingExportInvitation = {
 };
 
 describe('compareTableNames', () => {
-  it('puts the head table first, then numbers naturally', () => {
-    const names = ['Table 10', 'Table 2', 'Head Table', 'Table 1'];
-    expect([...names].sort(compareTableNames)).toEqual(['Head Table', 'Table 1', 'Table 2', 'Table 10']);
+  it('sorts alphabetically so numbered prefixes set the order', () => {
+    const names = ['34. Kim Mo\'s HS Friends', '01. Kim & Joe\'s Table', '10. Cousins', '00. Head Table'];
+    expect([...names].sort(compareTableNames)).toEqual(['00. Head Table', '01. Kim & Joe\'s Table', '10. Cousins', '34. Kim Mo\'s HS Friends']);
   });
 });
 
@@ -30,15 +30,15 @@ describe('buildSeatingExportRows', () => {
   it('orders by table and resolves meals for guests and plus-ones', () => {
     const rows = buildSeatingExportRows(
       [
-        { name: 'Table 2', assignments: [{ guestName: 'Dee Lee', invitationId: 'inv2' }] },
-        { name: 'Head Table', assignments: [{ guestName: 'Bob Smith', invitationId: 'inv1' }, { guestName: 'Cal Jones', invitationId: 'inv1' }] },
+        { name: '02. Friends', assignments: [{ guestName: 'Dee Lee', invitationId: 'inv2' }] },
+        { name: '00. Head Table', assignments: [{ guestName: 'Bob Smith', invitationId: 'inv1' }, { guestName: 'Cal Jones', invitationId: 'inv1' }] },
       ],
       [smiths, lees],
     );
     expect(rows).toEqual([
-      { guestName: 'Bob Smith', table: 'Head Table', meal: 'Fish', dietary: 'Bob: no shellfish' },
-      { guestName: 'Cal Jones', table: 'Head Table', meal: 'Vegetarian', dietary: 'Bob: no shellfish' },
-      { guestName: 'Dee Lee', table: 'Table 2', meal: 'Beef', dietary: '' },
+      { guestName: 'Bob Smith', table: '00. Head Table', meal: 'Fish', dietary: 'Bob: no shellfish' },
+      { guestName: 'Cal Jones', table: '00. Head Table', meal: 'Vegetarian', dietary: 'Bob: no shellfish' },
+      { guestName: 'Dee Lee', table: '02. Friends', meal: 'Beef', dietary: '' },
       { guestName: 'Ann Smith', table: 'Unassigned', meal: 'Chicken', dietary: 'Bob: no shellfish' },
     ]);
   });

@@ -1,5 +1,5 @@
 // Builds the caterer-style seating sheet: one row per seated guest with their
-// table, meal choice and dietary notes, ordered head table first. Pure — no
+// table, meal choice and dietary notes, ordered by table name. Pure — no
 // Prisma/ExcelJS — so the ordering and meal lookup can be unit-tested.
 
 export interface SeatingExportTable {
@@ -41,12 +41,9 @@ function parseJson<T>(raw: string | null | undefined, fallback: T): T {
 
 const norm = (s: string) => s.trim().toLowerCase();
 
-/** Head table(s) first, then natural order so "Table 2" sorts before "Table 10". */
+/** Plain alphabetical, so zero-padded prefixes ("00. Head Table", "01. …") set the order. */
 export function compareTableNames(a: string, b: string): number {
-  const headA = /\bhead\b/i.test(a);
-  const headB = /\bhead\b/i.test(b);
-  if (headA !== headB) return headA ? -1 : 1;
-  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+  return a.localeCompare(b, undefined, { sensitivity: 'base' });
 }
 
 interface Attendee {
