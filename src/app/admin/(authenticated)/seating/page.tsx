@@ -323,7 +323,12 @@ export default function SeatingPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Seating Chart</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Seating Chart</h1>
+        <a href="/api/tables/export">
+          <Button size="sm" variant="outline">Download Spreadsheet</Button>
+        </a>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left side: Tables list */}
