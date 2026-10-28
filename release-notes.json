@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.18.0",
+    "date": "2026-10-28",
+    "changes": [
+      { "type": "feature", "text": "Download Spreadsheet button on the admin Seating page — exports an Excel file with each guest's name, assigned table, meal choice, and dietary restrictions, sorted by table name so numbered tables (\"00. Head Table\", \"01. …\") come out in order. Attending guests who don't have a seat yet are listed at the bottom as Unassigned, so the caterer's list never silently drops anyone." }
+    ]
+  },
+  {
     "version": "2.17.2",
     "date": "2026-10-17",
     "changes": [

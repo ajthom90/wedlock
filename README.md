@@ -28,7 +28,7 @@ All content (couple names, dates, venues, events, photos, copy, colors, fonts) i
 - **RSVP dashboard** — see every response, edit submissions as an admin, view per-household change history.
 - **Custom RSVP form** — add/remove/reorder extra questions beyond the built-in meal/dietary/song fields.
 - **Events editor** — CRUD with times, venues, per-event maps, rich descriptions, visibility level.
-- **Seating tables** — create tables, assign guests, publish to the public seating page.
+- **Seating tables** — create tables, assign guests, publish to the public seating page, and download a guest / table / meal / dietary spreadsheet for the caterer.
 - **Shuttles** — routes, capacity, guest signups.
 - **Gifts registry tracker** — mark items purchased, track purchaser and thank-you status.
 - **Honeymoon fund** — manage items and pledges; mark pledges as received.
