@@ -8,6 +8,7 @@
 import { tableDisplayName } from './nameTentsPdf';
 import { buildMealColorMap, mealColorFor } from './mealColors';
 import type { RsvpChoice } from './rsvpChoices';
+import { parseVendorMeals, type VendorMeal } from './vendorMeals';
 import {
   resolveSeatedGuests,
   UNASSIGNED_TABLE,
@@ -18,10 +19,6 @@ import {
 
 export type SheetCell = string | number | null;
 
-export interface VendorMeals {
-  standard: number;
-  vegetarian: number;
-}
 
 export interface ReceptionSheet {
   rows: SheetCell[][];
@@ -36,8 +33,6 @@ export const RECEPTION_SHEET_NAME = 'Reception Seating';
 export const LABELS = {
   mealChoice: 'Meal Choice',
   colorCode: 'Color Code',
-  standardVendor: 'Standard Vendor Meals',
-  vegetarianVendor: 'Vegetarian Vendor Meal',
   total: 'Total:',
   allergens: 'Allergens / Restrictions (A)',
   boosters: 'Booster Chairs (B)',
@@ -80,7 +75,7 @@ export function buildReceptionSheet(args: {
   tables: SeatingExportTable[];
   invitations: SeatingExportInvitation[];
   mealChoices: RsvpChoice[];
-  vendorMeals: VendorMeals;
+  vendorMeals: VendorMeal[];
 }): ReceptionSheet {
   const guests = orderForSheet(resolveSeatedGuests(args.tables, args.invitations));
   const colors = buildMealColorMap(args.mealChoices);
@@ -107,15 +102,27 @@ export function buildReceptionSheet(args: {
   const allergens = guests.filter((g) => g.dietary.trim()).length;
   const boosters = guests.filter((g) => g.childSeat === 'booster').length;
   const highChairs = guests.filter((g) => g.childSeat === 'high_chair').length;
-  const standard = Math.max(0, Math.floor(args.vendorMeals.standard) || 0);
-  const vegetarian = Math.max(0, Math.floor(args.vendorMeals.vegetarian) || 0);
+  const vendorMeals = parseVendorMeals(args.vendorMeals);
+  const vendorTotal = vendorMeals.reduce((sum, v) => sum + v.count, 0);
 
   const rows: SheetCell[][] = [[LABELS.mealChoice, null, LABELS.colorCode]];
   for (const m of counts.values()) rows.push([m.name, m.count, m.color]);
   if (noMeal) rows.push([LABELS.noMeal, noMeal, null]);
-  rows.push([LABELS.standardVendor, standard, LABELS.allergens, allergens]);
-  rows.push([LABELS.vegetarianVendor, vegetarian, LABELS.boosters, boosters]);
-  rows.push([LABELS.total, guests.length + standard + vegetarian, LABELS.highChairs, highChairs]);
+
+  // Vendor meals sit between the guest meals and the total, and the A / B / H
+  // counts go beside the last three of those rows (C and D), as on the
+  // couple's sheet with its two vendor meals. With fewer than two vendor
+  // meals, blank rows keep A and B off the meal rows, whose C is a color.
+  const tail: SheetCell[][] = vendorMeals.map((v) => [v.name, v.count]);
+  while (tail.length < 2) tail.push([null, null]);
+  tail.push([LABELS.total, guests.length + vendorTotal]);
+  const marks: [string, number][] = [[LABELS.allergens, allergens], [LABELS.boosters, boosters], [LABELS.highChairs, highChairs]];
+  marks.forEach(([label, n], i) => {
+    const row = tail[tail.length - 3 + i];
+    row[2] = label;
+    row[3] = n;
+  });
+  rows.push(...tail);
 
   rows.push([...GUEST_HEADERS]);
   const headerRow = rows.length;
