@@ -104,6 +104,7 @@ model Guest {
   // page. Plus-ones carry theirs inside RsvpResponse.plusOnes instead.
   childSeat    String?
   invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  seat         TableAssignment?
 }
 
 model WeddingPartyMember {
@@ -242,12 +243,20 @@ model SeatingTable {
   assignments TableAssignment[]
 }
 
+// A seat links to its Guest row, so renaming a guest keeps them at their
+// table; the seat is freed (deleted) when the guest is removed. guestName is
+// a snapshot of the name at seating time and the only key for plus-ones,
+// who have no Guest row. Seats saved before guestId existed are linked by
+// name once, on first read (src/lib/seatLinking.ts); any that can't be
+// matched stay with guestId null and are flagged on the admin Seating page.
 model TableAssignment {
-  id        String       @id @default(uuid())
-  tableId   String
-  guestName String
+  id           String       @id @default(uuid())
+  tableId      String
+  guestName    String
   invitationId String?
-  table     SeatingTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  guestId      String?      @unique
+  table        SeatingTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  guest        Guest?       @relation(fields: [guestId], references: [id], onDelete: Cascade)
 }
 
 // Gift tracker (#9)
