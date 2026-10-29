@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSeatingExportRows, compareTableNames, type SeatingExportInvitation } from './seatingExport';
+import { buildSeatingExportRows, compareTableNames, resolveSeatedGuests, type SeatingExportInvitation } from './seatingExport';
 
 const smiths: SeatingExportInvitation = {
   id: 'inv1',
@@ -36,15 +36,42 @@ describe('buildSeatingExportRows', () => {
       [smiths, lees],
     );
     expect(rows).toEqual([
-      { guestName: 'Bob Smith', table: '00. Head Table', meal: 'Fish', dietary: 'Bob: no shellfish' },
-      { guestName: 'Cal Jones', table: '00. Head Table', meal: 'Vegetarian', dietary: 'Bob: no shellfish' },
-      { guestName: 'Dee Lee', table: '02. Friends', meal: 'Beef', dietary: '' },
-      { guestName: 'Ann Smith', table: 'Unassigned', meal: 'Chicken', dietary: 'Bob: no shellfish' },
+      { guestName: 'Bob Smith', table: '00. Head Table', meal: 'Fish', dietary: 'Household: Bob: no shellfish', childSeat: '' },
+      { guestName: 'Cal Jones', table: '00. Head Table', meal: 'Vegetarian', dietary: 'Household: Bob: no shellfish', childSeat: '' },
+      { guestName: 'Dee Lee', table: '02. Friends', meal: 'Beef', dietary: '', childSeat: '' },
+      { guestName: 'Ann Smith', table: 'Unassigned', meal: 'Chicken', dietary: 'Household: Bob: no shellfish', childSeat: '' },
     ]);
   });
 
   it('skips declined invitations from the unassigned list', () => {
     const declined = { ...lees, response: { ...lees.response!, attending: 'no' } };
     expect(buildSeatingExportRows([], [declined])).toEqual([]);
+  });
+
+  it('uses per-guest allergies and child seats, for guests and plus-ones', () => {
+    const kids: SeatingExportInvitation = {
+      id: 'inv3',
+      guests: [{ id: 'g4', name: 'Eve Park', childSeat: null }, { id: 'g5', name: 'Finn Park', childSeat: 'high_chair' }],
+      response: {
+        attending: 'yes',
+        attendingGuests: JSON.stringify(['g4', 'g5']),
+        guestMeals: null,
+        guestDietary: JSON.stringify({ g4: 'Peanuts' }),
+        plusOnes: JSON.stringify([{ name: 'Gus Park', meal: 'Kids', dietary: 'Dairy', childSeat: 'booster' }]),
+        dietaryNotes: 'old household note',
+      },
+    };
+    expect(buildSeatingExportRows([{ name: 'Table 3', assignments: [{ guestName: 'Finn Park', invitationId: 'inv3' }] }], [kids])).toEqual([
+      { guestName: 'Finn Park', table: 'Table 3', meal: '', dietary: '', childSeat: 'High chair' },
+      { guestName: 'Eve Park', table: 'Unassigned', meal: '', dietary: 'Peanuts', childSeat: '' },
+      { guestName: 'Gus Park', table: 'Unassigned', meal: 'Kids', dietary: 'Dairy', childSeat: 'Booster seat' },
+    ]);
+  });
+
+  it('gives an old household note to a household of one', () => {
+    const rows = resolveSeatedGuests([{ name: 'T1', assignments: [{ guestName: 'Dee Lee', invitationId: 'inv2' }] }], [
+      { ...lees, response: { ...lees.response!, dietaryNotes: 'Gluten free' } },
+    ]);
+    expect(rows[0]).toMatchObject({ guestName: 'Dee Lee', dietary: 'Gluten free', householdDietary: '' });
   });
 });

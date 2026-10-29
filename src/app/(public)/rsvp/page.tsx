@@ -3,9 +3,10 @@ import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, Button, Input, Textarea } from '@/components/ui';
 import { pruneGuestMeals } from '@/lib/rsvpMeals';
+import { pruneGuestDietary } from '@/lib/guestNeeds';
 
 type Guest = { id: string; name: string; isPrimary: boolean };
-type PlusOne = { name: string; meal: string };
+type PlusOne = { name: string; meal: string; dietary: string };
 type RsvpChoice = { name: string; description?: string };
 
 function RSVPForm() {
@@ -25,6 +26,9 @@ function RSVPForm() {
   const [guestMeals, setGuestMeals] = useState<Record<string, string>>({});
   const [songRequests, setSongRequests] = useState('');
   const [dietaryNotes, setDietaryNotes] = useState('');
+  // Allergies / dietary needs keyed by guest id. dietaryNotes above is the
+  // household-wide box, shown only when there are no guest rows to tick.
+  const [guestDietary, setGuestDietary] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
   const [correction, setCorrection] = useState('');
   const [mailingAddress1, setMailingAddress1] = useState('');
@@ -58,7 +62,7 @@ function RSVPForm() {
       setMailingPostalCode(data.invitation.mailingPostalCode || '');
       setContactEmail(data.invitation.contactEmail || '');
       const slotCount = data.invitation.plusOnesAllowed || 0;
-      const emptySlots = Array.from({ length: slotCount }, () => ({ name: '', meal: '' }));
+      const emptySlots = Array.from({ length: slotCount }, () => ({ name: '', meal: '', dietary: '' }));
       if (data.invitation.response) {
         const r = data.invitation.response;
         setAttending(r.attending); setGuestCount(r.guestCount); setMessage(r.message || ''); setSongRequests(r.songRequests || ''); setDietaryNotes(r.dietaryNotes || '');
@@ -75,9 +79,19 @@ function RSVPForm() {
           const ids: string[] = JSON.parse(r.attendingGuests || '[]');
           setAttendingGuests(ids.filter((id) => validIds.has(id)));
         } catch { setAttendingGuests([]); }
+        let dietary: Record<string, string> = {};
+        try {
+          const parsed: Record<string, string> = JSON.parse(r.guestDietary || '{}');
+          dietary = Object.fromEntries(Object.entries(parsed).filter(([id]) => validIds.has(id)));
+        } catch { dietary = {}; }
+        // An RSVP from before per-guest allergies has one household note; in a
+        // one-person household it can only be theirs, so prefill their box.
+        const onlyGuest = data.invitation.guests?.length === 1 ? data.invitation.guests[0].id : null;
+        if (onlyGuest && !Object.keys(dietary).length && r.dietaryNotes?.trim()) dietary = { [onlyGuest]: r.dietaryNotes.trim() };
+        setGuestDietary(dietary);
         try {
           const loaded: PlusOne[] = JSON.parse(r.plusOnes || '[]');
-          setPlusOnes(emptySlots.map((slot, i) => loaded[i] ? { name: loaded[i].name || '', meal: loaded[i].meal || '' } : slot));
+          setPlusOnes(emptySlots.map((slot, i) => loaded[i] ? { name: loaded[i].name || '', meal: loaded[i].meal || '', dietary: loaded[i].dietary || '' } : slot));
         } catch { setPlusOnes(emptySlots); }
       } else {
         setPlusOnes(emptySlots);
@@ -97,6 +111,13 @@ function RSVPForm() {
   const perGuestMode = !!(features.perGuestSelection && invitation?.guests?.length);
   const plusOnesActive = !!(features.rsvpPlusOnes && features.perGuestSelection && invitation?.plusOnesAllowed > 0);
   const plusOnesOnlyMode = plusOnesActive && !perGuestMode;
+  // Allergies are asked per person wherever there are people to ask about.
+  // Only a plain head-count RSVP (no guest rows, no plus-one rows) falls back
+  // to the single household box.
+  const showHouseholdDietary = !perGuestMode && !plusOnesOnlyMode;
+  const legacyHouseholdDietary = !showHouseholdDietary && invitation?.response?.dietaryNotes?.trim()
+    && !Object.keys(guestDietary).length && (invitation?.guests?.length ?? 0) !== 1
+    ? invitation.response.dietaryNotes.trim() : '';
 
   // Two-step submit: clicking "Submit RSVP" validates then opens a confirmation
   // modal. Only the modal's Confirm button actually POSTs. Accepting while
@@ -107,9 +128,9 @@ function RSVPForm() {
   // submission. Dietary/song/message/address are kept — they're informational.
   const declineRsvp = () => {
     setAttending('no');
-    setAttendingGuests([]); setGuestMeals({}); setResponses({});
+    setAttendingGuests([]); setGuestMeals({}); setGuestDietary({}); setResponses({});
     setMissingMeals([]); setMissingPlusOneMeals([]);
-    setPlusOnes((prev) => prev.map(() => ({ name: '', meal: '' })));
+    setPlusOnes((prev) => prev.map(() => ({ name: '', meal: '', dietary: '' })));
     setValidationError('');
   };
 
@@ -153,13 +174,20 @@ function RSVPForm() {
   const confirmSubmit = async () => {
     setSubmitting(true); setSubmitError('');
     try {
-      const namedPlusOnes = plusOnesActive ? plusOnes.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), meal: p.meal })) : [];
+      const namedPlusOnes = plusOnesActive ? plusOnes.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), meal: p.meal, dietary: features.dietaryNotes ? p.dietary.trim() : undefined })) : [];
       const totalAttending = perGuestMode
         ? attendingGuests.length + namedPlusOnes.length
         : plusOnesOnlyMode
           ? namedPlusOnes.length
           : guestCount;
-      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && perGuestMode ? pruneGuestMeals(guestMeals, attendingGuests) : undefined, attendingGuests: attending === 'yes' && perGuestMode ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: features.dietaryNotes ? dietaryNotes : undefined, message, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, contactEmail, correction: features.rsvpCorrections ? correction : undefined }) });
+      // The old household note is cleared once its contents can live per
+      // person: a one-person household had it prefilled into their own box,
+      // and anyone who entered a per-person note has seen the "please move
+      // it" notice. Otherwise it's left for the couple to sort out.
+      const perPersonNotes = Object.keys(pruneGuestDietary(guestDietary, attendingGuests)).length > 0
+        || namedPlusOnes.some((p) => p.dietary);
+      const clearsLegacyDietary = attending === 'yes' && (invitation.guests.length === 1 || perPersonNotes);
+      const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && perGuestMode ? pruneGuestMeals(guestMeals, attendingGuests) : undefined, guestDietary: attending === 'yes' && perGuestMode && features.dietaryNotes ? pruneGuestDietary(guestDietary, attendingGuests) : undefined, attendingGuests: attending === 'yes' && perGuestMode ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: !features.dietaryNotes ? undefined : showHouseholdDietary ? dietaryNotes : clearsLegacyDietary ? '' : undefined, message, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, contactEmail, correction: features.rsvpCorrections ? correction : undefined }) });
       const data = await res.json();
       if (res.ok) { setShowConfirm(false); setSubmitted(true); setCorrection(''); }
       else setSubmitError(data.error || 'Failed to submit RSVP');
@@ -201,12 +229,29 @@ function RSVPForm() {
             </div>
           )}
           {perGuestMode ? (
-            <div><p className="font-medium mb-3">Who will be attending?</p><div className="space-y-2">{invitation.guests.map((guest: any) => (
-              <label key={guest.id} className="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-gray-50">
-                <input type="checkbox" checked={attendingGuests.includes(guest.id)} onChange={() => toggleGuest(guest.id)} className="h-4 w-4" />
-                <span>{guest.name}</span>
-                {mealOption && attendingGuests.includes(guest.id) && <select className={`ml-auto border rounded px-2 py-1 text-sm ${missingMeals.includes(guest.id) ? 'border-red-500 ring-2 ring-red-500' : ''}`} value={guestMeals[guest.id] || ''} onChange={(e) => { setGuestMeals({...guestMeals, [guest.id]: e.target.value}); if (e.target.value) setMissingMeals(prev => prev.filter(id => id !== guest.id)); }}><option value="">Select meal...</option>{mealOption.choices.map((c: RsvpChoice) => <option key={c.name} value={c.name}>{c.name}</option>)}</select>}
-              </label>
+            <div><p className="font-medium mb-3">Who will be attending?</p>
+              {features.dietaryNotes && legacyHouseholdDietary && (
+                <p className="text-sm text-foreground/70 mb-3 rounded-md border border-primary/20 bg-primary/5 p-3">
+                  You told us earlier: &ldquo;{legacyHouseholdDietary}&rdquo;. We now track allergies per person, so please add them next to the right name below.
+                </p>
+              )}
+              <div className="space-y-2">{invitation.guests.map((guest: any) => (
+              <div key={guest.id} className="p-3 border rounded-md hover:bg-gray-50">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={attendingGuests.includes(guest.id)} onChange={() => toggleGuest(guest.id)} className="h-4 w-4" />
+                  <span>{guest.name}</span>
+                  {mealOption && attendingGuests.includes(guest.id) && <select className={`ml-auto border rounded px-2 py-1 text-sm ${missingMeals.includes(guest.id) ? 'border-red-500 ring-2 ring-red-500' : ''}`} value={guestMeals[guest.id] || ''} onChange={(e) => { setGuestMeals({...guestMeals, [guest.id]: e.target.value}); if (e.target.value) setMissingMeals(prev => prev.filter(id => id !== guest.id)); }}><option value="">Select meal...</option>{mealOption.choices.map((c: RsvpChoice) => <option key={c.name} value={c.name}>{c.name}</option>)}</select>}
+                </label>
+                {features.dietaryNotes && attendingGuests.includes(guest.id) && (
+                  <Input
+                    className="mt-2 text-sm"
+                    value={guestDietary[guest.id] || ''}
+                    onChange={(e) => setGuestDietary({ ...guestDietary, [guest.id]: e.target.value })}
+                    placeholder={`Allergies or dietary needs for ${guest.name} (optional)`}
+                    maxLength={300}
+                  />
+                )}
+              </div>
             ))}</div></div>
           ) : plusOnesOnlyMode ? null : <Input label="Number of Guests" type="number" min={1} max={invitation.maxGuests} value={guestCount || ''} onChange={(e) => setGuestCount(parseInt(e.target.value) || 0)} />}
           {plusOnesActive && (
@@ -215,7 +260,8 @@ function RSVPForm() {
               <p className="text-sm text-foreground/60 mb-3">Enter a name for each extra guest you&apos;d like to bring. Leave blank if unused.</p>
               <div className="space-y-2">
                 {plusOnes.map((p, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 border rounded-md">
+                  <div key={i} className="p-3 border rounded-md space-y-2">
+                  <div className="flex items-center gap-3">
                     <Input
                       value={p.name}
                       onChange={(e) => {
@@ -238,6 +284,16 @@ function RSVPForm() {
                         {mealOption.choices.map((c: RsvpChoice) => <option key={c.name} value={c.name}>{c.name}</option>)}
                       </select>
                     )}
+                  </div>
+                  {features.dietaryNotes && p.name.trim() && (
+                    <Input
+                      className="text-sm"
+                      value={p.dietary}
+                      onChange={(e) => updatePlusOne(i, { dietary: e.target.value })}
+                      placeholder={`Allergies or dietary needs for ${p.name.trim()} (optional)`}
+                      maxLength={300}
+                    />
+                  )}
                   </div>
                 ))}
               </div>
@@ -267,7 +323,7 @@ function RSVPForm() {
               )}
             </div>
           ))}
-          {features.dietaryNotes && <Textarea label="Dietary Restrictions or Allergies" value={dietaryNotes} onChange={(e) => setDietaryNotes(e.target.value)} placeholder="Let us know about any dietary needs..." rows={2} />}
+          {features.dietaryNotes && showHouseholdDietary && <Textarea label="Dietary Restrictions or Allergies" value={dietaryNotes} onChange={(e) => setDietaryNotes(e.target.value)} placeholder="Let us know about any dietary needs..." rows={2} />}
           {features.songRequests && <Textarea label="Song Requests" value={songRequests} onChange={(e) => setSongRequests(e.target.value)} placeholder="Any songs you'd like to hear?" rows={2} />}
         </>)}
         {attending && features.rsvpAddress !== false && (
@@ -324,6 +380,7 @@ function RSVPForm() {
         guestCount={guestCount}
         attendingGuests={attendingGuests}
         guestMeals={guestMeals}
+        guestDietary={features.dietaryNotes ? guestDietary : {}}
         plusOnes={plusOnesActive ? plusOnes.filter((p) => p.name.trim()) : []}
         perGuestSelection={perGuestMode || plusOnesOnlyMode}
         submitting={submitting}
@@ -335,12 +392,13 @@ function RSVPForm() {
   );
 }
 
-function ConfirmModal({ invitation, attending, guestCount, attendingGuests, guestMeals, plusOnes, perGuestSelection, submitting, submitError, onCancel, onConfirm }: {
+function ConfirmModal({ invitation, attending, guestCount, attendingGuests, guestMeals, guestDietary, plusOnes, perGuestSelection, submitting, submitError, onCancel, onConfirm }: {
   invitation: { guests: Guest[]; response: unknown };
   attending: string;
   guestCount: number;
   attendingGuests: string[];
   guestMeals: Record<string, string>;
+  guestDietary: Record<string, string>;
   plusOnes: PlusOne[];
   perGuestSelection: boolean;
   submitting: boolean;
@@ -370,8 +428,8 @@ function ConfirmModal({ invitation, attending, guestCount, attendingGuests, gues
                 <p className="text-sm font-medium text-green-700 mb-1">Attending ({totalYes})</p>
                 {totalYes > 0 ? (
                   <ul className="text-sm text-foreground/80 list-disc pl-5">
-                    {yes.map((g) => <li key={g.id}>{g.name}{guestMeals[g.id] && <span className="text-foreground/60"> — {guestMeals[g.id]}</span>}</li>)}
-                    {plusOnes.map((p, i) => <li key={`plus-${i}`}>{p.name}{p.meal && <span className="text-foreground/60"> — {p.meal}</span>} <span className="text-xs text-foreground/50">(plus-one)</span></li>)}
+                    {yes.map((g) => <li key={g.id}>{g.name}{guestMeals[g.id] && <span className="text-foreground/60"> — {guestMeals[g.id]}</span>}{guestDietary[g.id]?.trim() && <span className="block text-xs text-foreground/60">Allergies: {guestDietary[g.id].trim()}</span>}</li>)}
+                    {plusOnes.map((p, i) => <li key={`plus-${i}`}>{p.name}{p.meal && <span className="text-foreground/60"> — {p.meal}</span>} <span className="text-xs text-foreground/50">(plus-one)</span>{p.dietary?.trim() && <span className="block text-xs text-foreground/60">Allergies: {p.dietary.trim()}</span>}</li>)}
                   </ul>
                 ) : <p className="text-sm text-foreground/50 italic">None selected</p>}
               </div>
