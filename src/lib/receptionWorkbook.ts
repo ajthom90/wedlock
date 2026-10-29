@@ -1,6 +1,7 @@
 // Writes the Reception Seating grid (receptionSheet.ts) to an .xlsx with
-// ExcelJS: bold header rows, column widths, and each "Color Code" cell
-// filled in its meal's color so the sheet reads at a glance like the tents.
+// ExcelJS: bold header rows, column widths, thin cell borders, and each
+// "Color Code" cell filled in its meal's color so the sheet reads at a
+// glance like the tents.
 // Shared by both seating downloads on the admin Seating page.
 
 import ExcelJS from 'exceljs';
@@ -8,6 +9,8 @@ import { findMealColor } from './mealColors';
 import { RECEPTION_SHEET_NAME, type ReceptionSheet } from './receptionSheet';
 
 const COLUMN_WIDTHS = [30, 12, 28, 40, 8, 6, 12];
+const GUEST_COLUMNS = COLUMN_WIDTHS.length;
+const THIN: ExcelJS.Border = { style: 'thin', color: { argb: 'FF000000' } };
 
 /** Black or white text, whichever reads better on the fill. */
 function textOn(hex: string): string {
@@ -34,6 +37,18 @@ export function buildReceptionWorkbook(sheet: ReceptionSheet): ExcelJS.Workbook 
   };
   for (let r = 2; r < sheet.headerRow; r++) paint(ws.getCell(r, 3));
   for (let r = sheet.headerRow + 1; r <= sheet.rows.length; r++) paint(ws.getCell(r, 7));
+
+  // Thin grid lines: round every filled cell of the summary block, and every
+  // cell of the guest table, blank ones included, so it prints as a table.
+  const thin: Partial<ExcelJS.Borders> = { top: THIN, left: THIN, bottom: THIN, right: THIN };
+  sheet.rows.forEach((row, i) => {
+    const r = i + 1;
+    if (r < sheet.headerRow) {
+      row.forEach((v, c) => { if (v != null && v !== '') ws.getCell(r, c + 1).border = thin; });
+    } else {
+      for (let c = 1; c <= GUEST_COLUMNS; c++) ws.getCell(r, c).border = thin;
+    }
+  });
   return wb;
 }
 

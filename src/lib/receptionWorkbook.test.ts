@@ -45,6 +45,11 @@ describe('receptionWorkbookBuffer', () => {
     expect(fill(sheet.headerRow + 1, 7)).toBe('FFD62828');
     expect(fill(sheet.headerRow + 2, 7)).toBe('FFF27BB5');
     expect(fill(4, 3)).toBeUndefined();
+    const border = (r: number, c: number) => ws.getCell(r, c).border?.bottom?.style;
+    expect(border(sheet.headerRow, 1)).toBe('thin');
+    expect(border(sheet.headerRow + 2, 4)).toBe('thin'); // blank guest cell still ruled
+    expect(border(2, 1)).toBe('thin');
+    expect(border(2, 4)).toBeUndefined(); // nothing in the summary there
     expect(ws.getRow(1).font?.bold).toBe(true);
     expect(ws.getRow(sheet.headerRow).font?.bold).toBe(true);
   });
