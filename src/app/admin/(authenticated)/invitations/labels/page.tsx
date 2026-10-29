@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AVERY_FORMATS, type AveryFormat } from '@/lib/averyFormats';
 import { composeLabelLines, composeCodeLabelLines, type LabelSource, type LabelFontBytes } from '@/lib/mailingLabelsPdf';
+import { fetchThemeFontBytes } from '@/lib/themeFontBytes';
 
 interface InvitationForLabels {
   id: string;
@@ -48,32 +49,8 @@ export default function MailingLabelsPage() {
   const fontBytesRef = useRef<LabelFontBytes | null>(null);
 
   const loadThemeFontBytes = async (): Promise<LabelFontBytes> => {
-    if (fontBytesRef.current) return fontBytesRef.current;
-    let bytes: LabelFontBytes = {};
-    try {
-      const res = await fetch('/api/settings');
-      if (res.ok) {
-        const { theme } = await res.json();
-        const fetchFont = async (family: string, weight: 400 | 700) => {
-          try {
-            const r = await fetch(`/api/fonts/pdf?family=${encodeURIComponent(family)}&weight=${weight}`);
-            return r.ok ? await r.arrayBuffer() : undefined;
-          } catch {
-            return undefined;
-          }
-        };
-        const [heading, body, bodyBold] = await Promise.all([
-          fetchFont(theme.headingFont, 400),
-          fetchFont(theme.bodyFont, 400),
-          fetchFont(theme.bodyFont, 700),
-        ]);
-        bytes = { heading, body, bodyBold };
-      }
-    } catch {
-      bytes = {};
-    }
-    fontBytesRef.current = bytes;
-    return bytes;
+    if (!fontBytesRef.current) fontBytesRef.current = await fetchThemeFontBytes();
+    return fontBytesRef.current;
   };
 
   const format = useMemo(
