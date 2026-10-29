@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isAuthenticated } from '@/lib/auth';
 import { generateCode } from '@/lib/utils';
+import { parseChildSeat } from '@/lib/guestNeeds';
 
 async function generateUniqueCode(): Promise<string> {
   for (let i = 0; i < 10; i++) {
@@ -32,7 +33,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const { householdName, email, maxGuests, plusOnesAllowed, notes, guestNames, isWeddingParty, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode } = await request.json();
+    const { householdName, email, maxGuests, plusOnesAllowed, notes, guestNames, guests, isWeddingParty, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode } = await request.json();
     if (!householdName) return NextResponse.json({ error: 'Household name is required' }, { status: 400 });
     const code = await generateUniqueCode();
     const invitation = await prisma.invitation.create({
@@ -46,7 +47,15 @@ export async function POST(request: Request) {
         mailingCity: mailingCity || null,
         mailingState: mailingState || null,
         mailingPostalCode: mailingPostalCode || null,
-        guests: { create: guestNames?.map((name: string, i: number) => ({ name, isPrimary: i === 0, order: i })) || [] },
+        // `guests: [{ name, childSeat }]` from the admin form; `guestNames`
+        // is the older names-only shape (still used by the CSV import).
+        guests: {
+          create: Array.isArray(guests)
+            ? guests
+                .filter((g: any) => g && typeof g.name === 'string' && g.name.trim())
+                .map((g: any, i: number) => ({ name: g.name.trim(), isPrimary: i === 0, order: i, childSeat: parseChildSeat(g.childSeat) }))
+            : guestNames?.map((name: string, i: number) => ({ name, isPrimary: i === 0, order: i })) || [],
+        },
       },
       include: { guests: { orderBy: { order: 'asc' } } },
     });

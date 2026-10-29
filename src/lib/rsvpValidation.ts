@@ -5,6 +5,7 @@
 // survives the admin editing the household mid-flight; hard limits reject.
 
 import { pruneGuestMeals } from './rsvpMeals';
+import { cleanDietary, parseChildSeat, pruneGuestDietary, type ChildSeat } from './guestNeeds';
 
 export interface RsvpValidationContext {
   maxGuests: number;
@@ -18,7 +19,17 @@ export interface RsvpValidatedData {
   guestCount: number;
   attendingGuests: string[];
   guestMeals: Record<string, string>;
-  plusOnes: { name: string; meal: string }[];
+  guestDietary: Record<string, string>;
+  plusOnes: RsvpPlusOne[];
+}
+
+// dietary / childSeat are only present when set, so stored JSON stays small
+// and older plus-ones round-trip unchanged.
+export interface RsvpPlusOne {
+  name: string;
+  meal: string;
+  dietary?: string;
+  childSeat?: ChildSeat;
 }
 
 export type RsvpValidationResult =
@@ -34,7 +45,7 @@ export function validateRsvpSubmission(body: any, ctx: RsvpValidationContext): R
   if (attending === 'no') {
     return {
       ok: true,
-      data: { attending: 'no', guestCount: 0, attendingGuests: [], guestMeals: {}, plusOnes: [] },
+      data: { attending: 'no', guestCount: 0, attendingGuests: [], guestMeals: {}, guestDietary: {}, plusOnes: [] },
     };
   }
 
@@ -45,11 +56,19 @@ export function validateRsvpSubmission(body: any, ctx: RsvpValidationContext): R
   ];
 
   const guestMeals = pruneGuestMeals(body?.guestMeals, attendingGuests);
+  const guestDietary = pruneGuestDietary(body?.guestDietary, attendingGuests);
 
   const rawPlusOnes = Array.isArray(body?.plusOnes) ? body.plusOnes : [];
-  const plusOnes = rawPlusOnes
+  const plusOnes: RsvpPlusOne[] = rawPlusOnes
     .filter((p: any) => p && typeof p.name === 'string' && p.name.trim())
-    .map((p: any) => ({ name: p.name.trim(), meal: typeof p.meal === 'string' ? p.meal : '' }));
+    .map((p: any) => {
+      const out: RsvpPlusOne = { name: p.name.trim(), meal: typeof p.meal === 'string' ? p.meal : '' };
+      const dietary = cleanDietary(p.dietary);
+      if (dietary) out.dietary = dietary;
+      const childSeat = parseChildSeat(p.childSeat);
+      if (childSeat) out.childSeat = childSeat;
+      return out;
+    });
   if (plusOnes.length > 0 && !ctx.plusOnesEnabled) {
     return { ok: false, error: 'Additional guests are not enabled for this event.' };
   }
@@ -74,5 +93,5 @@ export function validateRsvpSubmission(body: any, ctx: RsvpValidationContext): R
     return { ok: false, error: 'Please select at least one attendee, or decline.' };
   }
 
-  return { ok: true, data: { attending: 'yes', guestCount, attendingGuests, guestMeals, plusOnes } };
+  return { ok: true, data: { attending: 'yes', guestCount, attendingGuests, guestMeals, guestDietary, plusOnes } };
 }

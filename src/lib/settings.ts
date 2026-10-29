@@ -69,6 +69,11 @@ export interface FeatureSettings {
   // Admin-side tools
   vendorContacts: boolean;
   budgetTracker: boolean;
+  // High chair / booster seat per guest (Invitations + RSVPs editors,
+  // seating list, spreadsheet export, name tents).
+  childSeats: boolean;
+  // Printable Avery table name tents from the Seating page.
+  nameTents: boolean;
 
   // Custom pages — when off, the Pages admin still lets the couple edit
   // built-in titles/URLs, but the "+ New custom page" button is hidden.
@@ -149,6 +154,8 @@ const defaultFeatures: FeatureSettings = {
   // Admin-side tools — default ON so the nav icons appear until hidden.
   vendorContacts: true,
   budgetTracker: true,
+  childSeats: true,
+  nameTents: true,
 
   customPages: true,
 

@@ -129,4 +129,16 @@ describe('reconcileGuests', () => {
     expect(ops.create).toEqual([{ name: 'Alexandra', isPrimary: false, order: 1 }]);
     expect(ops.deleteIds).toEqual([]);
   });
+
+  it('passes child seats through only when the edit sent them', () => {
+    const ops = reconcileGuests(
+      [{ id: 'a', name: 'Ann' }, { id: 'b', name: 'Bo' }],
+      [{ id: 'a', name: 'Ann', childSeat: null }, { id: 'b', name: 'Bo', childSeat: 'booster' }, { name: 'Cy' }],
+    );
+    expect(ops.update).toEqual([
+      { id: 'a', name: 'Ann', isPrimary: true, order: 0, childSeat: null },
+      { id: 'b', name: 'Bo', isPrimary: false, order: 1, childSeat: 'booster' },
+    ]);
+    expect(ops.create).toEqual([{ name: 'Cy', isPrimary: false, order: 2 }]);
+  });
 });

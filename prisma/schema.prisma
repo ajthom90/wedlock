@@ -86,7 +86,7 @@ model RsvpChangeLog {
   invitationId String
   invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
   source       String     // "guest" | "admin" — who made the change
-  details      String     // JSON snapshot: { attending, guestCount, attendingGuests?, guestMeals?, songRequests?, dietaryNotes?, message? }
+  details      String     // JSON snapshot: { attending, guestCount, attendingGuests?, guestMeals?, guestDietary?, songRequests?, dietaryNotes?, message? }
   createdAt    DateTime   @default(now())
 
   @@index([invitationId, createdAt])
@@ -100,6 +100,9 @@ model Guest {
   // Display position within the household — guest rows survive edits (see
   // reconcileGuests), so insertion order no longer reflects the entered order.
   order        Int        @default(0)
+  // "high_chair" | "booster" | null — set by the couple on the Invitations
+  // page. Plus-ones carry theirs inside RsvpResponse.plusOnes instead.
+  childSeat    String?
   invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
 }
 
@@ -150,9 +153,10 @@ model RsvpResponse {
   attendingGuests String?
   plusOneName      String?  // legacy single plus-one columns, superseded by plusOnes JSON
   plusOneMeal      String?
-  plusOnes         String?  // JSON array: [{ name, meal }] for each plus-one the guest added
+  plusOnes         String?  // JSON array: [{ name, meal, dietary?, childSeat? }] for each plus-one the guest added
   songRequests    String?
-  dietaryNotes    String?
+  dietaryNotes    String?  // pre-2.19 household-wide allergy note; new RSVPs use guestDietary (see lib/guestNeeds.ts)
+  guestDietary    String?  // JSON { [guestId]: allergies / dietary text } for named guests
   message         String?
   submittedAt     DateTime   @default(now())
   invitation      Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)

@@ -22,7 +22,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ invi
   try {
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { invitationId } = await params;
-    const { attending, guestCount, responses, guestMeals, attendingGuests, plusOnes, songRequests, dietaryNotes, message, contactEmail, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode } = await request.json();
+    const { attending, guestCount, responses, guestMeals, guestDietary, attendingGuests, plusOnes, songRequests, dietaryNotes, message, contactEmail, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode } = await request.json();
     const invitation = await prisma.invitation.findUnique({
       where: { id: invitationId },
       include: { guests: { select: { id: true } } },
@@ -31,7 +31,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ invi
     // plusOnesEnabled is always true on the admin path so the couple can record
     // a plus-one even when the public RSVP plus-ones toggle is off.
     const validation = validateRsvpSubmission(
-      { attending, guestCount, attendingGuests, guestMeals, plusOnes },
+      { attending, guestCount, attendingGuests, guestMeals, guestDietary, plusOnes },
       {
         maxGuests: invitation.maxGuests,
         plusOnesAllowed: invitation.plusOnesAllowed,
@@ -63,6 +63,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ invi
     const data = {
       attending: submission.attending, guestCount: submission.guestCount, responses: JSON.stringify(responses || {}),
       guestMeals: Object.keys(submission.guestMeals).length ? JSON.stringify(submission.guestMeals) : null,
+      guestDietary: Object.keys(submission.guestDietary).length ? JSON.stringify(submission.guestDietary) : null,
       attendingGuests: submission.attendingGuests.length ? JSON.stringify(submission.attendingGuests) : null,
       plusOnes: submission.plusOnes.length ? JSON.stringify(submission.plusOnes) : null,
       songRequests: songRequests || null, dietaryNotes: dietaryNotes || null, message: message || null,
@@ -71,6 +72,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ invi
       attending: submission.attending, guestCount: submission.guestCount,
       attendingGuests: submission.attendingGuests.length ? submission.attendingGuests : null,
       guestMeals: Object.keys(submission.guestMeals).length ? submission.guestMeals : null,
+      guestDietary: Object.keys(submission.guestDietary).length ? submission.guestDietary : null,
       plusOnes: submission.plusOnes.length ? submission.plusOnes : null,
       songRequests: songRequests || null, dietaryNotes: dietaryNotes || null,
       message: message || null,
