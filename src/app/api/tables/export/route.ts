@@ -2,15 +2,17 @@ import { NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 import prisma from '@/lib/prisma';
 import { isAuthenticated } from '@/lib/auth';
+import { ensureSeatsLinked } from '@/lib/seatLinkingDb';
 import { buildSeatingExportRows } from '@/lib/seatingExport';
 import { getFeatures } from '@/lib/settings';
 
 export async function GET() {
   try {
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    await ensureSeatsLinked();
 
     const [tables, invitations, features] = await Promise.all([
-      prisma.seatingTable.findMany({ include: { assignments: true } }),
+      prisma.seatingTable.findMany({ include: { assignments: { include: { guest: { select: { id: true, name: true, invitationId: true } } } } } }),
       prisma.invitation.findMany({ include: { guests: { orderBy: { order: 'asc' } }, response: true } }),
       getFeatures(),
     ]);

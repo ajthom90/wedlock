@@ -47,8 +47,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const invitation = await prisma.$transaction(async (tx) => {
       for (const u of guestOps.update) {
         await tx.guest.update({ where: { id: u.id }, data: { name: u.name, isPrimary: u.isPrimary, order: u.order, ...(u.childSeat !== undefined ? { childSeat: u.childSeat } : {}) } });
+        // The seat follows the guest by id; keep its stored name in step too.
+        await tx.tableAssignment.updateMany({ where: { guestId: u.id }, data: { guestName: u.name } });
       }
       if (guestOps.deleteIds.length > 0) {
+        // Deleting a guest frees their seat (the seat's guestId cascades).
         await tx.guest.deleteMany({ where: { id: { in: guestOps.deleteIds } } });
         // A genuinely removed guest must also leave the household's RSVP —
         // otherwise their id lingers in attendingGuests/guestMeals and the
@@ -111,7 +114,12 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   try {
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { id } = await params;
-    await prisma.invitation.delete({ where: { id } });
+    // Guests' seats go with their Guest rows; plus-one seats are only tied to
+    // the invitation by id, so free those here.
+    await prisma.$transaction([
+      prisma.tableAssignment.deleteMany({ where: { invitationId: id, guestId: null } }),
+      prisma.invitation.delete({ where: { id } }),
+    ]);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting invitation:', error);

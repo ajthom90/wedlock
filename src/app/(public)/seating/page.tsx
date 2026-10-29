@@ -1,16 +1,21 @@
 import prisma from '@/lib/prisma';
+import { ensureSeatsLinked } from '@/lib/seatLinkingDb';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SeatingPage() {
-  const tables = await prisma.seatingTable.findMany({
-    include: {
-      assignments: {
-        orderBy: { guestName: 'asc' },
-      },
-    },
+  await ensureSeatsLinked();
+  const rows = await prisma.seatingTable.findMany({
+    include: { assignments: { include: { guest: { select: { name: true } } } } },
     orderBy: { name: 'asc' },
   });
+  // A linked seat shows the guest's current name, so renames show up here.
+  const tables = rows.map((t) => ({
+    ...t,
+    assignments: t.assignments
+      .map((a) => ({ id: a.id, name: a.guest?.name ?? a.guestName }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  }));
 
   return (
     <div className="container mx-auto px-4 py-16">
@@ -49,7 +54,7 @@ export default async function SeatingPage() {
                         key={assignment.id}
                         className="text-sm text-foreground/80 py-1 border-b border-foreground/5 last:border-0"
                       >
-                        {assignment.guestName}
+                        {assignment.name}
                       </li>
                     ))}
                   </ul>
