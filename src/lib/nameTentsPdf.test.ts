@@ -33,6 +33,14 @@ describe('TENT_CARD_FORMATS', () => {
   });
 });
 
+describe('composeTentContent table line', () => {
+  it('prints a numbered table as "Table N" and a named one by name', () => {
+    const on = { showTable: true, showChildSeat: false, showAllergies: false, showMeal: false };
+    expect(composeTentContent(guest({ table: "Kim Mo's HS Friends", tableNumber: 34 }), on).table).toBe('Table 34');
+    expect(composeTentContent(guest({ table: 'Head Table', tableNumber: null }), on).table).toBe('Head Table');
+  });
+});
+
 describe('tableDisplayName', () => {
   it('drops a sort prefix', () => {
     expect(tableDisplayName('01. Head Table')).toBe('Head Table');

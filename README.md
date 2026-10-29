@@ -28,10 +28,10 @@ All content (couple names, dates, venues, events, photos, copy, colors, fonts) i
 - **RSVP dashboard** — see every response, edit submissions as an admin, view per-household change history.
 - **Custom RSVP form** — add/remove/reorder extra questions beyond the built-in meal/dietary/song fields.
 - **Events editor** — CRUD with times, venues, per-event maps, rich descriptions, visibility level.
-- **Seating tables** — create tables, assign guests, publish to the public seating page, and download a guest / table / meal / dietary / child seat spreadsheet for the caterer.
+- **Seating tables** — create tables with a name and an optional number, assign guests, and publish to the public seating page. Download Spreadsheet gives the Reception sheet below (or a plain guest / table / meal / dietary / child seat list when that sheet is turned off).
 - **Child seats** — mark guests who need a high chair or booster seat; shown on the Seating page, the seating spreadsheet and name tents.
 - **Name tents** — print folded table name tents (Avery 3328) with each seated guest's name and table, plus corner marks servers read at a glance (a circle in the meal's color, A for allergies, H or B for a high chair or booster) and optional spelled-out details. Meal colors are set per meal choice on RSVP Configuration.
-- **Reception sheet for vendors** — download an Excel sheet for the caterer and venue: meal counts with their colors, any number of named vendor meals with counts, the total, counts of allergies, boosters and high chairs, then every guest's table, meal, dietary restrictions, H / B, A and meal color.
+- **Reception sheet for vendors** — download an Excel sheet for the caterer and venue: meal counts with their colors, any number of named vendor meals with counts, the total, counts of allergies, boosters and high chairs, then every guest's table number (or name), meal, dietary restrictions, H / B, A and meal color, with color cells filled in.
 - **Shuttles** — routes, capacity, guest signups.
 - **Gifts registry tracker** — mark items purchased, track purchaser and thank-you status.
 - **Honeymoon fund** — manage items and pledges; mark pledges as received.

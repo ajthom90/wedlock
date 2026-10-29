@@ -14,7 +14,7 @@ let running: Promise<void> | null = null;
 
 export function ensureTableNumbers(): Promise<void> {
   if (!running) {
-    running = splitOnce().catch((error) => {
+    running = splitTableNumbersOnce().catch((error) => {
       // Let a later request try again rather than leaving prefixes in place.
       running = null;
       console.error('Moving table numbers out of table names failed:', error);
@@ -23,7 +23,7 @@ export function ensureTableNumbers(): Promise<void> {
   return running;
 }
 
-async function splitOnce(): Promise<void> {
+export async function splitTableNumbersOnce(): Promise<void> {
   if (await prisma.setting.findUnique({ where: { key: TABLE_NUMBERS_SETTING } })) return;
 
   const tables = await prisma.seatingTable.findMany({ select: { id: true, name: true, number: true } });

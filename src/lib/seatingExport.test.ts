@@ -26,6 +26,26 @@ describe('compareTableNames', () => {
   });
 });
 
+describe('resolveSeatedGuests with table numbers', () => {
+  it('orders unnumbered tables first, then by number, and carries the number', () => {
+    const seated = resolveSeatedGuests(
+      [
+        { name: 'Friends', number: 12, assignments: [{ guestName: 'Dee Lee', invitationId: 'inv2' }] },
+        { name: 'Family', number: 3, assignments: [{ guestName: 'Bob Smith', invitationId: 'inv1' }] },
+        { name: 'Head Table', number: null, assignments: [{ guestName: 'Ann Smith', invitationId: 'inv1' }] },
+      ],
+      [smiths, lees],
+    );
+    expect(seated.map((g) => [g.guestName, g.table, g.tableNumber])).toEqual([
+      ['Ann Smith', 'Head Table', null],
+      ['Bob Smith', 'Family', 3],
+      ['Dee Lee', 'Friends', 12],
+      ['Cal Jones', 'Unassigned', null],
+    ]);
+    expect(buildSeatingExportRows([{ name: 'Family', number: 3, assignments: [{ guestName: 'Dee Lee', invitationId: 'inv2' }] }], [lees])[0].table).toBe('3');
+  });
+});
+
 describe('buildSeatingExportRows', () => {
   it('orders by table and resolves meals for guests and plus-ones', () => {
     const rows = buildSeatingExportRows(

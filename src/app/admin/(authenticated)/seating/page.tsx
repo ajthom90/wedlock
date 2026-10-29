@@ -8,6 +8,7 @@ import { ChildSeatBadge } from '@/components/admin/ChildSeatSelect';
 import { ReceptionSheetCard } from '@/components/admin/ReceptionSheetCard';
 import { listAttendees, type AttendeeInvitation } from '@/lib/attendees';
 import { isPlusOneSeat, normName, plusOnesOf } from '@/lib/seatLinking';
+import { parseTableNumber, tableHeading } from '@/lib/tableNumbers';
 
 // Child seat + allergies for one person, looked up by guest id for named
 // guests and by invitation + name for plus-ones (who have no Guest row).
@@ -30,6 +31,7 @@ const seatName = (a: TableAssignment) => a.guest?.name ?? a.guestName;
 interface Table {
   id: string;
   name: string;
+  number: number | null;
   capacity: number;
   assignments: TableAssignment[];
 }
@@ -52,6 +54,7 @@ export default function SeatingPage() {
   const [tableModalOpen, setTableModalOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [tableName, setTableName] = useState('');
+  const [tableNumber, setTableNumber] = useState('');
   const [tableCapacity, setTableCapacity] = useState('8');
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -189,6 +192,7 @@ export default function SeatingPage() {
   const openAddTable = () => {
     setEditingTable(null);
     setTableName('');
+    setTableNumber('');
     setTableCapacity('8');
     setTableModalOpen(true);
   };
@@ -196,6 +200,7 @@ export default function SeatingPage() {
   const openEditTable = (table: Table) => {
     setEditingTable(table);
     setTableName(table.name);
+    setTableNumber(table.number == null ? '' : String(table.number));
     setTableCapacity(String(table.capacity));
     setTableModalOpen(true);
   };
@@ -204,22 +209,25 @@ export default function SeatingPage() {
     setTableModalOpen(false);
     setEditingTable(null);
     setTableName('');
+    setTableNumber('');
     setTableCapacity('8');
   };
 
   const handleSaveTable = async () => {
+    const number = parseTableNumber(tableNumber);
+    const body = JSON.stringify({ name: tableName, number, capacity: parseInt(tableCapacity) });
     setSaving(true);
     try {
       if (editingTable) {
         const res = await fetch(`/api/tables/${editingTable.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: tableName, capacity: parseInt(tableCapacity) }),
+          body,
         });
         if (res.ok) {
           await fetchAll();
           if (selectedTable?.id === editingTable.id) {
-            setSelectedTable({ ...selectedTable, name: tableName, capacity: parseInt(tableCapacity) });
+            setSelectedTable({ ...selectedTable, name: tableName, number, capacity: parseInt(tableCapacity) });
           }
           closeTableModal();
         }
@@ -227,7 +235,7 @@ export default function SeatingPage() {
         const res = await fetch('/api/tables', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: tableName, capacity: parseInt(tableCapacity) }),
+          body,
         });
         if (res.ok) {
           await fetchAll();
@@ -411,7 +419,7 @@ export default function SeatingPage() {
             <div className="flex flex-wrap gap-2">
               {flaggedSeats.map(({ table, assignment }) => (
                 <Button key={assignment.id} size="sm" variant="outline" onClick={() => setSelectedTable(table)}>
-                  {table.name}: {assignment.guestName}
+                  {tableHeading(table)}: {assignment.guestName}
                 </Button>
               ))}
             </div>
@@ -445,7 +453,7 @@ export default function SeatingPage() {
                 <CardContent className="py-4">
                   <div className="flex justify-between items-center">
                     <div>
-                      <p className="font-medium">{table.name}</p>
+                      <p className="font-medium">{tableHeading(table)}</p>
                       <p className="text-sm text-gray-500">
                         {table.assignments?.length || 0} / {table.capacity} seats filled
                       </p>
@@ -474,7 +482,7 @@ export default function SeatingPage() {
             <Card>
               <CardHeader>
                 <div className="flex items-baseline justify-between">
-                  <CardTitle>{selectedTable.name}</CardTitle>
+                  <CardTitle>{tableHeading(selectedTable)}</CardTitle>
                   <span className={`text-sm ${
                     (selectedTable.assignments?.length || 0) > selectedTable.capacity ? 'text-red-700 font-semibold' : 'text-gray-500'
                   }`}>
@@ -527,7 +535,7 @@ export default function SeatingPage() {
                           >
                             <option value="">Move to…</option>
                             {tables.filter((t) => t.id !== selectedTable.id).map((t) => (
-                              <option key={t.id} value={t.id}>{t.name}</option>
+                              <option key={t.id} value={t.id}>{tableHeading(t)}</option>
                             ))}
                           </select>
                           <Button size="sm" variant="danger" onClick={() => handleRemoveAssignment(assignment.id)}>
@@ -580,8 +588,23 @@ export default function SeatingPage() {
                 <Input
                   value={tableName}
                   onChange={(e) => setTableName(e.target.value)}
-                  placeholder="e.g. Table 1, Head Table"
+                  placeholder="e.g. Head Table, Smith Family"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Table Number</label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={tableNumber}
+                  onChange={(e) => setTableNumber(e.target.value)}
+                  placeholder="Optional"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  The number on the table. Shown as Table# on the spreadsheet and &ldquo;Table N&rdquo; on name tents. Leave blank for
+                  a table known by name, like the Head Table; those are listed first.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Capacity</label>

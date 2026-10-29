@@ -34,6 +34,39 @@ describe('sheetTableValue', () => {
     expect(sheetTableValue('00. Head Table')).toBe('Head Table');
     expect(sheetTableValue('Head Table')).toBe('Head Table');
   });
+
+  it("uses the table's own number over its name", () => {
+    expect(sheetTableValue("Kim Mo's HS Friends", 34)).toBe(34);
+    expect(sheetTableValue('Head Table', null)).toBe('Head Table');
+    expect(sheetTableValue('Kids', 0)).toBe(0);
+  });
+});
+
+describe('buildReceptionSheet with table numbers', () => {
+  const invitations = [
+    inv('a', [{ name: 'Ann Lee', meal: 'Beef' }]),
+    inv('b', [{ name: 'Cy Park', meal: 'Chicken' }]),
+    inv('c', [{ name: 'Flo Ng', meal: 'Beef' }]),
+    inv('d', [{ name: 'Hal Ito', meal: 'Beef' }]),
+  ];
+  // As the upgrade leaves them: names without their "NN. " prefix, numbers set.
+  const tables = [
+    { name: "Kim Mo's HS Friends", number: 34, assignments: [{ guestName: 'Flo Ng', invitationId: 'c' }] },
+    { name: 'Cousins', number: 2, assignments: [{ guestName: 'Cy Park', invitationId: 'b' }] },
+    { name: 'Head Table', number: null, assignments: [{ guestName: 'Ann Lee', invitationId: 'a' }] },
+    { name: 'Family', number: 10, assignments: [{ guestName: 'Hal Ito', invitationId: 'd' }] },
+  ];
+  const sheet = buildReceptionSheet({ tables, invitations, mealChoices, vendorMeals: [] });
+  const guestRows = sheet.rows.slice(sheet.headerRow);
+
+  it('shows the number in Table# and orders Head Table first, then by number', () => {
+    expect(guestRows.map((r) => [r[0], r[1]])).toEqual([
+      ['Ann Lee', 'Head Table'],
+      ['Cy Park', 2],
+      ['Hal Ito', 10],
+      ['Flo Ng', 34],
+    ]);
+  });
 });
 
 describe('buildReceptionSheet', () => {
