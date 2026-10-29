@@ -24,6 +24,7 @@ interface FeatureSettings {
   budgetTracker: boolean;
   childSeats: boolean;
   nameTents: boolean;
+  receptionSheet: boolean;
   customPages: boolean;
   sitePasswordEnabled: boolean;
   rsvpConfirmationEmails: boolean;
@@ -51,6 +52,7 @@ const DEFAULTS: FeatureSettings = {
   budgetTracker: true,
   childSeats: true,
   nameTents: true,
+  receptionSheet: true,
   customPages: true,
   sitePasswordEnabled: false,
   rsvpConfirmationEmails: false,
@@ -106,6 +108,8 @@ const ADMIN_TOOLS: ToggleDescriptor[] = [
     description: 'Mark guests who need a high chair or booster seat on the Invitations and RSVPs editors. Shown on the Seating page, the seating spreadsheet, and name tents. Turning this off hides it — recorded seats are kept.' },
   { key: 'nameTents', label: 'Table name tents',
     description: 'Show the Print Name Tents button on the Seating page — a PDF of Avery 3328 tent cards with each seated guest’s name and table.' },
+  { key: 'receptionSheet', label: 'Reception seating sheet',
+    description: 'Show the Reception Sheet download on the Seating page — a spreadsheet for the caterer and venue with meal counts and colors, vendor meals, and each guest’s table, meal, allergies (A) and high chair or booster (H / B).' },
   { key: 'customPages', label: 'Custom pages',
     description: 'Allow creating fully custom pages (title + WYSIWYG body) from the Pages admin. Built-in title/URL editing stays available either way.' },
 ];

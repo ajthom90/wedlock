@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ChildSeatBadge } from '@/components/admin/ChildSeatSelect';
+import { ReceptionSheetCard } from '@/components/admin/ReceptionSheetCard';
 import { listAttendees, type AttendeeInvitation } from '@/lib/attendees';
 
 // Child seat + allergies for one person, looked up by invitation + name the
@@ -46,7 +47,7 @@ export default function SeatingPage() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [needs, setNeeds] = useState<Map<string, GuestNeeds>>(new Map());
-  const [features, setFeatures] = useState<{ childSeats?: boolean; nameTents?: boolean; dietaryNotes?: boolean }>({});
+  const [features, setFeatures] = useState<{ childSeats?: boolean; nameTents?: boolean; dietaryNotes?: boolean; receptionSheet?: boolean }>({});
 
   useEffect(() => {
     fetch('/api/features').then((r) => (r.ok ? r.json() : {})).then(setFeatures).catch(() => setFeatures({}));
@@ -364,6 +365,8 @@ export default function SeatingPage() {
           </a>
         </div>
       </div>
+
+      {features.receptionSheet !== false && <ReceptionSheetCard />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left side: Tables list */}
