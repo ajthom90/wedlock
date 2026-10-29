@@ -28,7 +28,7 @@ export async function GET() {
       tables,
       invitations,
       mealChoices: mealOptions.flatMap((o) => parseRsvpChoices(o.choices)),
-      vendorMeals: { standard: site.vendorMealsStandard, vegetarian: site.vendorMealsVegetarian },
+      vendorMeals: site.vendorMeals,
     });
 
     const wb = new ExcelJS.Workbook();

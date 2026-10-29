@@ -31,7 +31,7 @@ All content (couple names, dates, venues, events, photos, copy, colors, fonts) i
 - **Seating tables** — create tables, assign guests, publish to the public seating page, and download a guest / table / meal / dietary / child seat spreadsheet for the caterer.
 - **Child seats** — mark guests who need a high chair or booster seat; shown on the Seating page, the seating spreadsheet and name tents.
 - **Name tents** — print folded table name tents (Avery 3328) with each seated guest's name and table, plus corner marks servers read at a glance (a circle in the meal's color, A for allergies, H or B for a high chair or booster) and optional spelled-out details. Meal colors are set per meal choice on RSVP Configuration.
-- **Reception sheet for vendors** — download an Excel sheet for the caterer and venue: meal counts with their colors, vendor meals and the total, counts of allergies, boosters and high chairs, then every guest's table, meal, dietary restrictions, H / B, A and meal color.
+- **Reception sheet for vendors** — download an Excel sheet for the caterer and venue: meal counts with their colors, any number of named vendor meals with counts, the total, counts of allergies, boosters and high chairs, then every guest's table, meal, dietary restrictions, H / B, A and meal color.
 - **Shuttles** — routes, capacity, guest signups.
 - **Gifts registry tracker** — mark items purchased, track purchaser and thank-you status.
 - **Honeymoon fund** — manage items and pledges; mark pledges as received.
