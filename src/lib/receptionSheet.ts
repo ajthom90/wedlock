@@ -43,20 +43,22 @@ export const LABELS = {
 export const GUEST_HEADERS = ['Guest Name', 'Table#', 'Meal Choice', 'Dietary Restrictions', 'H / B', 'A', 'Color Code'];
 
 /**
- * What goes in the Table# cell: the number on its own for a numbered table
- * ("5", "Table 5", "05. 5" → 5), otherwise the table's name with any sort
- * prefix stripped ("00. Head Table" → "Head Table").
+ * What goes in the Table# cell: the table's number when it has one;
+ * otherwise the number on its own for a numbered name ("5", "Table 5",
+ * "05. 5" → 5), else the table's name with any sort prefix stripped
+ * ("00. Head Table" → "Head Table").
  */
-export function sheetTableValue(raw: string): string | number {
+export function sheetTableValue(raw: string, number?: number | null): string | number {
+  if (number != null) return number;
   const shown = tableDisplayName(raw);
   const m = /^table\s+(\d+)$/i.exec(shown);
   return m ? Number(m[1]) : shown;
 }
 
 /** Named tables (Head Table) first in site order, then numbered tables by number, Unassigned last. */
-function tableRank(raw: string): [number, number] {
-  if (raw === UNASSIGNED_TABLE) return [2, 0];
-  const v = sheetTableValue(raw);
+function tableRank(g: SeatedGuest): [number, number] {
+  if (g.table === UNASSIGNED_TABLE) return [2, 0];
+  const v = sheetTableValue(g.table, g.tableNumber);
   return typeof v === 'number' ? [1, v] : [0, 0];
 }
 
@@ -64,7 +66,7 @@ export function orderForSheet(guests: SeatedGuest[]): SeatedGuest[] {
   // Stable sort: guests keep their order within a table, and named tables
   // keep the site's own order among themselves.
   return guests
-    .map((g, i) => ({ g, i, r: tableRank(g.table) }))
+    .map((g, i) => ({ g, i, r: tableRank(g) }))
     .sort((a, b) => a.r[0] - b.r[0] || a.r[1] - b.r[1] || a.i - b.i)
     .map((x) => x.g);
 }
@@ -132,7 +134,7 @@ export function buildReceptionSheet(args: {
     const dietary = [g.dietary.trim(), g.householdDietary && `Household: ${g.householdDietary}`].filter(Boolean).join('; ');
     rows.push([
       g.guestName.trim(),
-      sheetTableValue(g.table),
+      sheetTableValue(g.table, g.tableNumber),
       g.meal.trim() || null,
       dietary || null,
       childSeatMark(g) || null,

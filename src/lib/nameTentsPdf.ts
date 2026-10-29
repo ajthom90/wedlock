@@ -4,6 +4,7 @@ import type { SeatedGuest } from './seatingExport';
 import { childSeatLabel } from './guestNeeds';
 import { computeLabelPositions, embedThemeFonts, type LabelFontBytes, type ResolvedFonts } from './mailingLabelsPdf';
 import { hexToRgb01, mealColorFor, type MealColor } from './mealColors';
+import { tableLabel } from './tableNumbers';
 
 // Printable table name tents: one folded card per seated guest with their
 // name, their table, and optionally a small line of needs (child seat,
@@ -40,13 +41,11 @@ export interface TentOptions {
 /**
  * Table names are often prefixed purely to sort them ("01. Head Table",
  * "2) Garden"). Drop that prefix for print, and turn a bare number into
- * "Table 5" so a card never just says "5".
+ * "Table 5" so a card never just says "5". A table with a number prints as
+ * "Table 5" (see tableLabel).
  */
 export function tableDisplayName(raw: string): string {
-  const name = raw.trim();
-  const stripped = name.replace(/^\d+\s*[.):\-]\s*/, '').trim();
-  const shown = stripped || name;
-  return /^\d+$/.test(shown) ? `Table ${shown}` : shown;
+  return tableLabel({ name: raw });
 }
 
 export function composeTentContent(
@@ -63,7 +62,7 @@ export function composeTentContent(
   if (opts.showMeal && guest.meal.trim()) details.push(guest.meal.trim());
   const content: TentContent = {
     name: guest.guestName.trim(),
-    table: opts.showTable ? tableDisplayName(guest.table) : '',
+    table: opts.showTable ? tableLabel({ name: guest.table, number: guest.tableNumber }) : '',
     details,
   };
   if (opts.showMealColor) content.mealColor = mealColorFor(guest.meal, mealColors)?.hex ?? '';

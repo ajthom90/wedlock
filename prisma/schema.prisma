@@ -236,9 +236,15 @@ model NavItem {
 }
 
 // Table/seating assignments (#8)
+// number is the table's printed number (optional): the Reception sheet's
+// Table#, "Table N" on name tents, and the sort order. Tables without one
+// (a Head Table) sort first, by name. Names that used to carry the number as
+// a sort prefix ("05. Smith Family") are split once on upgrade
+// (src/lib/tableNumbers.ts).
 model SeatingTable {
   id          String            @id @default(uuid())
   name        String
+  number      Int?
   capacity    Int               @default(10)
   assignments TableAssignment[]
 }
