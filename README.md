@@ -20,7 +20,7 @@ All content (couple names, dates, venues, events, photos, copy, colors, fonts) i
 - **Photo Wall** — real-time reception photo wall with QR-code upload; optional admin moderation.
 - **FAQ** — admin-managed question/answer list.
 - **Seating chart** — searchable by name once assignments are published.
-- **RSVP** — per-guest meal selection, dietary notes, song requests, plus-ones, plus any custom questions the couple defines. Change log retained per invitation.
+- **RSVP** — per-guest meal selection, per-person allergies / dietary notes, song requests, plus-ones, plus any custom questions the couple defines. Change log retained per invitation.
 
 ### For the couple / admin
 
@@ -28,7 +28,9 @@ All content (couple names, dates, venues, events, photos, copy, colors, fonts) i
 - **RSVP dashboard** — see every response, edit submissions as an admin, view per-household change history.
 - **Custom RSVP form** — add/remove/reorder extra questions beyond the built-in meal/dietary/song fields.
 - **Events editor** — CRUD with times, venues, per-event maps, rich descriptions, visibility level.
-- **Seating tables** — create tables, assign guests, publish to the public seating page, and download a guest / table / meal / dietary spreadsheet for the caterer.
+- **Seating tables** — create tables, assign guests, publish to the public seating page, and download a guest / table / meal / dietary / child seat spreadsheet for the caterer.
+- **Child seats** — mark guests who need a high chair or booster seat; shown on the Seating page, the seating spreadsheet and name tents.
+- **Name tents** — print folded table name tents (Avery 3328) with each seated guest's name and table, plus optional child seat, allergy and meal details.
 - **Shuttles** — routes, capacity, guest signups.
 - **Gifts registry tracker** — mark items purchased, track purchaser and thank-you status.
 - **Honeymoon fund** — manage items and pledges; mark pledges as received.
@@ -48,7 +50,7 @@ All content (couple names, dates, venues, events, photos, copy, colors, fonts) i
 - **Theme** — primary/accent/background colors, heading and body fonts.
 - **Custom fonts** — upload `.woff2`/`.ttf`/`.otf` files and they appear in the font picker.
 - **Navigation editor** — reorder, rename, hide, or nest any nav item (one level of dropdowns).
-- **Feature flags** — toggle any major module on or off. When off, both the public page and the nav link disappear; when on, they return. Covers: per-guest meal selection, song requests, dietary notes, plus-ones, RSVP address, weather widget, story timeline, transportation, honeymoon fund, photo wall, trivia, guest photo uploads, guest book (off / public / moderated), vendor contacts, budget tracker, and site-wide password gate.
+- **Feature flags** — toggle any major module on or off. When off, both the public page and the nav link disappear; when on, they return. Covers: per-guest meal selection, song requests, dietary notes, plus-ones, RSVP address, weather widget, story timeline, transportation, honeymoon fund, photo wall, trivia, guest photo uploads, guest book (off / public / moderated), vendor contacts, budget tracker, child seats, name tents, and site-wide password gate.
 - **Site password gate** — optional global password to gate the public site.
 
 ### System

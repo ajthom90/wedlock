@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.19.0",
+    "date": "2026-10-29",
+    "changes": [
+      { "type": "feature", "text": "Child seats: mark any guest or plus-one as needing a high chair or a booster seat on the Invitations and RSVPs editors. It shows as a badge on the Seating page, as a Child Seat column in the seating spreadsheet and RSVPs CSV, and on name tents. Toggle with the new Child seats feature flag." },
+      { "type": "feature", "text": "Allergies per person: the RSVP form and the admin RSVP editor now take allergies and dietary needs for each guest and plus-one instead of one note for the whole household. The confirmation email, RSVPs CSV, seating spreadsheet and Seating page show them per person. Older household notes are kept: a household of one gets the note as theirs, and larger households are flagged \"Allergies need review\" on the RSVPs page until someone splits the note per person." },
+      { "type": "feature", "text": "Print Name Tents on the Seating page: a PDF of Avery 3328 tent cards (2\" × 3½\" folded, 4 per sheet) with each seated guest's name and table, printed on both halves so it reads from either side. Optional small print for child seats, allergies and meals; pick tables, a start position and nudge offsets, and test-print with outlines on plain paper first. Toggle with the new Name tents feature flag." },
+      { "type": "fix", "text": "Adding a new invitation from the admin form now saves its guest names." }
+    ]
+  },
+  {
     "version": "2.18.0",
     "date": "2026-10-28",
     "changes": [
