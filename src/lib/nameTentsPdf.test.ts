@@ -24,6 +24,12 @@ describe('TENT_CARD_FORMATS', () => {
     expect(format3328.labelWidth).toBe(3.5);
     expect(format3328.labelHeight / 2).toBe(2);
   });
+
+  it("3328 matches Avery's template: cards at ½\" and 4½\" across, 1¼\" and 5¾\" down", async () => {
+    const { computeLabelPositions } = await import('./mailingLabelsPdf');
+    const pos = computeLabelPositions({ format: format3328, startPosition: 1, labelCount: 4 });
+    expect(pos.map((p) => [p.xInches, p.yInchesFromTop])).toEqual([[0.5, 1.25], [4.5, 1.25], [0.5, 5.75], [4.5, 5.75]]);
+  });
 });
 
 describe('tableDisplayName', () => {

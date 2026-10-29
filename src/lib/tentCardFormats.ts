@@ -5,10 +5,9 @@
 // stood on the table.
 //
 // Field names match AveryFormat so the label grid math (computeLabelPositions)
-// is shared. Avery doesn't publish margins for these sheets; the numbers
-// below assume the card grid is centred on the page. If a test print on plain
-// paper doesn't line up with a real sheet, adjust marginTop / marginLeft here
-// (or use the nudge offsets on the Name Tents page).
+// is shared. Measurements come from Avery's own blank template for each
+// sheet. If a printer still shifts things, use the nudge offsets on the Name
+// Tents page rather than changing these.
 
 export interface TentCardFormat {
   code: '3328';
@@ -32,19 +31,20 @@ export interface TentCardFormat {
 
 export const TENT_CARD_FORMATS: TentCardFormat[] = [
   {
-    // Matte white with a metallic gold border, 2" × 3½" folded, 4 per sheet.
-    // Shares Avery's 5302 small tent card template.
+    // Matte white with a metallic gold border, 2" × 3½" folded, 4 per sheet
+    // (2 across, 2 down). From Avery's 3328 template: ½" side margins and
+    // ½" between columns, 1¼" top and bottom margins and ½" between rows.
     code: '3328',
     displayName: 'Avery 3328 — 4 tent cards/sheet (2" × 3½" folded, gold border)',
     paper: 'letter',
     pageWidth: 8.5,
     pageHeight: 11,
-    marginTop: 1.5,
-    marginLeft: 0.75,
+    marginTop: 1.25,
+    marginLeft: 0.5,
     labelWidth: 3.5,
     labelHeight: 4,
-    horizontalGap: 0,
-    verticalGap: 0,
+    horizontalGap: 0.5,
+    verticalGap: 0.5,
     cols: 2,
     rows: 2,
     labelsPerSheet: 4,
