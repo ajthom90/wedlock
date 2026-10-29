@@ -48,7 +48,7 @@ describe('buildReceptionSheet', () => {
     { name: '2', assignments: [{ guestName: 'Cy Park', invitationId: 'b' }, { guestName: 'Di Park', invitationId: 'b' }, { guestName: 'Ed Park', invitationId: 'b' }] },
     { name: 'Head Table', assignments: [{ guestName: 'Bo Lee', invitationId: 'a' }, { guestName: 'Ann Lee', invitationId: 'a' }] },
   ];
-  const sheet = buildReceptionSheet({ tables, invitations, mealChoices, vendorMeals: { standard: 3, vegetarian: 1 } });
+  const sheet = buildReceptionSheet({ tables, invitations, mealChoices, vendorMeals: [{ name: 'Standard Vendor Meals', count: 3 }, { name: 'Vegetarian Vendor Meal', count: 1 }] });
 
   it('lays out the summary block, header and guest rows like the couple’s sheet', () => {
     expect(sheetToText(sheet.rows)).toBe([
@@ -84,14 +84,46 @@ describe('buildReceptionSheet', () => {
   it('leaves out the no-meal row when everyone has one, and ignores bad vendor counts', () => {
     const s = buildReceptionSheet({
       tables: [], invitations: [inv('a', [{ name: 'Ann Lee', meal: 'Lobster' }])], mealChoices: [{ name: 'Beef', color: 'Red' }],
-      vendorMeals: { standard: -2, vegetarian: Number.NaN },
+      vendorMeals: [{ name: 'Crew', count: -2 }, { name: 'Band', count: Number.NaN }],
     });
     expect(sheetToText(s.rows).split('\n').slice(0, 6)).toEqual([
       'Meal Choice\t\tColor Code',
       'Beef\t0\tRed',
       'Lobster\t1',
-      'Standard Vendor Meals\t0\tAllergens / Restrictions (A)\t0',
-      'Vegetarian Vendor Meal\t0\tBooster Chairs (B)\t0',
+      'Crew\t0\tAllergens / Restrictions (A)\t0',
+      'Band\t0\tBooster Chairs (B)\t0',
+      'Total:\t1\tHeight Chairs (H)\t0',
+    ]);
+  });
+
+  const summary = (vendorMeals: { name: string; count: number }[]) =>
+    sheetToText(buildReceptionSheet({ tables: [], invitations: [inv('a', [{ name: 'Ann Lee', meal: 'Beef' }])], mealChoices: [{ name: 'Beef', color: 'Red' }], vendorMeals }).rows)
+      .split('\n').slice(0, -2);
+
+  it('lists any number of vendor meals and adds them all to the total', () => {
+    expect(summary([{ name: 'DJ', count: 2 }, { name: 'Photo', count: 3 }, { name: 'Planner (GF)', count: 1 }])).toEqual([
+      'Meal Choice\t\tColor Code',
+      'Beef\t1\tRed',
+      'DJ\t2',
+      'Photo\t3\tAllergens / Restrictions (A)\t0',
+      'Planner (GF)\t1\tBooster Chairs (B)\t0',
+      'Total:\t7\tHeight Chairs (H)\t0',
+    ]);
+  });
+
+  it('keeps A and B off the meal rows when there are fewer than two vendor meals', () => {
+    expect(summary([{ name: 'Crew', count: 4 }])).toEqual([
+      'Meal Choice\t\tColor Code',
+      'Beef\t1\tRed',
+      'Crew\t4\tAllergens / Restrictions (A)\t0',
+      '\t\tBooster Chairs (B)\t0',
+      'Total:\t5\tHeight Chairs (H)\t0',
+    ]);
+    expect(summary([])).toEqual([
+      'Meal Choice\t\tColor Code',
+      'Beef\t1\tRed',
+      '\t\tAllergens / Restrictions (A)\t0',
+      '\t\tBooster Chairs (B)\t0',
       'Total:\t1\tHeight Chairs (H)\t0',
     ]);
   });

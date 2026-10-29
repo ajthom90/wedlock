@@ -1,4 +1,5 @@
 import prisma from './prisma';
+import { parseVendorMeals, type VendorMeal } from './vendorMeals';
 
 export interface ThemeSettings {
   primaryColor: string;
@@ -40,9 +41,9 @@ export interface SiteSettings {
   emailHeading: string;
   emailFooter: string;
   // Meals the caterer plates for vendors (DJ, photographer…), which aren't
-  // guests on any invitation. Shown on the Reception Seating spreadsheet.
-  vendorMealsStandard: number;
-  vendorMealsVegetarian: number;
+  // guests on any invitation, by name with a count. Shown on the Reception
+  // Seating spreadsheet and added to its total. See lib/vendorMeals.ts.
+  vendorMeals: VendorMeal[];
 }
 
 export interface FeatureSettings {
@@ -133,8 +134,7 @@ const defaultSite: SiteSettings = {
   replyToEmail: '',
   emailHeading: '',
   emailFooter: '',
-  vendorMealsStandard: 0,
-  vendorMealsVegetarian: 0,
+  vendorMeals: [],
 };
 
 const defaultFeatures: FeatureSettings = {
@@ -214,9 +214,8 @@ export async function getSiteSettings(): Promise<SiteSettings> {
         (site as any)[key] = setting.value === 'true';
       } else if (key === 'qrCardWidth' || key === 'qrCardHeight') {
         (site as any)[key] = parseFloat(setting.value) || defaultSite[key];
-      } else if (key === 'vendorMealsStandard' || key === 'vendorMealsVegetarian') {
-        const n = parseInt(setting.value, 10);
-        (site as any)[key] = Number.isFinite(n) && n > 0 ? n : 0;
+      } else if (key === 'vendorMeals') {
+        (site as any)[key] = parseVendorMeals(setting.value);
       } else if (key === 'homeBannerStyle') {
         (site as any)[key] = setting.value === 'hero' ? 'hero' : 'strip';
       } else if (key === 'eventsDisplayStyle') {
@@ -232,8 +231,9 @@ export async function getSiteSettings(): Promise<SiteSettings> {
 }
 
 export async function saveSiteSettings(updates: Partial<SiteSettings>) {
-  for (const [key, value] of Object.entries(updates)) {
-    if (value !== undefined) {
+  for (const [key, raw] of Object.entries(updates)) {
+    if (raw !== undefined) {
+      const value = key === 'vendorMeals' ? parseVendorMeals(raw) : raw;
       const strValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
       await setSetting(`site.${key}`, strValue);
     }

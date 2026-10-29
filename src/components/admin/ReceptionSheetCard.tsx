@@ -4,47 +4,56 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MAX_VENDOR_MEALS, parseVendorMeals } from '@/lib/vendorMeals';
 
-// Vendor meal counts + the Reception Seating spreadsheet download, on the
-// Seating page. The counts are saved to site settings before each download so
-// the sheet always carries what's in the boxes.
+interface Row { key: number; name: string; count: string }
+
+let nextKey = 0;
+const toRow = (name: string, count: number | string): Row => ({ key: nextKey++, name, count: String(count) });
+
+// Vendor meals (any number, each a name and a count) + the Reception Seating
+// spreadsheet download, on the Seating page. The list is saved to site
+// settings with Save, and again before each download so the sheet always
+// carries what's on screen.
 export function ReceptionSheetCard() {
-  const [standard, setStandard] = useState('0');
-  const [vegetarian, setVegetarian] = useState('0');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [rows, setRows] = useState<Row[]>([]);
+  const [busy, setBusy] = useState<'save' | 'download' | null>(null);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     fetch('/api/settings')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (!data?.site) return;
-        setStandard(String(data.site.vendorMealsStandard ?? 0));
-        setVegetarian(String(data.site.vendorMealsVegetarian ?? 0));
+        if (data?.site) setRows(parseVendorMeals(data.site.vendorMeals).map((v) => toRow(v.name, v.count)));
       })
       .catch(() => {});
   }, []);
 
-  const count = (v: string) => {
-    const n = parseInt(v, 10);
-    return Number.isFinite(n) && n > 0 ? n : 0;
+  const update = (key: number, patch: Partial<Row>) =>
+    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+
+  const save = async () => {
+    const vendorMeals = parseVendorMeals(rows.map((r) => ({ name: r.name, count: r.count })));
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ site: { vendorMeals } }),
+    });
+    if (!res.ok) throw new Error('Could not save the vendor meals');
+    setRows(vendorMeals.map((v) => toRow(v.name, v.count)));
   };
 
-  const download = async () => {
-    setBusy(true);
-    setError(null);
+  const run = async (kind: 'save' | 'download') => {
+    setBusy(kind);
+    setMessage(null);
     try {
-      const res = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ site: { vendorMealsStandard: count(standard), vendorMealsVegetarian: count(vegetarian) } }),
-      });
-      if (!res.ok) throw new Error('Could not save the vendor meal counts');
-      window.location.href = '/api/tables/reception-sheet';
+      await save();
+      if (kind === 'download') window.location.href = '/api/tables/reception-sheet';
+      else setMessage({ ok: true, text: 'Vendor meals saved.' });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setMessage({ ok: false, text: err instanceof Error ? err.message : String(err) });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -53,25 +62,46 @@ export function ReceptionSheetCard() {
       <CardHeader>
         <CardTitle>Reception Sheet for Vendors</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
         <p className="text-sm text-gray-600">
           Meal counts with their colors, then every guest’s table, meal, allergies (A) and high chair or booster (H / B).
-          Vendor meals are added to the total.
         </p>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="w-44">
-            <Input id="vendor-meals-standard" label="Standard vendor meals" type="number" min={0} value={standard}
-              onChange={(e) => setStandard(e.target.value)} />
-          </div>
-          <div className="w-44">
-            <Input id="vendor-meals-vegetarian" label="Vegetarian vendor meals" type="number" min={0} value={vegetarian}
-              onChange={(e) => setVegetarian(e.target.value)} />
-          </div>
-          <Button size="sm" onClick={download} disabled={busy}>
-            {busy ? 'Preparing…' : 'Download Reception Sheet'}
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-gray-700">Vendor meals</p>
+          <p className="text-xs text-gray-500">
+            Meals for vendors who aren’t on the guest list. Each one is listed on the sheet with its count and added to the total.
+          </p>
+          {rows.length === 0 && <p className="text-sm text-gray-500 italic">No vendor meals yet.</p>}
+          {rows.map((r) => (
+            <div key={r.key} className="flex items-center gap-2">
+              <Input aria-label="Vendor meal name" placeholder="e.g. Standard Vendor Meals" value={r.name}
+                onChange={(e) => update(r.key, { name: e.target.value })} />
+              <div className="w-24 shrink-0">
+                <Input aria-label="Count" type="number" min={0} value={r.count}
+                  onChange={(e) => update(r.key, { count: e.target.value })} />
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}>
+                Remove
+              </Button>
+            </div>
+          ))}
+          {rows.length < MAX_VENDOR_MEALS && (
+            <Button size="sm" variant="outline" onClick={() => setRows((rs) => [...rs, toRow('', 1)])}>
+              Add vendor meal
+            </Button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => run('save')} disabled={busy !== null}>
+            {busy === 'save' ? 'Saving…' : 'Save vendor meals'}
+          </Button>
+          <Button size="sm" onClick={() => run('download')} disabled={busy !== null}>
+            {busy === 'download' ? 'Preparing…' : 'Download Reception Sheet'}
           </Button>
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {message && <p className={`text-sm ${message.ok ? 'text-green-700' : 'text-red-600'}`}>{message.text}</p>}
       </CardContent>
     </Card>
   );
