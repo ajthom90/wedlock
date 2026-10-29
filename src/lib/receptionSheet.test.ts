@@ -1,0 +1,98 @@
+import { describe, it, expect } from 'vitest';
+import { buildReceptionSheet, sheetTableValue, sheetToText } from './receptionSheet';
+import type { SeatingExportInvitation } from './seatingExport';
+
+const inv = (
+  id: string,
+  people: { name: string; meal?: string; dietary?: string; seat?: string }[],
+  householdNote: string | null = null,
+): SeatingExportInvitation => ({
+  id,
+  guests: people.map((p, i) => ({ id: `${id}-${i}`, name: p.name, childSeat: p.seat ?? null })),
+  response: {
+    attending: 'yes',
+    attendingGuests: JSON.stringify(people.map((_, i) => `${id}-${i}`)),
+    guestMeals: JSON.stringify(Object.fromEntries(people.map((p, i) => [`${id}-${i}`, p.meal ?? '']))),
+    guestDietary: JSON.stringify(Object.fromEntries(people.flatMap((p, i) => (p.dietary ? [[`${id}-${i}`, p.dietary]] : [])))),
+    plusOnes: null,
+    dietaryNotes: householdNote,
+  },
+});
+
+const mealChoices = [
+  { name: 'Beef', color: 'Red' },
+  { name: 'Chicken', color: 'Blue' },
+  { name: "Kid's Meal", color: 'Pink' },
+  { name: 'Fish' },
+];
+
+describe('sheetTableValue', () => {
+  it('gives numbered tables as numbers and keeps named tables as names', () => {
+    expect(sheetTableValue('5')).toBe(5);
+    expect(sheetTableValue('Table 12')).toBe(12);
+    expect(sheetTableValue('07. 7')).toBe(7);
+    expect(sheetTableValue('00. Head Table')).toBe('Head Table');
+    expect(sheetTableValue('Head Table')).toBe('Head Table');
+  });
+});
+
+describe('buildReceptionSheet', () => {
+  const invitations = [
+    inv('a', [{ name: 'Ann Lee', meal: 'Beef', dietary: 'Gluten Free' }, { name: 'Bo Lee', meal: 'Chicken' }]),
+    inv('b', [{ name: 'Cy Park', meal: 'Beef' }, { name: 'Di Park', meal: "Kid's Meal", seat: 'high_chair' }, { name: 'Ed Park', meal: "Kid's Meal", seat: 'booster' }]),
+    inv('c', [{ name: 'Flo Ng', meal: 'Chicken' }, { name: 'Gil Ng', meal: 'Beef' }], 'Shellfish'),
+    inv('d', [{ name: 'Hal Ito' }]),
+  ];
+  const tables = [
+    { name: '10', assignments: [{ guestName: 'Flo Ng', invitationId: 'c' }, { guestName: 'Gil Ng', invitationId: 'c' }] },
+    { name: '2', assignments: [{ guestName: 'Cy Park', invitationId: 'b' }, { guestName: 'Di Park', invitationId: 'b' }, { guestName: 'Ed Park', invitationId: 'b' }] },
+    { name: 'Head Table', assignments: [{ guestName: 'Bo Lee', invitationId: 'a' }, { guestName: 'Ann Lee', invitationId: 'a' }] },
+  ];
+  const sheet = buildReceptionSheet({ tables, invitations, mealChoices, vendorMeals: { standard: 3, vegetarian: 1 } });
+
+  it('lays out the summary block, header and guest rows like the couple’s sheet', () => {
+    expect(sheetToText(sheet.rows)).toBe([
+      'Meal Choice\t\tColor Code',
+      'Beef\t3\tRed',
+      'Chicken\t2\tBlue',
+      "Kid's Meal\t2\tPink",
+      'Fish\t0',
+      'No meal chosen\t1',
+      'Standard Vendor Meals\t3\tAllergens / Restrictions (A)\t1',
+      'Vegetarian Vendor Meal\t1\tBooster Chairs (B)\t1',
+      'Total:\t12\tHeight Chairs (H)\t1',
+      'Guest Name\tTable#\tMeal Choice\tDietary Restrictions\tH / B\tA\tColor Code',
+      'Bo Lee\tHead Table\tChicken\t\t\t\tBlue',
+      'Ann Lee\tHead Table\tBeef\tGluten Free\t\tA\tRed',
+      'Cy Park\t2\tBeef\t\t\t\tRed',
+      "Di Park\t2\tKid's Meal\t\tH\t\tPink",
+      "Ed Park\t2\tKid's Meal\t\tB\t\tPink",
+      'Flo Ng\t10\tChicken\tHousehold: Shellfish\t\t\tBlue',
+      'Gil Ng\t10\tBeef\tHousehold: Shellfish\t\t\tRed',
+      'Hal Ito\tUnassigned',
+    ].join('\n'));
+    expect(sheet.headerRow).toBe(10);
+  });
+
+  it('writes table numbers and counts as numbers', () => {
+    const header = sheet.headerRow - 1;
+    expect(sheet.rows[1][1]).toBe(3);
+    expect(sheet.rows[header + 3][1]).toBe(2);
+    expect(sheet.rows[header + 6][1]).toBe(10);
+  });
+
+  it('leaves out the no-meal row when everyone has one, and ignores bad vendor counts', () => {
+    const s = buildReceptionSheet({
+      tables: [], invitations: [inv('a', [{ name: 'Ann Lee', meal: 'Lobster' }])], mealChoices: [{ name: 'Beef', color: 'Red' }],
+      vendorMeals: { standard: -2, vegetarian: Number.NaN },
+    });
+    expect(sheetToText(s.rows).split('\n').slice(0, 6)).toEqual([
+      'Meal Choice\t\tColor Code',
+      'Beef\t0\tRed',
+      'Lobster\t1',
+      'Standard Vendor Meals\t0\tAllergens / Restrictions (A)\t0',
+      'Vegetarian Vendor Meal\t0\tBooster Chairs (B)\t0',
+      'Total:\t1\tHeight Chairs (H)\t0',
+    ]);
+  });
+});
