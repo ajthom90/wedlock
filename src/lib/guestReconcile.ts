@@ -21,11 +21,16 @@ export interface ExistingGuest {
 export interface IncomingGuest {
   id?: string | null;
   name: string;
+  // Omitted (undefined) leaves a stored seat alone — the legacy guestNames
+  // payload has no seats and must not clear them. null clears.
+  childSeat?: string | null;
 }
 
+type SeatPatch = { childSeat?: string | null };
+
 export interface GuestOps {
-  update: { id: string; name: string; isPrimary: boolean; order: number }[];
-  create: { name: string; isPrimary: boolean; order: number }[];
+  update: ({ id: string; name: string; isPrimary: boolean; order: number } & SeatPatch)[];
+  create: ({ name: string; isPrimary: boolean; order: number } & SeatPatch)[];
   deleteIds: string[];
 }
 
@@ -56,8 +61,9 @@ export function reconcileGuests(existing: ExistingGuest[], incoming: IncomingGue
   const ops: GuestOps = { update: [], create: [], deleteIds: [] };
   for (let i = 0; i < incoming.length; i++) {
     const id = assigned.get(i);
-    if (id) ops.update.push({ id, name: incoming[i].name, isPrimary: i === 0, order: i });
-    else ops.create.push({ name: incoming[i].name, isPrimary: i === 0, order: i });
+    const seat: SeatPatch = incoming[i].childSeat !== undefined ? { childSeat: incoming[i].childSeat } : {};
+    if (id) ops.update.push({ id, name: incoming[i].name, isPrimary: i === 0, order: i, ...seat });
+    else ops.create.push({ name: incoming[i].name, isPrimary: i === 0, order: i, ...seat });
   }
   ops.deleteIds = existing.filter((g) => !usedIds.has(g.id)).map((g) => g.id);
   return ops;

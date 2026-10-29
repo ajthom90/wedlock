@@ -29,7 +29,7 @@ describe('validateRsvpSubmission', () => {
     );
     expect(result).toEqual({
       ok: true,
-      data: { attending: 'no', guestCount: 0, attendingGuests: [], guestMeals: {}, plusOnes: [] },
+      data: { attending: 'no', guestCount: 0, attendingGuests: [], guestMeals: {}, guestDietary: {}, plusOnes: [] },
     });
   });
 
@@ -133,7 +133,7 @@ describe('validateRsvpSubmission', () => {
 
   it('tolerates malformed shapes for optional fields', () => {
     const result = validateRsvpSubmission(
-      { attending: 'yes', guestCount: 1, attendingGuests: 'nope', guestMeals: 'nope', plusOnes: 'nope' },
+      { attending: 'yes', guestCount: 1, attendingGuests: 'nope', guestMeals: 'nope', guestDietary: 'nope', plusOnes: 'nope' },
       ctx,
     );
     expect(result.ok).toBe(true);
@@ -143,7 +143,32 @@ describe('validateRsvpSubmission', () => {
       guestCount: 1,
       attendingGuests: [],
       guestMeals: {},
+      guestDietary: {},
       plusOnes: [],
     });
+  });
+
+  it('keeps per-guest allergies only for attending guests, trimmed', () => {
+    const result = validateRsvpSubmission(
+      {
+        attending: 'yes',
+        attendingGuests: ['g1'],
+        guestDietary: { g1: '  peanuts  ', g2: 'shellfish', ghost: 'gluten' },
+        plusOnes: [{ name: 'Extra', meal: 'Fish', dietary: ' dairy ', childSeat: 'booster' }],
+      },
+      ctx,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.guestDietary).toEqual({ g1: 'peanuts' });
+    expect(result.data.plusOnes).toEqual([{ name: 'Extra', meal: 'Fish', dietary: 'dairy', childSeat: 'booster' }]);
+  });
+
+  it('drops unknown child-seat values and blank plus-one allergies', () => {
+    const result = validateRsvpSubmission(
+      { attending: 'yes', attendingGuests: ['g1'], plusOnes: [{ name: 'Extra', meal: '', dietary: '   ', childSeat: 'throne' }] },
+      ctx,
+    );
+    expect(result.ok && result.data.plusOnes).toEqual([{ name: 'Extra', meal: '' }]);
   });
 });

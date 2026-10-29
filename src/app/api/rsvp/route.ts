@@ -5,6 +5,7 @@ import { parseRsvpChoices } from '@/lib/rsvpChoices';
 import { validateRsvpSubmission } from '@/lib/rsvpValidation';
 import { cookies } from 'next/headers';
 import { getEmailConfig, sendRsvpConfirmation } from '@/lib/email';
+import { carryOverPlusOneNeeds, parseGuestDietary, pruneGuestDietary } from '@/lib/guestNeeds';
 
 export async function GET(request: Request) {
   try {
@@ -65,7 +66,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { code, attending, guestCount, responses, guestMeals, message, attendingGuests, plusOnes, songRequests, dietaryNotes, contactEmail, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, correction } = await request.json();
+    const { code, attending, guestCount, responses, guestMeals, guestDietary, message, attendingGuests, plusOnes, songRequests, dietaryNotes, contactEmail, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, correction } = await request.json();
     if (!code) return NextResponse.json({ error: 'Invitation code is required' }, { status: 400 });
     const settings = await getSiteSettings();
     if (settings.rsvpDeadline && settings.rsvpCloseAfterDeadline) {
@@ -79,7 +80,7 @@ export async function POST(request: Request) {
     // Validate the attendance fields against this invitation's limits BEFORE
     // writing anything, so a rejected submission leaves no partial state.
     const validation = validateRsvpSubmission(
-      { attending, guestCount, attendingGuests, guestMeals, plusOnes },
+      { attending, guestCount, attendingGuests, guestMeals, guestDietary, plusOnes },
       {
         maxGuests: invitation.maxGuests,
         plusOnesAllowed: invitation.plusOnesAllowed,
@@ -119,12 +120,30 @@ export async function POST(request: Request) {
     }
     const existing = await prisma.rsvpResponse.findUnique({ where: { invitationId: invitation.id } });
     const cleanResponses = responses && typeof responses === 'object' && !Array.isArray(responses) ? responses : {};
+    // High chairs / boosters on plus-ones are the couple's to set; keep the
+    // stored ones rather than trusting the guest's resubmit. Allergies the
+    // form didn't ask about this time (the allergies feature is off, or a
+    // head-count RSVP with no guest rows) are kept rather than wiped.
+    const plusOnesToSave = carryOverPlusOneNeeds(submission.plusOnes, existing?.plusOnes, { keepDietary: !features.dietaryNotes });
+    let guestDietaryToSave = submission.guestDietary;
+    if (submission.attending === 'yes' && (!features.dietaryNotes || guestDietary === undefined)) {
+      const stored = parseGuestDietary(existing?.guestDietary);
+      // An empty roster means everyone on the invitation (head-count RSVP).
+      guestDietaryToSave = submission.attendingGuests.length ? pruneGuestDietary(stored, submission.attendingGuests) : stored;
+    }
+    // Allergies are per guest now, so the per-guest form doesn't send the old
+    // household-wide note. Keep a stored one until someone edits it (the
+    // household textarea, or the admin editor) instead of silently dropping it.
+    const householdDietary = typeof dietaryNotes === 'string'
+      ? dietaryNotes.trim() || null
+      : existing?.dietaryNotes ?? null;
     const data = {
       attending: submission.attending, guestCount: submission.guestCount, responses: JSON.stringify(cleanResponses),
       guestMeals: Object.keys(submission.guestMeals).length ? JSON.stringify(submission.guestMeals) : null,
+      guestDietary: Object.keys(guestDietaryToSave).length ? JSON.stringify(guestDietaryToSave) : null,
       attendingGuests: submission.attendingGuests.length ? JSON.stringify(submission.attendingGuests) : null,
-      plusOnes: submission.plusOnes.length ? JSON.stringify(submission.plusOnes) : null,
-      songRequests: songRequests || null, dietaryNotes: dietaryNotes || null, message: message || null,
+      plusOnes: plusOnesToSave.length ? JSON.stringify(plusOnesToSave) : null,
+      songRequests: songRequests || null, dietaryNotes: householdDietary, message: message || null,
     };
     // Snapshot of the submitted state for the change log. Stored as JSON so the
     // admin RSVPs page can reconstruct "what was RSVPed on this date" without
@@ -133,8 +152,9 @@ export async function POST(request: Request) {
       attending: submission.attending, guestCount: submission.guestCount,
       attendingGuests: submission.attendingGuests.length ? submission.attendingGuests : null,
       guestMeals: Object.keys(submission.guestMeals).length ? submission.guestMeals : null,
-      plusOnes: submission.plusOnes.length ? submission.plusOnes : null,
-      songRequests: songRequests || null, dietaryNotes: dietaryNotes || null,
+      guestDietary: Object.keys(guestDietaryToSave).length ? guestDietaryToSave : null,
+      plusOnes: plusOnesToSave.length ? plusOnesToSave : null,
+      songRequests: songRequests || null, dietaryNotes: householdDietary,
       message: message || null,
     });
     let response;

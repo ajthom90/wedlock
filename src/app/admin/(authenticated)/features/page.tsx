@@ -22,6 +22,8 @@ interface FeatureSettings {
   guestBook: string;
   vendorContacts: boolean;
   budgetTracker: boolean;
+  childSeats: boolean;
+  nameTents: boolean;
   customPages: boolean;
   sitePasswordEnabled: boolean;
   rsvpConfirmationEmails: boolean;
@@ -47,6 +49,8 @@ const DEFAULTS: FeatureSettings = {
   guestBook: 'off',
   vendorContacts: true,
   budgetTracker: true,
+  childSeats: true,
+  nameTents: true,
   customPages: true,
   sitePasswordEnabled: false,
   rsvpConfirmationEmails: false,
@@ -98,6 +102,10 @@ const ADMIN_TOOLS: ToggleDescriptor[] = [
     description: 'Keep the private Vendors admin page. Turning this off just hides the sidebar item — data is preserved.' },
   { key: 'budgetTracker', label: 'Budget tracker',
     description: 'Keep the private Budget admin page. Data is preserved when hidden.' },
+  { key: 'childSeats', label: 'High chairs & booster seats',
+    description: 'Mark guests who need a high chair or booster seat on the Invitations and RSVPs editors. Shown on the Seating page, the seating spreadsheet, and name tents. Turning this off hides it — recorded seats are kept.' },
+  { key: 'nameTents', label: 'Table name tents',
+    description: 'Show the Print Name Tents button on the Seating page — a PDF of Avery 3328 tent cards with each seated guest’s name and table.' },
   { key: 'customPages', label: 'Custom pages',
     description: 'Allow creating fully custom pages (title + WYSIWYG body) from the Pages admin. Built-in title/URL editing stays available either way.' },
 ];

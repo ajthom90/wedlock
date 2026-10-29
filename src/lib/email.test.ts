@@ -347,6 +347,19 @@ describe('sendRsvpConfirmation', () => {
     expect(text).toContain('Your message: Cannot wait!');
   });
 
+  it('lists allergies under each guest and plus-one', async () => {
+    const response = {
+      ...baseResponse,
+      guestDietary: JSON.stringify({ 'g-bob': 'Peanuts' }),
+      plusOnes: JSON.stringify([{ name: 'Pat Lee', meal: 'Fish', dietary: 'Dairy' }]),
+    };
+    await sendRsvpConfirmation(baseInvitation as any, response as any, { isUpdate: false });
+    const text: string = sendMailMock.mock.calls[0][0].text;
+    expect(text).toContain('Bob Smith (Fish)\n      Allergies / dietary: Peanuts');
+    expect(text).toContain('Pat Lee (Fish)\n      Allergies / dietary: Dairy');
+    expect(text).not.toMatch(/Alice Smith \(Chicken\)\n\s+Allergies/);
+  });
+
   it('uses replyToEmail as the Reply-To header', async () => {
     await sendRsvpConfirmation(baseInvitation as any, baseResponse as any, { isUpdate: false });
     expect(sendMailMock.mock.calls[0][0].replyTo).toBe('joeandalex@example.com');

@@ -4,6 +4,13 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { ChildSeatBadge } from '@/components/admin/ChildSeatSelect';
+import { listAttendees, type AttendeeInvitation } from '@/lib/attendees';
+
+// Child seat + allergies for one person, looked up by invitation + name the
+// same way the seating export matches assignments to attendees.
+interface GuestNeeds { childSeat: string | null; dietary: string }
+const needsKey = (invitationId: string | null, name: string) => `${invitationId ?? ''}|${name.trim().toLowerCase()}`;
 
 interface TableAssignment {
   id: string;
@@ -38,7 +45,15 @@ export default function SeatingPage() {
   const [tableCapacity, setTableCapacity] = useState('8');
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [needs, setNeeds] = useState<Map<string, GuestNeeds>>(new Map());
+  const [features, setFeatures] = useState<{ childSeats?: boolean; nameTents?: boolean; dietaryNotes?: boolean }>({});
 
+  useEffect(() => {
+    fetch('/api/features').then((r) => (r.ok ? r.json() : {})).then(setFeatures).catch(() => setFeatures({}));
+  }, []);
+
+  const needsFor = (invitationId: string | null, name: string): GuestNeeds | undefined =>
+    needs.get(needsKey(invitationId, name)) ?? needs.get(needsKey(null, name));
   const fetchTables = useCallback(async () => {
     try {
       const res = await fetch('/api/tables');
@@ -123,6 +138,19 @@ export default function SeatingPage() {
         });
 
         setUnseatedGuests(attendingGuests);
+
+        const needsMap = new Map<string, GuestNeeds>();
+        (invitations as AttendeeInvitation[]).forEach((inv) => {
+          // Everyone goes in, needs or not, so a guest with none never borrows
+          // a same-named guest's badges from another household.
+          for (const a of listAttendees(inv).attendees) {
+            const n = { childSeat: a.childSeat, dietary: a.dietary };
+            needsMap.set(needsKey(inv.id, a.name), n);
+            // Name-only fallback for assignments saved without an invitation.
+            if (!needsMap.has(needsKey(null, a.name))) needsMap.set(needsKey(null, a.name), n);
+          }
+        });
+        setNeeds(needsMap);
       }
     } catch (error) {
       console.error('Failed to fetch unseated guests:', error);
@@ -325,9 +353,16 @@ export default function SeatingPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Seating Chart</h1>
-        <a href="/api/tables/export">
-          <Button size="sm" variant="outline">Download Spreadsheet</Button>
-        </a>
+        <div className="flex gap-2">
+          {features.nameTents !== false && (
+            <a href="/admin/seating/name-tents">
+              <Button size="sm" variant="outline">Print Name Tents</Button>
+            </a>
+          )}
+          <a href="/api/tables/export">
+            <Button size="sm" variant="outline">Download Spreadsheet</Button>
+          </a>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -400,7 +435,10 @@ export default function SeatingPage() {
                     <div className="space-y-2">
                       {selectedTable.assignments?.map((assignment) => (
                         <div key={assignment.id} className="flex items-center gap-2 py-2 px-3 bg-gray-50 rounded">
-                          <span className="flex-1 text-sm">{assignment.guestName}</span>
+                          <span className="flex-1 text-sm">
+                            {assignment.guestName}
+                            <NeedsBadges needs={needsFor(assignment.invitationId, assignment.guestName)} features={features} />
+                          </span>
                           <select
                             className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
                             value=""
@@ -431,6 +469,8 @@ export default function SeatingPage() {
                     <span className="text-xs text-gray-500">{unseatedGuests.length} remaining</span>
                   </div>
                   <UnseatedList
+                    needsFor={needsFor}
+                    features={features}
                     guests={unseatedGuests}
                     onAssignOne={handleAssignUnseated}
                     onAssignHousehold={handleAssignHousehold}
@@ -444,7 +484,7 @@ export default function SeatingPage() {
               <CardHeader><CardTitle>Unseated guests</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-500 mb-3">Select a table on the left to start assigning the guests below.</p>
-                <UnseatedList guests={unseatedGuests} saving={false} />
+                <UnseatedList guests={unseatedGuests} saving={false} needsFor={needsFor} features={features} />
               </CardContent>
             </Card>
           )}
@@ -495,12 +535,33 @@ export default function SeatingPage() {
 // get a "seat whole household" shortcut, which is the most common case for
 // wedding seating. onAssignOne/onAssignHousehold are only wired when a table
 // is selected; otherwise the list is purely informational.
+function NeedsBadges({ needs, features }: {
+  needs: GuestNeeds | undefined;
+  features: { childSeats?: boolean; dietaryNotes?: boolean };
+}) {
+  if (!needs) return null;
+  return (
+    <>
+      {features.childSeats !== false && <ChildSeatBadge seat={needs.childSeat} />}
+      {features.dietaryNotes !== false && needs.dietary && (
+        <span className="ml-1 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full" title={needs.dietary}>
+          Allergy: {needs.dietary.length > 24 ? `${needs.dietary.slice(0, 24)}…` : needs.dietary}
+        </span>
+      )}
+    </>
+  );
+}
+
 function UnseatedList({
   guests,
   onAssignOne,
   onAssignHousehold,
   saving,
+  needsFor,
+  features,
 }: {
+  needsFor: (invitationId: string | null, name: string) => GuestNeeds | undefined;
+  features: { childSeats?: boolean; dietaryNotes?: boolean };
   guests: UnseatedGuest[];
   onAssignOne?: (guest: UnseatedGuest) => void;
   onAssignHousehold?: (invitationId: string, guests: UnseatedGuest[]) => void;
@@ -538,7 +599,10 @@ function UnseatedList({
           <div className="divide-y divide-gray-100">
             {members.map((g) => (
               <div key={g.key} className="flex items-center gap-2 px-3 py-2">
-                <span className="flex-1 text-sm">{g.name}</span>
+                <span className="flex-1 text-sm">
+                  {g.name}
+                  <NeedsBadges needs={needsFor(g.invitationId, g.name)} features={features} />
+                </span>
                 {onAssignOne && (
                   <Button size="sm" disabled={saving} onClick={() => onAssignOne(g)}>
                     Assign

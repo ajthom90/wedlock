@@ -75,10 +75,36 @@ export interface LabelFontBytes {
   bodyBold?: ArrayBuffer | Uint8Array;
 }
 
-interface ResolvedFonts {
+export interface ResolvedFonts {
   heading: PDFFont;
   body: PDFFont;
   bodyBold: PDFFont;
+}
+
+// Embeds theme fonts with graceful fallbacks: body → Helvetica, heading →
+// body, bodyBold → the body font itself when a theme body loaded (a custom
+// family usually has no separate bold file) or Helvetica-Bold otherwise.
+// Shared with the name-tent renderer.
+export async function embedThemeFonts(doc: PDFDocument, fontBytes?: LabelFontBytes): Promise<ResolvedFonts> {
+  if (fontBytes && (fontBytes.heading || fontBytes.body || fontBytes.bodyBold)) {
+    doc.registerFontkit(fontkit);
+  }
+  const helvetica = await doc.embedFont(StandardFonts.Helvetica);
+  let body = helvetica;
+  let usedThemeBody = false;
+  if (fontBytes?.body) {
+    try { body = await doc.embedFont(fontBytes.body); usedThemeBody = true; } catch { body = helvetica; }
+  }
+  let heading = body;
+  if (fontBytes?.heading) {
+    try { heading = await doc.embedFont(fontBytes.heading); } catch { heading = body; }
+  }
+  let bodyBold: PDFFont | null = null;
+  if (fontBytes?.bodyBold) {
+    try { bodyBold = await doc.embedFont(fontBytes.bodyBold); } catch { bodyBold = null; }
+  }
+  if (!bodyBold) bodyBold = usedThemeBody ? body : await doc.embedFont(StandardFonts.HelveticaBold);
+  return { heading, body, bodyBold };
 }
 
 function runFont(role: 'heading' | 'body', bold: boolean, fonts: ResolvedFonts): PDFFont {
@@ -105,11 +131,18 @@ export interface LabelPosition {
   yInchesFromTop: number;    // top edge of the label, measured from the page top
 }
 
+// The grid fields position math needs — shared by label sheets and tent
+// card sheets (src/lib/tentCardFormats.ts).
+export type LabelGrid = Pick<
+  AveryFormat,
+  'marginTop' | 'marginLeft' | 'labelWidth' | 'labelHeight' | 'horizontalGap' | 'verticalGap' | 'cols' | 'labelsPerSheet'
+>;
+
 // Given a format + starting slot + number of labels, compute where each
 // label lands. Pure math — no pdf-lib involved. The renderer in Task 4
 // converts inches to PDF points and draws inside each box.
 export function computeLabelPositions(args: {
-  format: AveryFormat;
+  format: LabelGrid;
   startPosition: number;    // 1-indexed; 1 = first slot on the first page
   labelCount: number;
 }): LabelPosition[] {
@@ -212,25 +245,7 @@ export async function renderLabelsPdf(args: {
 }): Promise<Uint8Array> {
   const { format, startPosition, labels, fonts: fontBytes } = args;
   const doc = await PDFDocument.create();
-  if (fontBytes && (fontBytes.heading || fontBytes.body || fontBytes.bodyBold)) {
-    doc.registerFontkit(fontkit);
-  }
-  const helvetica = await doc.embedFont(StandardFonts.Helvetica);
-  let body = helvetica;
-  let usedThemeBody = false;
-  if (fontBytes?.body) {
-    try { body = await doc.embedFont(fontBytes.body); usedThemeBody = true; } catch { body = helvetica; }
-  }
-  let heading = body;
-  if (fontBytes?.heading) {
-    try { heading = await doc.embedFont(fontBytes.heading); } catch { heading = body; }
-  }
-  let bodyBold: PDFFont | null = null;
-  if (fontBytes?.bodyBold) {
-    try { bodyBold = await doc.embedFont(fontBytes.bodyBold); } catch { bodyBold = null; }
-  }
-  if (!bodyBold) bodyBold = usedThemeBody ? body : await doc.embedFont(StandardFonts.HelveticaBold);
-  const fonts: ResolvedFonts = { heading, body, bodyBold };
+  const fonts = await embedThemeFonts(doc, fontBytes);
 
   const positions = computeLabelPositions({
     format,

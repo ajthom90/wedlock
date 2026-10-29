@@ -6,12 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { ChildSeatSelect, ChildSeatBadge } from '@/components/admin/ChildSeatSelect';
 
 interface Guest {
   id: string;
   name: string;
   isPrimary: boolean;
+  childSeat: string | null;
 }
+
+type GuestRow = { id: string | null; name: string; childSeat: string | null };
 
 interface RsvpResponse {
   id: string;
@@ -70,7 +74,9 @@ export default function InvitationsPage() {
   const [notes, setNotes] = useState('');
   // Each edit row carries the original guest id (null for newly added rows)
   // so the API can tell a typo fix (same row, new name) from a replacement.
-  const [guestRows, setGuestRows] = useState<{ id: string | null; name: string }[]>([{ id: null, name: '' }]);
+  const [guestRows, setGuestRows] = useState<GuestRow[]>([{ id: null, name: '', childSeat: null }]);
+  // High chair / booster pickers only show when the Child seats feature is on.
+  const [childSeatsOn, setChildSeatsOn] = useState(false);
   const [isWeddingParty, setIsWeddingParty] = useState(false);
   const [mailingAddress1, setMailingAddress1] = useState('');
   const [mailingAddress2, setMailingAddress2] = useState('');
@@ -95,6 +101,10 @@ export default function InvitationsPage() {
 
   useEffect(() => {
     fetchInvitations();
+    fetch('/api/features')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((f) => setChildSeatsOn(f?.childSeats !== false))
+      .catch(() => setChildSeatsOn(false));
   }, [fetchInvitations]);
 
   const resetForm = () => {
@@ -103,7 +113,7 @@ export default function InvitationsPage() {
     setMaxGuests(2);
     setPlusOnesAllowed(0);
     setNotes('');
-    setGuestRows([{ id: null, name: '' }]);
+    setGuestRows([{ id: null, name: '', childSeat: null }]);
     setIsWeddingParty(false);
     setMailingAddress1('');
     setMailingAddress2('');
@@ -125,7 +135,7 @@ export default function InvitationsPage() {
     setMaxGuests(inv.maxGuests);
     setPlusOnesAllowed(inv.plusOnesAllowed || 0);
     setNotes(inv.notes || '');
-    setGuestRows(inv.guests.length > 0 ? inv.guests.map((g) => ({ id: g.id, name: g.name })) : [{ id: null, name: '' }]);
+    setGuestRows(inv.guests.length > 0 ? inv.guests.map((g) => ({ id: g.id, name: g.name, childSeat: g.childSeat ?? null })) : [{ id: null, name: '', childSeat: null }]);
     setIsWeddingParty(Boolean(inv.isWeddingParty));
     setMailingAddress1(inv.mailingAddress1 || '');
     setMailingAddress2(inv.mailingAddress2 || '');
@@ -145,7 +155,11 @@ export default function InvitationsPage() {
         maxGuests,
         plusOnesAllowed,
         notes: notes.trim() || null,
-        guests: guestRows.filter((r) => r.name.trim()).map((r) => ({ id: r.id, name: r.name.trim() })),
+        // childSeat is only sent while the feature is on, so turning it off
+        // never clears seats the couple already recorded.
+        guests: guestRows.filter((r) => r.name.trim()).map((r) => ({
+          id: r.id, name: r.name.trim(), ...(childSeatsOn ? { childSeat: r.childSeat } : {}),
+        })),
         isWeddingParty,
         mailingAddress1: mailingAddress1.trim() || null,
         mailingAddress2: mailingAddress2.trim() || null,
@@ -236,13 +250,15 @@ export default function InvitationsPage() {
     }
   };
 
-  const addGuestName = () => setGuestRows([...guestRows, { id: null, name: '' }]);
+  const addGuestName = () => setGuestRows([...guestRows, { id: null, name: '', childSeat: null }]);
   const removeGuestName = (index: number) => setGuestRows(guestRows.filter((_, i) => i !== index));
   const updateGuestName = (index: number, value: string) => {
     const updated = [...guestRows];
     updated[index] = { ...updated[index], name: value };
     setGuestRows(updated);
   };
+  const updateGuestSeat = (index: number, childSeat: string | null) =>
+    setGuestRows(guestRows.map((r, i) => (i === index ? { ...r, childSeat } : r)));
 
   const filtered = invitations.filter(
     (inv) =>
@@ -312,7 +328,9 @@ export default function InvitationsPage() {
               <CardContent>
                 <div className="space-y-2">
                   <p className="text-sm"><span className="font-medium">Guests ({inv.guests.length}/{inv.maxGuests}):</span>{' '}
-                    {inv.guests.map((g) => g.name).join(', ') || 'None'}
+                    {inv.guests.length === 0 ? 'None' : inv.guests.map((g, i) => (
+                      <span key={g.id}>{i > 0 && ', '}{g.name}{childSeatsOn && <ChildSeatBadge seat={g.childSeat} />}</span>
+                    ))}
                     {inv.plusOnesAllowed > 0 && <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">+{inv.plusOnesAllowed}</span>}
                   </p>
                   {inv.notes && <p className="text-sm text-gray-500">Notes: {inv.notes}</p>}
@@ -388,6 +406,7 @@ export default function InvitationsPage() {
                   {guestRows.map((row, i) => (
                     <div key={i} className="flex gap-2">
                       <Input value={row.name} onChange={(e) => updateGuestName(i, e.target.value)} placeholder={`Guest ${i + 1}`} />
+                      {childSeatsOn && <ChildSeatSelect value={row.childSeat} onChange={(v) => updateGuestSeat(i, v)} />}
                       {guestRows.length > 1 && (
                         <Button size="sm" variant="danger" onClick={() => removeGuestName(i)}>Remove</Button>
                       )}

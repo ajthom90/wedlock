@@ -1,43 +1,38 @@
 // Builds the caterer-style seating sheet: one row per seated guest with their
-// table, meal choice and dietary notes, ordered by table name. Pure — no
-// Prisma/ExcelJS — so the ordering and meal lookup can be unit-tested.
+// table, meal choice, allergies and child seat, ordered by table name. Pure —
+// no Prisma/ExcelJS — so the ordering and lookups can be unit-tested.
+
+import { listAttendees, type Attendee, type AttendeeInvitation } from './attendees';
+import { childSeatLabel, type ChildSeat } from './guestNeeds';
 
 export interface SeatingExportTable {
   name: string;
   assignments: { guestName: string; invitationId: string | null }[];
 }
 
-export interface SeatingExportInvitation {
-  id: string;
-  guests: { id: string; name: string }[];
-  response: {
-    attending: string;
-    attendingGuests: string | null;
-    guestMeals: string | null;
-    plusOnes: string | null;
-    plusOneName?: string | null;
-    plusOneMeal?: string | null;
-    dietaryNotes: string | null;
-  } | null;
-}
+export type SeatingExportInvitation = AttendeeInvitation;
 
 export interface SeatingExportRow {
   guestName: string;
   table: string;
   meal: string;
   dietary: string;
+  childSeat: string;
+}
+
+// Same rows with the raw pieces kept apart, for callers (name tents) that lay
+// them out themselves instead of as spreadsheet cells.
+export interface SeatedGuest {
+  guestName: string;
+  table: string;
+  meal: string;
+  dietary: string;            // this person's own allergies / dietary needs
+  householdDietary: string;   // pre-per-guest household note nobody's been assigned yet
+  childSeat: ChildSeat | null;
+  invitationId: string | null;
 }
 
 export const UNASSIGNED_TABLE = 'Unassigned';
-
-function parseJson<T>(raw: string | null | undefined, fallback: T): T {
-  if (!raw) return fallback;
-  try {
-    return (JSON.parse(raw) as T) ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 const norm = (s: string) => s.trim().toLowerCase();
 
@@ -46,48 +41,13 @@ export function compareTableNames(a: string, b: string): number {
   return a.localeCompare(b, undefined, { sensitivity: 'base' });
 }
 
-interface Attendee {
-  name: string;
-  meal: string;
-  invitationId: string;
-}
-
-/** Every attending person on an invitation (named guests + plus-ones) with their meal. */
-function attendeesOf(inv: SeatingExportInvitation): Attendee[] {
-  const r = inv.response;
-  if (!r || r.attending !== 'yes') return [];
-  const meals = parseJson<Record<string, unknown>>(r.guestMeals, {});
-  const mealFor = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
-
-  const out: Attendee[] = [];
-  const ids = parseJson<unknown[]>(r.attendingGuests, inv.guests.map((g) => g.id));
-  const byId = new Map(inv.guests.map((g) => [g.id, g.name]));
-  for (const id of Array.isArray(ids) ? ids : []) {
-    if (typeof id !== 'string') continue;
-    const name = byId.get(id);
-    if (name) out.push({ name, meal: mealFor(meals[id]), invitationId: inv.id });
-  }
-
-  const pluses = parseJson<unknown[] | null>(r.plusOnes, null);
-  if (Array.isArray(pluses)) {
-    for (const p of pluses) {
-      const { name, meal } = (p ?? {}) as { name?: unknown; meal?: unknown };
-      if (typeof name === 'string' && name.trim()) out.push({ name, meal: mealFor(meal), invitationId: inv.id });
-    }
-  } else if (r.plusOneName?.trim()) {
-    out.push({ name: r.plusOneName, meal: mealFor(r.plusOneMeal), invitationId: inv.id });
-  }
-  return out;
-}
-
-export function buildSeatingExportRows(
+export function resolveSeatedGuests(
   tables: SeatingExportTable[],
   invitations: SeatingExportInvitation[],
-): SeatingExportRow[] {
-  const invById = new Map(invitations.map((inv) => [inv.id, inv]));
-  const attendees = invitations.flatMap(attendeesOf);
-  const dietaryFor = (invitationId: string | null) =>
-    (invitationId && invById.get(invitationId)?.response?.dietaryNotes?.trim()) || '';
+): SeatedGuest[] {
+  const resolved = invitations.map(listAttendees);
+  const attendees = resolved.flatMap((r) => r.attendees);
+  const householdNote = new Map(invitations.map((inv, i) => [inv.id, resolved[i].unassignedDietary]));
 
   const find = (guestName: string, invitationId: string | null) => {
     const key = norm(guestName);
@@ -96,20 +56,26 @@ export function buildSeatingExportRows(
       attendees.find((a) => norm(a.name) === key)
     );
   };
+  const row = (guestName: string, table: string, match: Attendee | undefined, invitationId: string | null): SeatedGuest => {
+    const invId = match?.invitationId ?? invitationId;
+    return {
+      guestName,
+      table,
+      meal: match?.meal ?? '',
+      dietary: match?.dietary ?? '',
+      householdDietary: (invId && householdNote.get(invId)) || '',
+      childSeat: match?.childSeat ?? null,
+      invitationId: invId,
+    };
+  };
 
-  const rows: SeatingExportRow[] = [];
+  const rows: SeatedGuest[] = [];
   const seated = new Set<string>();
   const sorted = [...tables].sort((a, b) => compareTableNames(a.name, b.name));
   for (const table of sorted) {
     for (const a of table.assignments) {
-      const match = find(a.guestName, a.invitationId);
       seated.add(norm(a.guestName));
-      rows.push({
-        guestName: a.guestName,
-        table: table.name,
-        meal: match?.meal ?? '',
-        dietary: dietaryFor(match?.invitationId ?? a.invitationId),
-      });
+      rows.push(row(a.guestName, table.name, find(a.guestName, a.invitationId), a.invitationId));
     }
   }
 
@@ -118,7 +84,22 @@ export function buildSeatingExportRows(
   for (const a of attendees) {
     if (seated.has(norm(a.name))) continue;
     seated.add(norm(a.name));
-    rows.push({ guestName: a.name, table: UNASSIGNED_TABLE, meal: a.meal, dietary: dietaryFor(a.invitationId) });
+    rows.push(row(a.name, UNASSIGNED_TABLE, a, a.invitationId));
   }
   return rows;
+}
+
+export function buildSeatingExportRows(
+  tables: SeatingExportTable[],
+  invitations: SeatingExportInvitation[],
+): SeatingExportRow[] {
+  return resolveSeatedGuests(tables, invitations).map((g) => ({
+    guestName: g.guestName,
+    table: g.table,
+    meal: g.meal,
+    // A household note that hasn't been split per person yet still reaches
+    // the caterer, labelled so it isn't mistaken for this guest's own.
+    dietary: [g.dietary, g.householdDietary && `Household: ${g.householdDietary}`].filter(Boolean).join('; '),
+    childSeat: childSeatLabel(g.childSeat),
+  }));
 }

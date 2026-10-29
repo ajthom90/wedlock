@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isAuthenticated } from '@/lib/auth';
 import { reconcileGuests } from '@/lib/guestReconcile';
+import { parseChildSeat } from '@/lib/guestNeeds';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -26,10 +27,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     // guests must keep their rows or existing RSVPs orphan. The admin UI
     // sends `guests: [{id, name}]` so renamed rows keep their identity; the
     // legacy `guestNames: string[]` shape still works (name matching only).
-    const incoming: { id?: string | null; name: string }[] = Array.isArray(guests)
+    const incoming: { id?: string | null; name: string; childSeat?: string | null }[] = Array.isArray(guests)
       ? guests
           .filter((g: any) => g && typeof g.name === 'string' && g.name.trim())
-          .map((g: any) => ({ id: typeof g.id === 'string' ? g.id : null, name: g.name }))
+          .map((g: any) => ({
+            id: typeof g.id === 'string' ? g.id : null,
+            name: g.name,
+            // Only touch the seat when the client sent the field at all.
+            ...('childSeat' in g ? { childSeat: parseChildSeat(g.childSeat) } : {}),
+          }))
       : Array.isArray(guestNames)
         ? guestNames.filter((n: any) => typeof n === 'string').map((name: string) => ({ name }))
         : [];
@@ -40,7 +46,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     );
     const invitation = await prisma.$transaction(async (tx) => {
       for (const u of guestOps.update) {
-        await tx.guest.update({ where: { id: u.id }, data: { name: u.name, isPrimary: u.isPrimary, order: u.order } });
+        await tx.guest.update({ where: { id: u.id }, data: { name: u.name, isPrimary: u.isPrimary, order: u.order, ...(u.childSeat !== undefined ? { childSeat: u.childSeat } : {}) } });
       }
       if (guestOps.deleteIds.length > 0) {
         await tx.guest.deleteMany({ where: { id: { in: guestOps.deleteIds } } });
@@ -57,6 +63,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
               let meals: Record<string, string> = {};
               try { meals = JSON.parse(response.guestMeals || '{}'); } catch { meals = {}; }
               for (const gid of removed) delete meals[gid];
+              let dietary: Record<string, string> = {};
+              try { dietary = JSON.parse(response.guestDietary || '{}'); } catch { dietary = {}; }
+              for (const gid of removed) delete dietary[gid];
               let plusOnesCount = 0;
               try { plusOnesCount = (JSON.parse(response.plusOnes || '[]') as unknown[]).length; } catch { plusOnesCount = 0; }
               await tx.rsvpResponse.update({
@@ -64,6 +73,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
                 data: {
                   attendingGuests: JSON.stringify(kept),
                   guestMeals: Object.keys(meals).length ? JSON.stringify(meals) : null,
+                  guestDietary: Object.keys(dietary).length ? JSON.stringify(dietary) : null,
                   guestCount: kept.length + plusOnesCount,
                 },
               });
