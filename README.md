@@ -30,7 +30,7 @@ All content (couple names, dates, venues, events, photos, copy, colors, fonts) i
 - **Events editor** — CRUD with times, venues, per-event maps, rich descriptions, visibility level.
 - **Seating tables** — create tables, assign guests, publish to the public seating page, and download a guest / table / meal / dietary / child seat spreadsheet for the caterer.
 - **Child seats** — mark guests who need a high chair or booster seat; shown on the Seating page, the seating spreadsheet and name tents.
-- **Name tents** — print folded table name tents (Avery 3328) with each seated guest's name and table, plus optional child seat, allergy and meal details.
+- **Name tents** — print folded table name tents (Avery 3328) with each seated guest's name and table, plus corner marks servers read at a glance (a circle in the meal's color, A for allergies, H or B for a high chair or booster) and optional spelled-out details. Meal colors are set per meal choice on RSVP Configuration.
 - **Shuttles** — routes, capacity, guest signups.
 - **Gifts registry tracker** — mark items purchased, track purchaser and thank-you status.
 - **Honeymoon fund** — manage items and pledges; mark pledges as received.
