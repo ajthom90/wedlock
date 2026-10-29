@@ -11,6 +11,8 @@ import { composeTentContent, tableDisplayName, type TentOptions } from '@/lib/na
 import { resolveSeatedGuests, UNASSIGNED_TABLE, type SeatingExportInvitation, type SeatingExportTable } from '@/lib/seatingExport';
 import { fetchThemeFontBytes } from '@/lib/themeFontBytes';
 import type { LabelFontBytes } from '@/lib/mailingLabelsPdf';
+import { parseRsvpChoices, type RsvpChoice } from '@/lib/rsvpChoices';
+import { buildMealColorMap, mealColorFor } from '@/lib/mealColors';
 
 interface Features { nameTents?: boolean; childSeats?: boolean; dietaryNotes?: boolean }
 
@@ -18,6 +20,7 @@ export default function NameTentsPage() {
   const [tables, setTables] = useState<(SeatingExportTable & { id: string })[]>([]);
   const [invitations, setInvitations] = useState<SeatingExportInvitation[]>([]);
   const [features, setFeatures] = useState<Features>({});
+  const [mealChoices, setMealChoices] = useState<RsvpChoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -25,7 +28,8 @@ export default function NameTentsPage() {
   const [formatCode, setFormatCode] = useState<TentCardFormat['code']>('3328');
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
   const [options, setOptions] = useState<TentOptions>({
-    showTable: true, showChildSeat: true, showAllergies: false, showMeal: false,
+    showTable: true, showChildSeat: false, showAllergies: false, showMeal: false,
+    showMealColor: true, showAllergyMark: true, showChildSeatMark: true,
   });
   const [bothSides, setBothSides] = useState(true);
   const [outline, setOutline] = useState(false);
@@ -39,14 +43,16 @@ export default function NameTentsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [t, i, f] = await Promise.all([
-          fetch('/api/tables'), fetch('/api/invitations'), fetch('/api/features'),
+        const [t, i, f, o] = await Promise.all([
+          fetch('/api/tables'), fetch('/api/invitations'), fetch('/api/features'), fetch('/api/rsvp-options'),
         ]);
         if (!t.ok || !i.ok) throw new Error('Failed to load seating');
         const tablesData = await t.json();
         setTables(tablesData);
         setInvitations(await i.json());
         setFeatures(f.ok ? await f.json() : {});
+        const rsvpOptions: { type: string; choices: string }[] = o.ok ? await o.json() : [];
+        setMealChoices(rsvpOptions.filter((x) => x.type === 'meal').flatMap((x) => parseRsvpChoices(x.choices)));
         setSelectedTables(new Set(tablesData.map((x: { name: string }) => x.name)));
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -62,13 +68,23 @@ export default function NameTentsPage() {
     ...options,
     showChildSeat: options.showChildSeat && childSeatsOn,
     showAllergies: options.showAllergies && allergiesOn,
+    showChildSeatMark: options.showChildSeatMark && childSeatsOn,
+    showAllergyMark: options.showAllergyMark && allergiesOn,
   };
+  const mealColors = useMemo(() => buildMealColorMap(mealChoices), [mealChoices]);
+  const coloredMeals = mealChoices.filter((c) => c.color);
 
   const seated = useMemo(() => resolveSeatedGuests(tables, invitations), [tables, invitations]);
   const unseatedCount = seated.filter((g) => g.table === UNASSIGNED_TABLE).length;
   const printing = seated.filter((g) => g.table !== UNASSIGNED_TABLE && selectedTables.has(g.table));
   // Households still on one shared allergy note: it can't go on any single
   // card, so warn before the couple prints without it.
+  // Guests whose meal has no color print with no circle; name the meals so
+  // the couple can fix them on RSVP Configuration before printing.
+  const uncoloredMeals = [...new Set(
+    printing.filter((g) => !mealColorFor(g.meal, mealColors)).map((g) => g.meal.trim() || 'No meal chosen'),
+  )];
+  const uncoloredGuests = printing.filter((g) => !mealColorFor(g.meal, mealColors)).length;
   const unsplitHouseholds = new Set(
     printing.filter((g) => g.householdDietary && g.invitationId).map((g) => g.invitationId),
   ).size;
@@ -104,7 +120,7 @@ export default function NameTentsPage() {
       const bytes = await renderNameTentsPdf({
         format,
         startPosition,
-        tents: printing.map((g) => composeTentContent(g, effectiveOptions)),
+        tents: printing.map((g) => composeTentContent(g, effectiveOptions, mealColors)),
         fonts: fontBytesRef.current,
         bothSides,
         outline,
@@ -215,13 +231,45 @@ export default function NameTentsPage() {
         <CardContent className="space-y-2">
           <p className="text-sm text-gray-500">The guest’s name is always printed.</p>
           {checkbox(options.showTable, (v) => setOptions({ ...options, showTable: v }), 'Table name', 'A sort prefix like “01. ” is left off.')}
+          <p className="text-sm font-medium pt-1">Small print</p>
           {childSeatsOn && checkbox(options.showChildSeat, (v) => setOptions({ ...options, showChildSeat: v }), 'High chair or booster seat')}
-          {allergiesOn && checkbox(options.showAllergies, (v) => setOptions({ ...options, showAllergies: v }), 'Allergies', 'Small print under the table name. Guests at the table will see it.')}
+          {allergiesOn && checkbox(options.showAllergies, (v) => setOptions({ ...options, showAllergies: v }), 'Allergies', 'Spelled out under the table name. Guests at the table will see it.')}
           {checkbox(options.showMeal, (v) => setOptions({ ...options, showMeal: v }), 'Meal choice')}
-          {effectiveOptions.showAllergies && unsplitHouseholds > 0 && (
+          <div className="pt-2">
+            <p className="text-sm font-medium">Corner marks for servers</p>
+            <p className="text-xs text-gray-500 mb-2">Big enough to read at a glance from standing height, on both halves of the card.</p>
+          </div>
+          {checkbox(options.showMealColor ?? false, (v) => setOptions({ ...options, showMealColor: v }), 'Meal color circle, bottom right', 'A ½" circle in the color set for each meal on RSVP Configuration.')}
+          {options.showMealColor && (
+            <div className="ml-6 text-xs text-gray-600 space-y-1">
+              {coloredMeals.length > 0 ? (
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  {coloredMeals.map((c) => (
+                    <span key={c.name} className="inline-flex items-center gap-1">
+                      <span className="inline-block h-3 w-3 rounded-full border border-gray-400" style={{ backgroundColor: mealColors.get(c.name.toLowerCase())?.hex }} aria-hidden />
+                      {c.name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-amber-800">
+                  No meal has a color yet. Set them on <Link href="/admin/rsvp-config" className="underline">RSVP Configuration</Link>.
+                </p>
+              )}
+              {coloredMeals.length > 0 && uncoloredGuests > 0 && (
+                <p className="text-amber-800">
+                  {uncoloredGuests} card{uncoloredGuests === 1 ? '' : 's'} will print with no circle because their meal has no
+                  color: {uncoloredMeals.join(', ')}. Set colors on <Link href="/admin/rsvp-config" className="underline">RSVP Configuration</Link>.
+                </p>
+              )}
+            </div>
+          )}
+          {allergiesOn && checkbox(options.showAllergyMark ?? false, (v) => setOptions({ ...options, showAllergyMark: v }), 'A for allergies, bottom left', 'When the guest has any allergy or dietary restriction of their own.')}
+          {childSeatsOn && checkbox(options.showChildSeatMark ?? false, (v) => setOptions({ ...options, showChildSeatMark: v }), 'H or B for a high chair or booster, top right')}
+          {(effectiveOptions.showAllergies || effectiveOptions.showAllergyMark) && unsplitHouseholds > 0 && (
             <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
               {unsplitHouseholds} household{unsplitHouseholds === 1 ? ' still has' : 's still have'} one shared allergy
-              note that isn’t split per person, so it won’t print on anyone’s card. Split it
+              note that isn’t split per person, so it won’t print or get an A on anyone’s card. Split it
               on <Link href="/admin/rsvps" className="underline">RSVPs</Link> first.
             </p>
           )}

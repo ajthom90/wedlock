@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.20.0",
+    "date": "2026-10-29",
+    "changes": [
+      { "type": "feature", "text": "Meal colors: give each meal choice a color on RSVP Configuration (Red, Blue, Purple, Green, Pink, Black and a few more, tuned to print distinctly)." },
+      { "type": "feature", "text": "Corner marks on name tents so servers can tell what each guest needs at a glance: a ½\" circle in the guest's meal color bottom right, A bottom left when the guest has an allergy or dietary restriction, and H (high chair) or B (booster) top right. On by default; the Name Tents page shows which meals still have no color." }
+    ]
+  },
+  {
     "version": "2.19.0",
     "date": "2026-10-29",
     "changes": [
