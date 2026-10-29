@@ -5,7 +5,7 @@ import { parseRsvpChoices } from '@/lib/rsvpChoices';
 import { validateRsvpSubmission } from '@/lib/rsvpValidation';
 import { cookies } from 'next/headers';
 import { getEmailConfig, sendRsvpConfirmation } from '@/lib/email';
-import { carryOverPlusOneSeats } from '@/lib/guestNeeds';
+import { carryOverPlusOneNeeds, parseGuestDietary, pruneGuestDietary } from '@/lib/guestNeeds';
 
 export async function GET(request: Request) {
   try {
@@ -121,8 +121,16 @@ export async function POST(request: Request) {
     const existing = await prisma.rsvpResponse.findUnique({ where: { invitationId: invitation.id } });
     const cleanResponses = responses && typeof responses === 'object' && !Array.isArray(responses) ? responses : {};
     // High chairs / boosters on plus-ones are the couple's to set; keep the
-    // stored ones rather than trusting the guest's resubmit.
-    const plusOnesToSave = carryOverPlusOneSeats(submission.plusOnes, existing?.plusOnes);
+    // stored ones rather than trusting the guest's resubmit. Allergies the
+    // form didn't ask about this time (the allergies feature is off, or a
+    // head-count RSVP with no guest rows) are kept rather than wiped.
+    const plusOnesToSave = carryOverPlusOneNeeds(submission.plusOnes, existing?.plusOnes, { keepDietary: !features.dietaryNotes });
+    let guestDietaryToSave = submission.guestDietary;
+    if (submission.attending === 'yes' && (!features.dietaryNotes || guestDietary === undefined)) {
+      const stored = parseGuestDietary(existing?.guestDietary);
+      // An empty roster means everyone on the invitation (head-count RSVP).
+      guestDietaryToSave = submission.attendingGuests.length ? pruneGuestDietary(stored, submission.attendingGuests) : stored;
+    }
     // Allergies are per guest now, so the per-guest form doesn't send the old
     // household-wide note. Keep a stored one until someone edits it (the
     // household textarea, or the admin editor) instead of silently dropping it.
@@ -132,7 +140,7 @@ export async function POST(request: Request) {
     const data = {
       attending: submission.attending, guestCount: submission.guestCount, responses: JSON.stringify(cleanResponses),
       guestMeals: Object.keys(submission.guestMeals).length ? JSON.stringify(submission.guestMeals) : null,
-      guestDietary: Object.keys(submission.guestDietary).length ? JSON.stringify(submission.guestDietary) : null,
+      guestDietary: Object.keys(guestDietaryToSave).length ? JSON.stringify(guestDietaryToSave) : null,
       attendingGuests: submission.attendingGuests.length ? JSON.stringify(submission.attendingGuests) : null,
       plusOnes: plusOnesToSave.length ? JSON.stringify(plusOnesToSave) : null,
       songRequests: songRequests || null, dietaryNotes: householdDietary, message: message || null,
@@ -144,7 +152,7 @@ export async function POST(request: Request) {
       attending: submission.attending, guestCount: submission.guestCount,
       attendingGuests: submission.attendingGuests.length ? submission.attendingGuests : null,
       guestMeals: Object.keys(submission.guestMeals).length ? submission.guestMeals : null,
-      guestDietary: Object.keys(submission.guestDietary).length ? submission.guestDietary : null,
+      guestDietary: Object.keys(guestDietaryToSave).length ? guestDietaryToSave : null,
       plusOnes: plusOnesToSave.length ? plusOnesToSave : null,
       songRequests: songRequests || null, dietaryNotes: householdDietary,
       message: message || null,

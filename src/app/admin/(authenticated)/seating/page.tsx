@@ -141,8 +141,9 @@ export default function SeatingPage() {
 
         const needsMap = new Map<string, GuestNeeds>();
         (invitations as AttendeeInvitation[]).forEach((inv) => {
+          // Everyone goes in, needs or not, so a guest with none never borrows
+          // a same-named guest's badges from another household.
           for (const a of listAttendees(inv).attendees) {
-            if (!a.childSeat && !a.dietary) continue;
             const n = { childSeat: a.childSeat, dietary: a.dietary };
             needsMap.set(needsKey(inv.id, a.name), n);
             // Name-only fallback for assignments saved without an invitation.

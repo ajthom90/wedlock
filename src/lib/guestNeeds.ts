@@ -87,28 +87,37 @@ const norm = (s: string) => s.trim().toLowerCase();
 /**
  * Plus-ones are re-sent whole on every guest RSVP update, but child seats on
  * them are set only by the couple. Carry each stored seat over to the
- * submitted plus-one with the same name so a guest's resubmit can't wipe it.
+ * submitted plus-one so a guest's resubmit can't wipe it — matched by name,
+ * or by position when the name changed (a typo fix) and the old name isn't
+ * used by anyone else. With keepDietary (the form didn't ask about allergies
+ * this time), stored allergies are carried over the same way.
  */
-export function carryOverPlusOneSeats<T extends { name: string }>(
+export function carryOverPlusOneNeeds<T extends { name: string; dietary?: string }>(
   submitted: T[],
   storedRaw: string | null | undefined,
+  opts: { keepDietary?: boolean } = {},
 ): (T & { childSeat?: ChildSeat })[] {
-  let stored: unknown[] = [];
+  let stored: { name: string; childSeat: ChildSeat | null; dietary: string }[] = [];
   try {
     const parsed = storedRaw ? JSON.parse(storedRaw) : [];
-    stored = Array.isArray(parsed) ? parsed : [];
+    stored = (Array.isArray(parsed) ? parsed : []).map((p: unknown) => {
+      const { name, childSeat, dietary } = (p ?? {}) as { name?: unknown; childSeat?: unknown; dietary?: unknown };
+      return { name: typeof name === 'string' ? name : '', childSeat: parseChildSeat(childSeat), dietary: cleanDietary(dietary) };
+    });
   } catch {
     stored = [];
   }
-  const seatByName = new Map<string, ChildSeat>();
-  for (const p of stored) {
-    const { name, childSeat } = (p ?? {}) as { name?: unknown; childSeat?: unknown };
-    const seat = parseChildSeat(childSeat);
-    if (typeof name === 'string' && seat) seatByName.set(norm(name), seat);
-  }
-  return submitted.map((p) => {
+  const submittedNames = new Set(submitted.map((p) => norm(p.name)));
+  return submitted.map((p, i) => {
     const { childSeat: _ignored, ...rest } = p as T & { childSeat?: unknown };
-    const seat = seatByName.get(norm(p.name));
-    return (seat ? { ...rest, childSeat: seat } : rest) as T & { childSeat?: ChildSeat };
+    const match = stored.find((s) => norm(s.name) === norm(p.name))
+      ?? (stored[i] && !submittedNames.has(norm(stored[i].name)) ? stored[i] : undefined);
+    const out = { ...rest } as T & { childSeat?: ChildSeat };
+    if (match?.childSeat) out.childSeat = match.childSeat;
+    if (opts.keepDietary) {
+      if (match?.dietary) out.dietary = match.dietary;
+      else delete out.dietary;
+    }
+    return out;
   });
 }

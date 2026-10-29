@@ -109,6 +109,12 @@ describe('renderNameTentsPdf', () => {
     expect(empty.getPageCount()).toBe(1);
   });
 
+  it('prints names the fallback font can’t encode instead of failing', async () => {
+    const tents = ['Łukasz Żółć', '王小明', 'José'].map((n) => composeTentContent(guest({ guestName: n }), allOff));
+    const bytes = await renderNameTentsPdf({ format: format3328, startPosition: 1, tents, bothSides: true, outline: false });
+    expect(bytes.length).toBeGreaterThan(0);
+  });
+
   it('copes with a very long name', async () => {
     const long = composeTentContent(guest({ guestName: 'Maximiliana Alexandrina Featherstonehaugh-Montgomery-Smythe' }), allOff);
     const bytes = await renderNameTentsPdf({ format: format3328, startPosition: 1, tents: [long], bothSides: true, outline: false });

@@ -94,11 +94,36 @@ const TABLE_SIZE = 12;
 const DETAIL_SIZE = 8;
 const INK = rgb(0.12, 0.12, 0.12);
 
+// When no theme font loads, the fallback Helvetica can only encode
+// Windows-1252 and throws on anything else, which would fail the whole PDF.
+// Drop accents it can't show and replace any other character with "?" so
+// one unusual name degrades instead.
+function encodable(font: PDFFont, text: string): string {
+  try {
+    font.encodeText(text);
+    return text;
+  } catch {
+    const ok = (ch: string) => {
+      try { font.encodeText(ch); return true; } catch { return false; }
+    };
+    return Array.from(text).map((ch) => {
+      if (ok(ch)) return ch;
+      const base = ch.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return base && ok(base) ? base : '?';
+    }).join('');
+  }
+}
+
 interface DrawOp { text: string; font: PDFFont; size: number; x: number; y: number }
 
 // Lays out one panel in its own upright coordinates: (0,0) is the panel's
 // bottom-left, (width,height) its top-right. Everything is centred.
-function layoutPanel(content: TentContent, fonts: ResolvedFonts, width: number, height: number, padX: number, padY: number): DrawOp[] {
+function layoutPanel(raw: TentContent, fonts: ResolvedFonts, width: number, height: number, padX: number, padY: number): DrawOp[] {
+  const content: TentContent = {
+    name: encodable(fonts.heading, raw.name),
+    table: encodable(fonts.body, raw.table),
+    details: raw.details.map((d) => encodable(fonts.body, d)),
+  };
   const maxW = width - padX * 2;
   const maxH = height - padY * 2;
   type Line = { text: string; font: PDFFont; size: number; gapBefore: number };

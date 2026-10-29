@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { countRsvpPeople } from '@/lib/rsvpCounts';
 import { countMealChoices, pruneGuestMeals } from '@/lib/rsvpMeals';
-import { listAttendees } from '@/lib/attendees';
+import { legacyNoteOwner, listAttendees } from '@/lib/attendees';
 import { childSeatLabel, parseGuestDietary, pruneGuestDietary } from '@/lib/guestNeeds';
 import { ChildSeatSelect } from '@/components/admin/ChildSeatSelect';
 
@@ -99,6 +99,9 @@ export default function RsvpsPage() {
   const [editAttendingGuests, setEditAttendingGuests] = useState<string[]>([]);
   const [editGuestMeals, setEditGuestMeals] = useState<Record<string, string>>({});
   const [editGuestDietary, setEditGuestDietary] = useState<Record<string, string>>({});
+  // An old household note moved into its owner's box on open (see
+  // legacyNoteOwner); saving clears the household copy.
+  const [editLegacyPrefilled, setEditLegacyPrefilled] = useState(false);
   const [editPlusOnes, setEditPlusOnes] = useState<EditPlusOne[]>([]);
   const [childSeatsOn, setChildSeatsOn] = useState(false);
   const [editResponses, setEditResponses] = useState<Record<string, string>>({});
@@ -266,17 +269,25 @@ export default function RsvpsPage() {
       const dietary = Object.fromEntries(
         Object.entries(parseGuestDietary(inv.response.guestDietary)).filter(([id]) => validIds.has(id)),
       );
-      // Same one-person-household rule as the public form: an old household
-      // note can only belong to them, so prefill it into their own box.
-      if (inv.guests.length === 1 && !Object.keys(dietary).length && inv.response.dietaryNotes?.trim()) {
-        dietary[inv.guests[0].id] = inv.response.dietaryNotes.trim();
-      }
+      // Same rule as the public form: when the stored RSVP had exactly one
+      // person coming, an old household note can only be theirs, so it's
+      // prefilled into their own box.
+      const owner = legacyNoteOwner(inv);
+      const legacyNote = inv.response.dietaryNotes?.trim() ?? '';
+      if (owner?.guestId && validIds.has(owner.guestId)) dietary[owner.guestId] = legacyNote;
       setEditGuestDietary(dietary);
       const loadedPluses = safeParse<Partial<EditPlusOne>[]>(inv.response.plusOnes, []);
-      setEditPlusOnes(plusOneSlots.map((slot, i) => loadedPluses[i] ? {
-        name: loadedPluses[i].name || '', meal: loadedPluses[i].meal || '',
-        dietary: loadedPluses[i].dietary || '', childSeat: loadedPluses[i].childSeat || null,
-      } : slot));
+      let ownerPlusOneFilled = false;
+      setEditPlusOnes(plusOneSlots.map((slot, i) => {
+        if (!loadedPluses[i]) return slot;
+        const isOwner = Boolean(owner && !owner.guestId && !ownerPlusOneFilled && loadedPluses[i].name?.trim() === owner.name.trim());
+        if (isOwner) ownerPlusOneFilled = true;
+        return {
+          name: loadedPluses[i].name || '', meal: loadedPluses[i].meal || '',
+          dietary: isOwner ? legacyNote : loadedPluses[i].dietary || '', childSeat: loadedPluses[i].childSeat || null,
+        };
+      }));
+      setEditLegacyPrefilled(owner?.guestId ? validIds.has(owner.guestId) : ownerPlusOneFilled);
       setEditResponses(safeParse<Record<string, string>>(inv.response.responses, {}));
     } else {
       setEditAttending('yes');
@@ -287,6 +298,7 @@ export default function RsvpsPage() {
       setEditAttendingGuests([]);
       setEditGuestMeals({});
       setEditGuestDietary({});
+      setEditLegacyPrefilled(false);
       setEditPlusOnes(plusOneSlots);
       setEditResponses({});
     }
@@ -317,10 +329,10 @@ export default function RsvpsPage() {
         : 0;
       const prunedMeals = pruneGuestMeals(editGuestMeals, editAttendingGuests);
       const prunedDietary = pruneGuestDietary(editGuestDietary, editAttendingGuests);
-      // A one-person household's old note was moved into their own box when
-      // the editor opened, so saving clears the household copy.
-      const householdDietary = selectedInvitation.guests.length === 1 && Object.keys(prunedDietary).length
-        ? '' : editDietaryNotes.trim();
+      // An old note that was moved into its owner's box when the editor
+      // opened now lives there (even if the couple then cleared that box),
+      // so saving clears the household copy.
+      const householdDietary = editLegacyPrefilled ? '' : editDietaryNotes.trim();
 
       const body = {
         attending: editAttending,
@@ -334,7 +346,7 @@ export default function RsvpsPage() {
         attendingGuests: editAttendingGuests.length > 0 ? editAttendingGuests : null,
         plusOnes: namedPlusOnes.map((p) => ({
           name: p.name.trim(), meal: p.meal || '', dietary: p.dietary.trim(),
-          // Leave stored seats alone while the feature is hidden.
+          // Sent as loaded when the feature is hidden, so stored seats stay.
           childSeat: p.childSeat,
         })),
         // Invitation-level fields (persisted by the PUT route to the Invitation, not RsvpResponse).
@@ -435,6 +447,10 @@ export default function RsvpsPage() {
       const guestsById = new Map(inv.guests.map((g) => [g.id, g]));
       const resolved = listAttendees(inv);
       const dietaryById = new Map(resolved.attendees.filter((a) => a.guestId).map((a) => [a.guestId!, a.dietary]));
+      const plusOneDietary = new Map<string, string>();
+      for (const a of resolved.attendees) {
+        if (a.kind === 'plus-one' && !plusOneDietary.has(a.name)) plusOneDietary.set(a.name, a.dietary);
+      }
       const needCols = (dietary: string, seat: string | null | undefined) =>
         [dietary, ...(childSeatsOn ? [childSeatLabel(seat)] : [])];
       const emptyNeeds = needCols('', null);
@@ -458,7 +474,7 @@ export default function RsvpsPage() {
       }
       for (const p of plusOnes) {
         if (!p?.name) continue;
-        rows.push([...baseCols, p.name, 'plus-one', p.meal || '', ...needCols(p.dietary?.trim() ?? '', p.childSeat), ...tailCols]);
+        rows.push([...baseCols, p.name, 'plus-one', p.meal || '', ...needCols(plusOneDietary.get(p.name) ?? p.dietary?.trim() ?? '', p.childSeat), ...tailCols]);
       }
       // Attending household with zero attendees recorded — still emit one row so the
       // invitation doesn't drop out of the export entirely.
@@ -912,12 +928,12 @@ export default function RsvpsPage() {
                       {/* Household-wide note: the only allergy field for a
                           head-count RSVP, otherwise shown just while an older
                           note is still waiting to be split per person. */}
-                      {(selectedInvitation.guests.length === 0 || (selectedInvitation.guests.length > 1 && editDietaryNotes.trim())) && (
+                      {!editLegacyPrefilled && (selectedInvitation.guests.length === 0 || editDietaryNotes.trim()) && (
                         <div>
                           <label className="block text-sm font-medium mb-1">
-                            {selectedInvitation.guests.length === 0 ? 'Dietary Notes' : 'Household dietary note (from before per-guest allergies)'}
+                            {(selectedInvitation.guests.length > 0 || editPlusOnes.some((p) => p.name.trim())) ? 'Household dietary note (from before per-guest allergies)' : 'Dietary Notes'}
                           </label>
-                          {selectedInvitation.guests.length > 0 && (
+                          {(selectedInvitation.guests.length > 0 || editPlusOnes.some((p) => p.name.trim())) && (
                             <p className="text-xs text-amber-700 mb-1">Copy each person&apos;s allergies into their own box above, then clear this note.</p>
                           )}
                           <Textarea rows={2} value={editDietaryNotes} onChange={(e) => setEditDietaryNotes(e.target.value)} />

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { listAttendees, type AttendeeInvitation } from './attendees';
+import { legacyNoteOwner, listAttendees, type AttendeeInvitation } from './attendees';
 
 const base: AttendeeInvitation = {
   id: 'inv',
@@ -50,5 +50,36 @@ describe('listAttendees', () => {
     expect(r.attendees).toHaveLength(1);
     expect(r.attendees[0].dietary).toBe('Shellfish');
     expect(r.unassignedDietary).toBe('');
+  });
+});
+
+describe('legacyNoteOwner', () => {
+  const base = {
+    id: 'inv1',
+    guests: [{ id: 'g1', name: 'Ann' }],
+    response: {
+      attending: 'yes', attendingGuests: '["g1"]', guestMeals: null, guestDietary: null,
+      plusOnes: null, dietaryNotes: 'Peanuts',
+    },
+  };
+
+  it('is the one attending guest', () => {
+    expect(legacyNoteOwner(base)).toEqual({ guestId: 'g1', name: 'Ann' });
+  });
+
+  it('is the one plus-one in a plus-ones-only household', () => {
+    expect(legacyNoteOwner({
+      ...base, guests: [],
+      response: { ...base.response, attendingGuests: null, plusOnes: '[{"name":"Sam"}]' },
+    })).toEqual({ guestId: null, name: 'Sam' });
+  });
+
+  it('is nobody when a plus-one comes too', () => {
+    expect(legacyNoteOwner({ ...base, response: { ...base.response, plusOnes: '[{"name":"Sam"}]' } })).toBeNull();
+  });
+
+  it('is nobody when the only attendee has their own note, or there is no note', () => {
+    expect(legacyNoteOwner({ ...base, response: { ...base.response, guestDietary: '{"g1":"Shellfish"}' } })).toBeNull();
+    expect(legacyNoteOwner({ ...base, response: { ...base.response, dietaryNotes: '  ' } })).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  carryOverPlusOneSeats,
+  carryOverPlusOneNeeds,
   childSeatLabel,
   householdDietaryFallback,
   parseChildSeat,
@@ -58,10 +58,10 @@ describe('householdDietaryFallback', () => {
   });
 });
 
-describe('carryOverPlusOneSeats', () => {
+describe('carryOverPlusOneNeeds', () => {
   it('keeps the couple-set seat by name and ignores what the guest sent', () => {
     const stored = JSON.stringify([{ name: 'Baby Lee', meal: '', childSeat: 'high_chair' }, { name: 'Pat', meal: 'Fish' }]);
-    expect(carryOverPlusOneSeats([
+    expect(carryOverPlusOneNeeds([
       { name: 'baby lee', meal: 'Kids' },
       { name: 'Pat', meal: 'Fish', childSeat: 'booster' as const },
     ], stored)).toEqual([
@@ -71,6 +71,30 @@ describe('carryOverPlusOneSeats', () => {
   });
 
   it('handles nothing stored', () => {
-    expect(carryOverPlusOneSeats([{ name: 'Pat', meal: '' }], null)).toEqual([{ name: 'Pat', meal: '' }]);
+    expect(carryOverPlusOneNeeds([{ name: 'Pat', meal: '' }], null)).toEqual([{ name: 'Pat', meal: '' }]);
+  });
+
+  it('follows a renamed plus-one by position', () => {
+    const stored = JSON.stringify([{ name: 'Ava', childSeat: 'high_chair' }, { name: 'Pat' }]);
+    expect(carryOverPlusOneNeeds([{ name: 'Eva', meal: '' }, { name: 'Pat', meal: '' }], stored)).toEqual([
+      { name: 'Eva', meal: '', childSeat: 'high_chair' },
+      { name: 'Pat', meal: '' },
+    ]);
+  });
+
+  it("doesn't follow by position when the old name is still in the list", () => {
+    const stored = JSON.stringify([{ name: 'Ava', childSeat: 'high_chair' }]);
+    expect(carryOverPlusOneNeeds([{ name: 'Sam', meal: '' }, { name: 'Ava', meal: '' }], stored)).toEqual([
+      { name: 'Sam', meal: '' },
+      { name: 'Ava', meal: '', childSeat: 'high_chair' },
+    ]);
+  });
+
+  it('keeps stored allergies only when asked to', () => {
+    const stored = JSON.stringify([{ name: 'Pat', dietary: 'Peanuts' }]);
+    expect(carryOverPlusOneNeeds([{ name: 'Pat', meal: '', dietary: 'new' }], stored)).toEqual([{ name: 'Pat', meal: '', dietary: 'new' }]);
+    expect(carryOverPlusOneNeeds([{ name: 'Pat', meal: '' }], stored, { keepDietary: true })).toEqual([{ name: 'Pat', meal: '', dietary: 'Peanuts' }]);
+    expect(carryOverPlusOneNeeds([{ name: 'Sam', meal: '', dietary: 'x' }, { name: 'Pat', meal: '' }], stored, { keepDietary: true }))
+      .toEqual([{ name: 'Sam', meal: '' }, { name: 'Pat', meal: '', dietary: 'Peanuts' }]);
   });
 });

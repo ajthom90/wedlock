@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, Button, Input, Textarea } from '@/components/ui';
 import { pruneGuestMeals } from '@/lib/rsvpMeals';
 import { pruneGuestDietary } from '@/lib/guestNeeds';
+import { legacyNoteOwner } from '@/lib/attendees';
 
 type Guest = { id: string; name: string; isPrimary: boolean };
 type PlusOne = { name: string; meal: string; dietary: string };
@@ -29,6 +30,9 @@ function RSVPForm() {
   // Allergies / dietary needs keyed by guest id. dietaryNotes above is the
   // household-wide box, shown only when there are no guest rows to tick.
   const [guestDietary, setGuestDietary] = useState<Record<string, string>>({});
+  // True when an old household-wide note was moved into its owner's own box
+  // on load (see legacyNoteOwner); saving then clears the household copy.
+  const [legacyPrefilled, setLegacyPrefilled] = useState(false);
   const [message, setMessage] = useState('');
   const [correction, setCorrection] = useState('');
   const [mailingAddress1, setMailingAddress1] = useState('');
@@ -84,15 +88,24 @@ function RSVPForm() {
           const parsed: Record<string, string> = JSON.parse(r.guestDietary || '{}');
           dietary = Object.fromEntries(Object.entries(parsed).filter(([id]) => validIds.has(id)));
         } catch { dietary = {}; }
-        // An RSVP from before per-guest allergies has one household note; in a
-        // one-person household it can only be theirs, so prefill their box.
-        const onlyGuest = data.invitation.guests?.length === 1 ? data.invitation.guests[0].id : null;
-        if (onlyGuest && !Object.keys(dietary).length && r.dietaryNotes?.trim()) dietary = { [onlyGuest]: r.dietaryNotes.trim() };
+        // An RSVP from before per-guest allergies has one household note.
+        // When the stored RSVP had exactly one person coming it can only be
+        // theirs, so prefill it into their own box.
+        const owner = legacyNoteOwner({ id: data.invitation.id, guests: data.invitation.guests ?? [], response: r });
+        const legacyNote = r.dietaryNotes?.trim() ?? '';
+        if (owner?.guestId && validIds.has(owner.guestId)) dietary = { ...dietary, [owner.guestId]: legacyNote };
         setGuestDietary(dietary);
+        let ownerPlusOneFilled = false;
         try {
           const loaded: PlusOne[] = JSON.parse(r.plusOnes || '[]');
-          setPlusOnes(emptySlots.map((slot, i) => loaded[i] ? { name: loaded[i].name || '', meal: loaded[i].meal || '', dietary: loaded[i].dietary || '' } : slot));
+          setPlusOnes(emptySlots.map((slot, i) => {
+            if (!loaded[i]) return slot;
+            const isOwner = !owner?.guestId && owner && !ownerPlusOneFilled && loaded[i].name?.trim() === owner.name.trim();
+            if (isOwner) ownerPlusOneFilled = true;
+            return { name: loaded[i].name || '', meal: loaded[i].meal || '', dietary: isOwner ? legacyNote : loaded[i].dietary || '' };
+          }));
         } catch { setPlusOnes(emptySlots); }
+        setLegacyPrefilled(Boolean(owner?.guestId ? validIds.has(owner.guestId) : ownerPlusOneFilled));
       } else {
         setPlusOnes(emptySlots);
       }
@@ -115,9 +128,15 @@ function RSVPForm() {
   // Only a plain head-count RSVP (no guest rows, no plus-one rows) falls back
   // to the single household box.
   const showHouseholdDietary = !perGuestMode && !plusOnesOnlyMode;
-  const legacyHouseholdDietary = !showHouseholdDietary && invitation?.response?.dietaryNotes?.trim()
-    && !Object.keys(guestDietary).length && (invitation?.guests?.length ?? 0) !== 1
+  // An old household note nobody can be sure is one person's: show it so the
+  // guest can re-enter it next to the right names.
+  const legacyHouseholdDietary = !showHouseholdDietary && !legacyPrefilled && invitation?.response?.dietaryNotes?.trim()
     ? invitation.response.dietaryNotes.trim() : '';
+  const legacyNotice = features.dietaryNotes && legacyHouseholdDietary ? (
+    <p className="text-sm text-foreground/70 mb-3 rounded-md border border-primary/20 bg-primary/5 p-3">
+      You told us earlier: &ldquo;{legacyHouseholdDietary}&rdquo;. We now track allergies per person, so please add them next to the right name below.
+    </p>
+  ) : null;
 
   // Two-step submit: clicking "Submit RSVP" validates then opens a confirmation
   // modal. Only the modal's Confirm button actually POSTs. Accepting while
@@ -181,12 +200,12 @@ function RSVPForm() {
           ? namedPlusOnes.length
           : guestCount;
       // The old household note is cleared once its contents can live per
-      // person: a one-person household had it prefilled into their own box,
-      // and anyone who entered a per-person note has seen the "please move
-      // it" notice. Otherwise it's left for the couple to sort out.
+      // person: it was prefilled into its owner's own box, or the guest has
+      // seen the "please add them per person" notice and entered per-person
+      // notes. Otherwise it's left for the couple to sort out.
       const perPersonNotes = Object.keys(pruneGuestDietary(guestDietary, attendingGuests)).length > 0
         || namedPlusOnes.some((p) => p.dietary);
-      const clearsLegacyDietary = attending === 'yes' && (invitation.guests.length === 1 || perPersonNotes);
+      const clearsLegacyDietary = attending === 'yes' && (legacyPrefilled || perPersonNotes);
       const res = await fetch('/api/rsvp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: invitation.code, attending, guestCount: attending === 'yes' ? totalAttending : 0, responses: attending === 'yes' ? responses : {}, guestMeals: attending === 'yes' && perGuestMode ? pruneGuestMeals(guestMeals, attendingGuests) : undefined, guestDietary: attending === 'yes' && perGuestMode && features.dietaryNotes ? pruneGuestDietary(guestDietary, attendingGuests) : undefined, attendingGuests: attending === 'yes' && perGuestMode ? attendingGuests : undefined, plusOnes: attending === 'yes' ? namedPlusOnes : [], songRequests: features.songRequests ? songRequests : undefined, dietaryNotes: !features.dietaryNotes ? undefined : showHouseholdDietary ? dietaryNotes : clearsLegacyDietary ? '' : undefined, message, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, contactEmail, correction: features.rsvpCorrections ? correction : undefined }) });
       const data = await res.json();
       if (res.ok) { setShowConfirm(false); setSubmitted(true); setCorrection(''); }
@@ -230,11 +249,7 @@ function RSVPForm() {
           )}
           {perGuestMode ? (
             <div><p className="font-medium mb-3">Who will be attending?</p>
-              {features.dietaryNotes && legacyHouseholdDietary && (
-                <p className="text-sm text-foreground/70 mb-3 rounded-md border border-primary/20 bg-primary/5 p-3">
-                  You told us earlier: &ldquo;{legacyHouseholdDietary}&rdquo;. We now track allergies per person, so please add them next to the right name below.
-                </p>
-              )}
+              {legacyNotice}
               <div className="space-y-2">{invitation.guests.map((guest: any) => (
               <div key={guest.id} className="p-3 border rounded-md hover:bg-gray-50">
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -258,6 +273,7 @@ function RSVPForm() {
             <div>
               <p className="font-medium mb-1">Additional guests (up to {invitation.plusOnesAllowed})</p>
               <p className="text-sm text-foreground/60 mb-3">Enter a name for each extra guest you&apos;d like to bring. Leave blank if unused.</p>
+              {plusOnesOnlyMode && legacyNotice}
               <div className="space-y-2">
                 {plusOnes.map((p, i) => (
                   <div key={i} className="p-3 border rounded-md space-y-2">

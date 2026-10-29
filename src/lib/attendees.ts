@@ -94,3 +94,18 @@ export function listAttendees(inv: AttendeeInvitation): InvitationAttendees {
   if (soleAttendeeNote) out[0] = { ...out[0], dietary: soleAttendeeNote };
   return { attendees: out, unassignedDietary: unassignedNote };
 }
+
+/**
+ * Who an old household-wide allergy note belongs to: the one person the
+ * stored RSVP has coming, when there's exactly one and they have no note of
+ * their own. The RSVP forms prefill the note into that person's box and
+ * clear the household copy on save. null means nobody can be sure whose it
+ * is, so it waits to be split by hand (and is flagged for review).
+ */
+export function legacyNoteOwner(inv: AttendeeInvitation): { guestId: string | null; name: string } | null {
+  const r = inv.response;
+  if (!r?.dietaryNotes?.trim()) return null;
+  const { attendees } = listAttendees({ ...inv, response: { ...r, dietaryNotes: null } });
+  if (attendees.length !== 1 || attendees[0].dietary) return null;
+  return { guestId: attendees[0].guestId, name: attendees[0].name };
+}
