@@ -31,6 +31,7 @@ All content (couple names, dates, venues, events, photos, copy, colors, fonts) i
 - **Seating tables** — create tables, assign guests, publish to the public seating page, and download a guest / table / meal / dietary / child seat spreadsheet for the caterer.
 - **Child seats** — mark guests who need a high chair or booster seat; shown on the Seating page, the seating spreadsheet and name tents.
 - **Name tents** — print folded table name tents (Avery 3328) with each seated guest's name and table, plus corner marks servers read at a glance (a circle in the meal's color, A for allergies, H or B for a high chair or booster) and optional spelled-out details. Meal colors are set per meal choice on RSVP Configuration.
+- **Reception sheet for vendors** — download an Excel sheet for the caterer and venue: meal counts with their colors, vendor meals and the total, counts of allergies, boosters and high chairs, then every guest's table, meal, dietary restrictions, H / B, A and meal color.
 - **Shuttles** — routes, capacity, guest signups.
 - **Gifts registry tracker** — mark items purchased, track purchaser and thank-you status.
 - **Honeymoon fund** — manage items and pledges; mark pledges as received.
@@ -50,7 +51,7 @@ All content (couple names, dates, venues, events, photos, copy, colors, fonts) i
 - **Theme** — primary/accent/background colors, heading and body fonts.
 - **Custom fonts** — upload `.woff2`/`.ttf`/`.otf` files and they appear in the font picker.
 - **Navigation editor** — reorder, rename, hide, or nest any nav item (one level of dropdowns).
-- **Feature flags** — toggle any major module on or off. When off, both the public page and the nav link disappear; when on, they return. Covers: per-guest meal selection, song requests, dietary notes, plus-ones, RSVP address, weather widget, story timeline, transportation, honeymoon fund, photo wall, trivia, guest photo uploads, guest book (off / public / moderated), vendor contacts, budget tracker, child seats, name tents, and site-wide password gate.
+- **Feature flags** — toggle any major module on or off. When off, both the public page and the nav link disappear; when on, they return. Covers: per-guest meal selection, song requests, dietary notes, plus-ones, RSVP address, weather widget, story timeline, transportation, honeymoon fund, photo wall, trivia, guest photo uploads, guest book (off / public / moderated), vendor contacts, budget tracker, child seats, name tents, reception seating sheet, and site-wide password gate.
 - **Site password gate** — optional global password to gate the public site.
 
 ### System

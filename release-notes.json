@@ -3,6 +3,7 @@
     "version": "2.20.0",
     "date": "2026-10-29",
     "changes": [
+      { "type": "feature", "text": "Reception Sheet for vendors on the Seating page: an Excel file laid out like a caterer's seating sheet. On top, each meal choice with its count and color, standard and vegetarian vendor meals (entered next to the download), the total, and counts of guests with allergies (A), booster chairs (B) and high chairs (H). Below, every guest's name, table, meal, dietary restrictions, H or B, A and meal color, Head Table first and then tables in number order. Toggle with the new Reception seating sheet feature flag." },
       { "type": "feature", "text": "Meal colors: give each meal choice a color on RSVP Configuration (Red, Blue, Purple, Green, Pink, Black and a few more, tuned to print distinctly)." },
       { "type": "feature", "text": "Corner marks on name tents so servers can tell what each guest needs at a glance: a ½\" circle in the guest's meal color bottom right, A bottom left when the guest has an allergy or dietary restriction, and H (high chair) or B (booster) top right. On by default; the Name Tents page shows which meals still have no color." }
     ]
