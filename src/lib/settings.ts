@@ -39,6 +39,10 @@ export interface SiteSettings {
   // admin test sends.
   emailHeading: string;
   emailFooter: string;
+  // Meals the caterer plates for vendors (DJ, photographer…), which aren't
+  // guests on any invitation. Shown on the Reception Seating spreadsheet.
+  vendorMealsStandard: number;
+  vendorMealsVegetarian: number;
 }
 
 export interface FeatureSettings {
@@ -74,6 +78,9 @@ export interface FeatureSettings {
   childSeats: boolean;
   // Printable Avery table name tents from the Seating page.
   nameTents: boolean;
+  // Reception Seating spreadsheet for vendors (meal counts, colors, A/H/B)
+  // from the Seating page.
+  receptionSheet: boolean;
 
   // Custom pages — when off, the Pages admin still lets the couple edit
   // built-in titles/URLs, but the "+ New custom page" button is hidden.
@@ -126,6 +133,8 @@ const defaultSite: SiteSettings = {
   replyToEmail: '',
   emailHeading: '',
   emailFooter: '',
+  vendorMealsStandard: 0,
+  vendorMealsVegetarian: 0,
 };
 
 const defaultFeatures: FeatureSettings = {
@@ -156,6 +165,7 @@ const defaultFeatures: FeatureSettings = {
   budgetTracker: true,
   childSeats: true,
   nameTents: true,
+  receptionSheet: true,
 
   customPages: true,
 
@@ -204,6 +214,9 @@ export async function getSiteSettings(): Promise<SiteSettings> {
         (site as any)[key] = setting.value === 'true';
       } else if (key === 'qrCardWidth' || key === 'qrCardHeight') {
         (site as any)[key] = parseFloat(setting.value) || defaultSite[key];
+      } else if (key === 'vendorMealsStandard' || key === 'vendorMealsVegetarian') {
+        const n = parseInt(setting.value, 10);
+        (site as any)[key] = Number.isFinite(n) && n > 0 ? n : 0;
       } else if (key === 'homeBannerStyle') {
         (site as any)[key] = setting.value === 'hero' ? 'hero' : 'strip';
       } else if (key === 'eventsDisplayStyle') {
