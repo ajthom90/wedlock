@@ -8,7 +8,7 @@ import type { SeatedGuest } from './seatingExport';
 const format3328 = TENT_CARD_FORMATS.find((f) => f.code === '3328')!;
 
 const guest = (over: Partial<SeatedGuest> = {}): SeatedGuest => ({
-  guestName: 'Ann Smith', table: '01. Head Table', meal: 'Chicken', dietary: 'Peanuts',
+  guestName: 'Ann Smith', table: '01. Head Table', tableNumber: null, meal: 'Chicken', dietary: 'Peanuts',
   householdDietary: '', childSeat: null, invitationId: 'inv1', unlinked: false, ...over,
 });
 
@@ -30,6 +30,14 @@ describe('TENT_CARD_FORMATS', () => {
     const { computeLabelPositions } = await import('./mailingLabelsPdf');
     const pos = computeLabelPositions({ format: format3328, startPosition: 1, labelCount: 4 });
     expect(pos.map((p) => [p.xInches, p.yInchesFromTop])).toEqual([[0.5, 1.25], [4.5, 1.25], [0.5, 5.75], [4.5, 5.75]]);
+  });
+});
+
+describe('composeTentContent table line', () => {
+  it('prints a numbered table as "Table N" and a named one by name', () => {
+    const on = { showTable: true, showChildSeat: false, showAllergies: false, showMeal: false };
+    expect(composeTentContent(guest({ table: "Kim Mo's HS Friends", tableNumber: 34 }), on).table).toBe('Table 34');
+    expect(composeTentContent(guest({ table: 'Head Table', tableNumber: null }), on).table).toBe('Head Table');
   });
 });
 

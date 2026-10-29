@@ -1,17 +1,20 @@
 import prisma from '@/lib/prisma';
 import { ensureSeatsLinked } from '@/lib/seatLinkingDb';
+import { ensureTableNumbers } from '@/lib/tableNumbersDb';
+import { compareTables, tableHeading } from '@/lib/tableNumbers';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SeatingPage() {
   await ensureSeatsLinked();
+  await ensureTableNumbers();
   const rows = await prisma.seatingTable.findMany({
     include: { assignments: { include: { guest: { select: { name: true } } } } },
-    orderBy: { name: 'asc' },
   });
   // A linked seat shows the guest's current name, so renames show up here.
-  const tables = rows.map((t) => ({
+  const tables = rows.sort(compareTables).map((t) => ({
     ...t,
+    heading: tableHeading(t),
     assignments: t.assignments
       .map((a) => ({ id: a.id, name: a.guest?.name ?? a.guestName }))
       .sort((a, b) => a.name.localeCompare(b.name)),
@@ -38,7 +41,7 @@ export default async function SeatingPage() {
                 className="border border-foreground/10 rounded-lg p-6 hover:border-primary/30 hover:shadow-md transition-all"
               >
                 <h2 className="text-xl font-heading font-semibold text-primary mb-1">
-                  {table.name}
+                  {table.heading}
                 </h2>
                 <p className="text-xs text-foreground/40 mb-4">
                   {table.assignments.length} / {table.capacity} seats
@@ -48,7 +51,7 @@ export default async function SeatingPage() {
                     No guests assigned yet.
                   </p>
                 ) : (
-                  <ul className="space-y-1" aria-label={`Guests at ${table.name}`}>
+                  <ul className="space-y-1" aria-label={`Guests at ${table.heading}`}>
                     {table.assignments.map((assignment) => (
                       <li
                         key={assignment.id}

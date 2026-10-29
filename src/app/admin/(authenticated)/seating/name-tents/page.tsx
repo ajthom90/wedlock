@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChildSeatBadge } from '@/components/admin/ChildSeatSelect';
 import { TENT_CARD_FORMATS, type TentCardFormat } from '@/lib/tentCardFormats';
-import { composeTentContent, tableDisplayName, type TentOptions } from '@/lib/nameTentsPdf';
+import { composeTentContent, type TentOptions } from '@/lib/nameTentsPdf';
+import { tableHeading } from '@/lib/tableNumbers';
 import { resolveSeatedGuests, UNASSIGNED_TABLE, type SeatingExportInvitation, type SeatingExportTable } from '@/lib/seatingExport';
 import { fetchThemeFontBytes } from '@/lib/themeFontBytes';
 import type { LabelFontBytes } from '@/lib/mailingLabelsPdf';
@@ -15,6 +16,9 @@ import { parseRsvpChoices, type RsvpChoice } from '@/lib/rsvpChoices';
 import { buildMealColorMap, mealColorFor } from '@/lib/mealColors';
 
 interface Features { nameTents?: boolean; childSeats?: boolean; dietaryNotes?: boolean }
+
+// Tables are picked by name + number, so two tables sharing a name stay apart.
+const tableKey = (name: string, number?: number | null) => `${number ?? ''}|${name}`;
 
 export default function NameTentsPage() {
   const [tables, setTables] = useState<(SeatingExportTable & { id: string })[]>([]);
@@ -53,7 +57,7 @@ export default function NameTentsPage() {
         setFeatures(f.ok ? await f.json() : {});
         const rsvpOptions: { type: string; choices: string }[] = o.ok ? await o.json() : [];
         setMealChoices(rsvpOptions.filter((x) => x.type === 'meal').flatMap((x) => parseRsvpChoices(x.choices)));
-        setSelectedTables(new Set(tablesData.map((x: { name: string }) => x.name)));
+        setSelectedTables(new Set(tablesData.map((x: { name: string; number?: number | null }) => tableKey(x.name, x.number))));
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
@@ -78,7 +82,7 @@ export default function NameTentsPage() {
   const unseatedCount = seated.filter((g) => g.table === UNASSIGNED_TABLE).length;
   // Seats that lost their guest print with no meal color or marks.
   const unlinkedCount = seated.filter((g) => g.unlinked && g.table !== UNASSIGNED_TABLE).length;
-  const printing = seated.filter((g) => g.table !== UNASSIGNED_TABLE && selectedTables.has(g.table));
+  const printing = seated.filter((g) => g.table !== UNASSIGNED_TABLE && selectedTables.has(tableKey(g.table, g.tableNumber)));
   // Households still on one shared allergy note: it can't go on any single
   // card, so warn before the couple prints without it.
   // Guests whose meal has no color print with no circle; name the meals so
@@ -95,7 +99,8 @@ export default function NameTentsPage() {
     const map = new Map<string, typeof seated>();
     for (const g of seated) {
       if (g.table === UNASSIGNED_TABLE) continue;
-      map.set(g.table, [...(map.get(g.table) ?? []), g]);
+      const key = tableKey(g.table, g.tableNumber);
+      map.set(key, [...(map.get(key) ?? []), g]);
     }
     return [...map.entries()];
   }, [seated]);
@@ -297,7 +302,7 @@ export default function NameTentsPage() {
                 <input type="checkbox" className="h-4 w-4 mt-0.5" checked={selectedTables.has(table)} onChange={() => toggleTable(table)} />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium">
-                    {tableDisplayName(table)} <span className="text-gray-500 font-normal">({guests.length})</span>
+                    {tableHeading({ name: guests[0].table, number: guests[0].tableNumber })} <span className="text-gray-500 font-normal">({guests.length})</span>
                   </div>
                   <div className="text-xs text-gray-500">
                     {guests.map((g, i) => (

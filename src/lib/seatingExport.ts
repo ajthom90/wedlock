@@ -4,6 +4,7 @@
 
 import { listAttendees, type Attendee, type AttendeeInvitation } from './attendees';
 import { childSeatLabel, type ChildSeat } from './guestNeeds';
+import { compareTables } from './tableNumbers';
 
 export interface SeatingExportAssignment {
   guestName: string;
@@ -17,6 +18,7 @@ export interface SeatingExportAssignment {
 
 export interface SeatingExportTable {
   name: string;
+  number?: number | null;
   assignments: SeatingExportAssignment[];
 }
 
@@ -35,6 +37,7 @@ export interface SeatingExportRow {
 export interface SeatedGuest {
   guestName: string;
   table: string;
+  tableNumber: number | null; // the table's printed number, if it has one
   meal: string;
   dietary: string;            // this person's own allergies / dietary needs
   householdDietary: string;   // pre-per-guest household note nobody's been assigned yet
@@ -82,12 +85,13 @@ export function resolveSeatedGuests(
     const free = attendees.filter((a) => norm(a.name) === key && !isSeated(a));
     return free.find((a) => a.invitationId === invitationId) ?? (invitationId ? undefined : free[0]);
   };
-  const row = (guestName: string, table: string, match: Attendee | undefined, invitationId: string | null, unlinked = false): SeatedGuest => {
+  const row = (guestName: string, table: SeatingExportTable | null, match: Attendee | undefined, invitationId: string | null, unlinked = false): SeatedGuest => {
     const invId = match?.invitationId ?? invitationId;
     return {
       unlinked,
       guestName,
-      table,
+      table: table?.name ?? UNASSIGNED_TABLE,
+      tableNumber: table?.number ?? null,
       meal: match?.meal ?? '',
       dietary: match?.dietary ?? '',
       householdDietary: (invId && householdNote.get(invId)) || '',
@@ -97,7 +101,7 @@ export function resolveSeatedGuests(
   };
 
   const rows: SeatedGuest[] = [];
-  const sorted = [...tables].sort((a, b) => compareTableNames(a.name, b.name));
+  const sorted = [...tables].sort(compareTables);
   for (const table of sorted) {
     for (const a of table.assignments) {
       // A linked guest who isn't coming (declined, or unticked on the RSVP)
@@ -105,7 +109,7 @@ export function resolveSeatedGuests(
       const match = a.guestId ? byGuestId.get(a.guestId) : findByName(a.guestName, a.invitationId);
       if (match) markSeated(match);
       const name = a.guest?.name ?? match?.name ?? a.guestName;
-      rows.push(row(name, table.name, match, a.invitationId, !a.guestId && match?.kind !== 'plus-one'));
+      rows.push(row(name, table, match, a.invitationId, !a.guestId && match?.kind !== 'plus-one'));
     }
   }
 
@@ -114,7 +118,7 @@ export function resolveSeatedGuests(
   for (const a of attendees) {
     if (isSeated(a)) continue;
     markSeated(a);
-    rows.push(row(a.name, UNASSIGNED_TABLE, a, a.invitationId));
+    rows.push(row(a.name, null, a, a.invitationId));
   }
   return rows;
 }
@@ -125,7 +129,7 @@ export function buildSeatingExportRows(
 ): SeatingExportRow[] {
   return resolveSeatedGuests(tables, invitations).map((g) => ({
     guestName: g.guestName,
-    table: g.table,
+    table: g.tableNumber != null ? String(g.tableNumber) : g.table,
     meal: g.meal,
     // A household note that hasn't been split per person yet still reaches
     // the caterer, labelled so it isn't mistaken for this guest's own.

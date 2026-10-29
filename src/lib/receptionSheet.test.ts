@@ -34,6 +34,39 @@ describe('sheetTableValue', () => {
     expect(sheetTableValue('00. Head Table')).toBe('Head Table');
     expect(sheetTableValue('Head Table')).toBe('Head Table');
   });
+
+  it("uses the table's own number over its name", () => {
+    expect(sheetTableValue("Kim Mo's HS Friends", 34)).toBe(34);
+    expect(sheetTableValue('Head Table', null)).toBe('Head Table');
+    expect(sheetTableValue('Kids', 0)).toBe(0);
+  });
+});
+
+describe('buildReceptionSheet with table numbers', () => {
+  const invitations = [
+    inv('a', [{ name: 'Ann Lee', meal: 'Beef' }]),
+    inv('b', [{ name: 'Cy Park', meal: 'Chicken' }]),
+    inv('c', [{ name: 'Flo Ng', meal: 'Beef' }]),
+    inv('d', [{ name: 'Hal Ito', meal: 'Beef' }]),
+  ];
+  // As the upgrade leaves them: names without their "NN. " prefix, numbers set.
+  const tables = [
+    { name: "Kim Mo's HS Friends", number: 34, assignments: [{ guestName: 'Flo Ng', invitationId: 'c' }] },
+    { name: 'Cousins', number: 2, assignments: [{ guestName: 'Cy Park', invitationId: 'b' }] },
+    { name: 'Head Table', number: null, assignments: [{ guestName: 'Ann Lee', invitationId: 'a' }] },
+    { name: 'Family', number: 10, assignments: [{ guestName: 'Hal Ito', invitationId: 'd' }] },
+  ];
+  const sheet = buildReceptionSheet({ tables, invitations, mealChoices, vendorMeals: [] });
+  const guestRows = sheet.rows.slice(sheet.headerRow);
+
+  it('shows the number in Table# and orders Head Table first, then by number', () => {
+    expect(guestRows.map((r) => [r[0], r[1]])).toEqual([
+      ['Ann Lee', 'Head Table'],
+      ['Cy Park', 2],
+      ['Hal Ito', 10],
+      ['Flo Ng', 34],
+    ]);
+  });
 });
 
 describe('buildReceptionSheet', () => {
@@ -61,6 +94,7 @@ describe('buildReceptionSheet', () => {
       'Standard Vendor Meals\t3\tAllergens / Restrictions (A)\t1',
       'Vegetarian Vendor Meal\t1\tBooster Chairs (B)\t1',
       'Total:\t12\tHeight Chairs (H)\t1',
+      '',
       'Guest Name\tTable#\tMeal Choice\tDietary Restrictions\tH / B\tA\tColor Code',
       'Bo Lee\tHead Table\tChicken\t\t\t\tBlue',
       'Ann Lee\tHead Table\tBeef\tGluten Free\t\tA\tRed',
@@ -71,7 +105,11 @@ describe('buildReceptionSheet', () => {
       'Gil Ng\t10\tBeef\tHousehold: Shellfish\t\t\tRed',
       'Hal Ito\tUnassigned',
     ].join('\n'));
-    expect(sheet.headerRow).toBe(10);
+    expect(sheet.headerRow).toBe(11);
+    expect(sheet.summary).toEqual({
+      firstMealRow: 2, lastMealRow: 6, noMealRow: 6, firstVendorRow: 7, lastVendorRow: 8,
+      totalRow: 9, allergensRow: 7, boostersRow: 8, highChairsRow: 9,
+    });
   });
 
   it('writes table numbers and counts as numbers', () => {
@@ -98,7 +136,7 @@ describe('buildReceptionSheet', () => {
 
   const summary = (vendorMeals: { name: string; count: number }[]) =>
     sheetToText(buildReceptionSheet({ tables: [], invitations: [inv('a', [{ name: 'Ann Lee', meal: 'Beef' }])], mealChoices: [{ name: 'Beef', color: 'Red' }], vendorMeals }).rows)
-      .split('\n').slice(0, -2);
+      .split('\n').slice(0, -3);
 
   it('lists any number of vendor meals and adds them all to the total', () => {
     expect(summary([{ name: 'DJ', count: 2 }, { name: 'Photo', count: 3 }, { name: 'Planner (GF)', count: 1 }])).toEqual([
