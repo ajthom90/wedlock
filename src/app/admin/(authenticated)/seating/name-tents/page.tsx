@@ -76,6 +76,8 @@ export default function NameTentsPage() {
 
   const seated = useMemo(() => resolveSeatedGuests(tables, invitations), [tables, invitations]);
   const unseatedCount = seated.filter((g) => g.table === UNASSIGNED_TABLE).length;
+  // Seats that lost their guest print with no meal color or marks.
+  const unlinkedCount = seated.filter((g) => g.unlinked && g.table !== UNASSIGNED_TABLE).length;
   const printing = seated.filter((g) => g.table !== UNASSIGNED_TABLE && selectedTables.has(g.table));
   // Households still on one shared allergy note: it can't go on any single
   // card, so warn before the couple prints without it.
@@ -313,6 +315,12 @@ export default function NameTentsPage() {
           {unseatedCount > 0 && (
             <p className="text-xs text-gray-500">
               {unseatedCount} attending guest{unseatedCount === 1 ? ' isn’t' : 's aren’t'} seated yet and won’t get a card.
+            </p>
+          )}
+          {unlinkedCount > 0 && (
+            <p className="text-xs text-red-700">
+              {unlinkedCount} seat{unlinkedCount === 1 ? ' isn’t' : 's aren’t'} linked to a guest, so {unlinkedCount === 1 ? 'its card' : 'their cards'} would
+              print with no meal or marks. Fix {unlinkedCount === 1 ? 'it' : 'them'} on the <Link href="/admin/seating" className="underline">Seating page</Link> first.
             </p>
           )}
         </CardContent>

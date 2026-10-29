@@ -9,7 +9,7 @@ const format3328 = TENT_CARD_FORMATS.find((f) => f.code === '3328')!;
 
 const guest = (over: Partial<SeatedGuest> = {}): SeatedGuest => ({
   guestName: 'Ann Smith', table: '01. Head Table', meal: 'Chicken', dietary: 'Peanuts',
-  householdDietary: '', childSeat: null, invitationId: 'inv1', ...over,
+  householdDietary: '', childSeat: null, invitationId: 'inv1', unlinked: false, ...over,
 });
 
 const allOff = { showTable: false, showChildSeat: false, showAllergies: false, showMeal: false };

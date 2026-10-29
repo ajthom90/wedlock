@@ -136,7 +136,7 @@ export function isPlusOneSeat(
 /** Plus-ones on an RSVP, whether stored as the plusOnes list or the older single plusOneName. */
 export function plusOnesOf(inv: {
   id: string;
-  response: { plusOnes: string | null; plusOneName?: string | null } | null;
+  response?: { plusOnes: string | null; plusOneName?: string | null } | null;
 }): { invitationId: string; name: string }[] {
   const r = inv.response;
   if (!r) return [];
