@@ -20,10 +20,24 @@ import {
 export type SheetCell = string | number | null;
 
 
+/** 1-based row numbers of the summary block's parts, for the .xlsx writer's formulas and borders. */
+export interface SummaryLayout {
+  firstMealRow: number;
+  lastMealRow: number;        // includes the "No meal chosen" row when there is one
+  noMealRow: number | null;
+  firstVendorRow: number;     // vendor meals, plus blank rows when there are fewer than two
+  lastVendorRow: number;
+  totalRow: number;
+  allergensRow: number;       // A / B / H labels sit in C, their counts in D
+  boostersRow: number;
+  highChairsRow: number;
+}
+
 export interface ReceptionSheet {
   rows: SheetCell[][];
   /** 1-based row number of the "Guest Name" header row. */
   headerRow: number;
+  summary: SummaryLayout;
 }
 
 export const RECEPTION_SHEET_NAME = 'Reception Seating';
@@ -124,8 +138,23 @@ export function buildReceptionSheet(args: {
     row[2] = label;
     row[3] = n;
   });
+  const firstVendorRow = rows.length + 1;
   rows.push(...tail);
+  const totalRow = rows.length;
+  const summary: SummaryLayout = {
+    firstMealRow: 2,
+    lastMealRow: firstVendorRow - 1,
+    noMealRow: noMeal ? firstVendorRow - 1 : null,
+    firstVendorRow,
+    lastVendorRow: totalRow - 1,
+    totalRow,
+    allergensRow: totalRow - 2,
+    boostersRow: totalRow - 1,
+    highChairsRow: totalRow,
+  };
 
+  // A blank row between the summary and the guest list, as on the couple's sheet.
+  rows.push([]);
   rows.push([...GUEST_HEADERS]);
   const headerRow = rows.length;
   for (const g of guests) {
@@ -142,7 +171,7 @@ export function buildReceptionSheet(args: {
       colorName(g.meal) || null,
     ]);
   }
-  return { rows, headerRow };
+  return { rows, headerRow, summary };
 }
 
 /**

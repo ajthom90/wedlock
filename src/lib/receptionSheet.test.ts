@@ -94,6 +94,7 @@ describe('buildReceptionSheet', () => {
       'Standard Vendor Meals\t3\tAllergens / Restrictions (A)\t1',
       'Vegetarian Vendor Meal\t1\tBooster Chairs (B)\t1',
       'Total:\t12\tHeight Chairs (H)\t1',
+      '',
       'Guest Name\tTable#\tMeal Choice\tDietary Restrictions\tH / B\tA\tColor Code',
       'Bo Lee\tHead Table\tChicken\t\t\t\tBlue',
       'Ann Lee\tHead Table\tBeef\tGluten Free\t\tA\tRed',
@@ -104,7 +105,11 @@ describe('buildReceptionSheet', () => {
       'Gil Ng\t10\tBeef\tHousehold: Shellfish\t\t\tRed',
       'Hal Ito\tUnassigned',
     ].join('\n'));
-    expect(sheet.headerRow).toBe(10);
+    expect(sheet.headerRow).toBe(11);
+    expect(sheet.summary).toEqual({
+      firstMealRow: 2, lastMealRow: 6, noMealRow: 6, firstVendorRow: 7, lastVendorRow: 8,
+      totalRow: 9, allergensRow: 7, boostersRow: 8, highChairsRow: 9,
+    });
   });
 
   it('writes table numbers and counts as numbers', () => {
@@ -131,7 +136,7 @@ describe('buildReceptionSheet', () => {
 
   const summary = (vendorMeals: { name: string; count: number }[]) =>
     sheetToText(buildReceptionSheet({ tables: [], invitations: [inv('a', [{ name: 'Ann Lee', meal: 'Beef' }])], mealChoices: [{ name: 'Beef', color: 'Red' }], vendorMeals }).rows)
-      .split('\n').slice(0, -2);
+      .split('\n').slice(0, -3);
 
   it('lists any number of vendor meals and adds them all to the total', () => {
     expect(summary([{ name: 'DJ', count: 2 }, { name: 'Photo', count: 3 }, { name: 'Planner (GF)', count: 1 }])).toEqual([
