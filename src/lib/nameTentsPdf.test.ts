@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { PDFDocument } from 'pdf-lib';
-import { composeTentContent, renderNameTentsPdf, tableDisplayName, wrapText } from './nameTentsPdf';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { composeTentContent, layoutTentPanel, markBandsFor, renderNameTentsPdf, tableDisplayName, wrapText, type DrawOp } from './nameTentsPdf';
 import { TENT_CARD_FORMATS } from './tentCardFormats';
+import { buildMealColorMap } from './mealColors';
 import type { SeatedGuest } from './seatingExport';
 
 const format3328 = TENT_CARD_FORMATS.find((f) => f.code === '3328')!;
@@ -65,6 +66,100 @@ describe('composeTentContent', () => {
     const c = composeTentContent(guest({ dietary: '', householdDietary: 'Bob: shellfish' }), { ...allOff, showAllergies: true });
     expect(c.details).toEqual([]);
   });
+
+  const colors = buildMealColorMap([{ name: 'Chicken', color: 'Blue' }, { name: 'Beef', color: 'Red' }, { name: 'Vendor Meal' }]);
+  const marksOn = { ...allOff, showMealColor: true, showAllergyMark: true, showChildSeatMark: true };
+
+  it('adds the meal color, A and H/B marks when turned on', () => {
+    expect(composeTentContent(guest({ childSeat: 'high_chair' }), marksOn, colors))
+      .toMatchObject({ mealColor: '#1F5FD1', allergyMark: true, childSeatMark: 'H' });
+    expect(composeTentContent(guest({ meal: 'beef', dietary: ' ', childSeat: 'booster' }), marksOn, colors))
+      .toMatchObject({ mealColor: '#D62828', allergyMark: false, childSeatMark: 'B' });
+  });
+
+  it('leaves the circle off for a meal with no color, and marks off when turned off', () => {
+    expect(composeTentContent(guest({ meal: 'Vendor Meal' }), marksOn, colors).mealColor).toBe('');
+    expect(composeTentContent(guest({ meal: '' }), marksOn, colors).mealColor).toBe('');
+    const off = composeTentContent(guest({ childSeat: 'booster' }), allOff, colors);
+    expect(off).not.toHaveProperty('mealColor');
+    expect(off).not.toHaveProperty('allergyMark');
+    expect(off).not.toHaveProperty('childSeatMark');
+  });
+
+  it('only marks A for the guest’s own allergies', () => {
+    expect(composeTentContent(guest({ dietary: '', householdDietary: 'Bob: shellfish' }), marksOn, colors).allergyMark).toBe(false);
+  });
+});
+
+describe('markBandsFor', () => {
+  it('keeps bands for every card once a mark is on for the run', () => {
+    expect(markBandsFor([{ name: 'a', table: '', details: [] }])).toEqual({ top: false, bottom: false });
+    expect(markBandsFor([{ name: 'a', table: '', details: [], mealColor: '' }])).toEqual({ top: false, bottom: true });
+    expect(markBandsFor([{ name: 'a', table: '', details: [], childSeatMark: '' }])).toEqual({ top: true, bottom: false });
+  });
+});
+
+describe('layoutTentPanel', () => {
+  // A 3328 panel in points.
+  const W = 3.5 * 72, H = 2 * 72, PX = 0.3 * 72, PY = 0.25 * 72;
+
+  async function layout(content: Parameters<typeof layoutTentPanel>[0]) {
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+    const fonts = { heading: font, body: font, bodyBold: bold };
+    return layoutTentPanel(content, fonts, bold, markBandsFor([content]), W, H, PX, PY);
+  }
+
+  const texts = (ops: DrawOp[]) => ops.filter((o): o is Extract<DrawOp, { kind: 'text' }> => o.kind === 'text');
+
+  it('puts the circle bottom right, A bottom left and H top right, clear of the name', async () => {
+    const ops = await layout({
+      name: 'Alexandra Mohrhauser', table: 'Head Table', details: ['Allergies: gluten'],
+      mealColor: '#D62828', allergyMark: true, childSeatMark: 'H',
+    });
+    const circle = ops.find((o) => o.kind === 'circle')!;
+    expect(circle.kind === 'circle' && circle.radius).toBe(18);
+    expect(circle.x + 18).toBeCloseTo(W - PX);
+    expect(circle.y - 18).toBeCloseTo(PY);
+
+    const a = texts(ops).find((o) => o.text === 'A')!;
+    expect(a.x).toBeCloseTo(PX);
+    expect(a.y).toBeLessThan(PY + 36);
+    const h = texts(ops).find((o) => o.text === 'H')!;
+    expect(h.x + h.font.widthOfTextAtSize('H', h.size)).toBeCloseTo(W - PX);
+    expect(h.y).toBeGreaterThan(H / 2);
+
+    // Name and table sit between the bands; the small print sits between A and the circle.
+    const name = texts(ops).find((o) => o.text.startsWith('Alexandra'))!;
+    const table = texts(ops).find((o) => o.text === 'Head Table')!;
+    for (const t of [name, table]) {
+      expect(t.y - t.size * 0.2).toBeGreaterThanOrEqual(PY + 36);
+      expect(t.y + t.size * 0.8).toBeLessThanOrEqual(h.y);
+    }
+    const detail = texts(ops).find((o) => o.text.startsWith('Allergies'))!;
+    expect(detail.x).toBeGreaterThan(PX + 36);
+    expect(detail.x + detail.font.widthOfTextAtSize(detail.text, detail.size)).toBeLessThan(W - PX - 36);
+  });
+
+  it('prints no circle or letters for a guest with nothing to mark', async () => {
+    const ops = await layout({ name: 'Ann Smith', table: 'Table 1', details: [], mealColor: '', allergyMark: false, childSeatMark: '' });
+    expect(ops.some((o) => o.kind === 'circle')).toBe(false);
+    expect(texts(ops).map((o) => o.text)).toEqual(['Ann Smith', 'Table 1']);
+  });
+
+  it('keeps a long two-line name inside the bands', async () => {
+    const ops = await layout({
+      name: 'Maximiliana Alexandrina Featherstonehaugh-Montgomery', table: 'Head Table', details: [],
+      mealColor: '#1F5FD1', allergyMark: false, childSeatMark: 'B',
+    });
+    const top = H - PY - 20 * 0.72;
+    for (const t of texts(ops).filter((o) => o.text !== 'B')) {
+      expect(t.y - t.size * 0.2).toBeGreaterThanOrEqual(PY + 36);
+      expect(t.y + t.size * 0.8).toBeLessThanOrEqual(top + 0.01);
+    }
+    expect(texts(ops).some((o) => o.text === 'Head Table')).toBe(true);
+  });
 });
 
 describe('wrapText', () => {
@@ -119,6 +214,15 @@ describe('renderNameTentsPdf', () => {
     const tents = ['Łukasz Żółć', '王小明', 'José'].map((n) => composeTentContent(guest({ guestName: n }), allOff));
     const bytes = await renderNameTentsPdf({ format: format3328, startPosition: 1, tents, bothSides: true, outline: false });
     expect(bytes.length).toBeGreaterThan(0);
+  });
+
+  it('renders meal circles and corner marks on both halves', async () => {
+    const colors = buildMealColorMap([{ name: 'Chicken', color: 'Blue' }]);
+    const marked = [guest(), guest({ childSeat: 'booster', meal: 'Beef' })].map((g) => composeTentContent(g, {
+      ...allOff, showTable: true, showMealColor: true, showAllergyMark: true, showChildSeatMark: true,
+    }, colors));
+    const bytes = await renderNameTentsPdf({ format: format3328, startPosition: 1, tents: marked, bothSides: true, outline: false });
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
   });
 
   it('copes with a very long name', async () => {
