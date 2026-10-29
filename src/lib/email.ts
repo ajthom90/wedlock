@@ -120,8 +120,9 @@ function buildRsvpRecapBody(args: {
   // them against guestNameById below. Unknown IDs render raw as a fallback.
   attendingGuests: string[] | null;
   guestNameById: Record<string, string>;
-  plusOnes: { name: string; meal?: string }[] | null;
+  plusOnes: { name: string; meal?: string; dietary?: string }[] | null;
   guestMeals: Record<string, string> | null;
+  guestDietary: Record<string, string> | null;
   songRequests: string | null;
   dietaryNotes: string | null;
   message: string | null;
@@ -146,11 +147,14 @@ function buildRsvpRecapBody(args: {
         const name = args.guestNameById[id] ?? id;
         const meal = args.guestMeals?.[id];
         lines.push(meal ? `    - ${name} (${meal})` : `    - ${name}`);
+        const allergies = args.guestDietary?.[id]?.trim();
+        if (allergies) lines.push(`      Allergies / dietary: ${allergies}`);
       }
     }
     if (args.plusOnes && args.plusOnes.length) {
       for (const p of args.plusOnes) {
         lines.push(p.meal ? `    - ${p.name} (${p.meal})` : `    - ${p.name}`);
+        if (p.dietary?.trim()) lines.push(`      Allergies / dietary: ${p.dietary.trim()}`);
       }
     }
   }
@@ -203,8 +207,9 @@ export async function sendRsvpConfirmation(
     guestCount: response.guestCount,
     attendingGuests: safeJsonParse<string[] | null>(response.attendingGuests, null),
     guestNameById,
-    plusOnes: safeJsonParse<{ name: string; meal?: string }[] | null>(response.plusOnes, null),
+    plusOnes: safeJsonParse<{ name: string; meal?: string; dietary?: string }[] | null>(response.plusOnes, null),
     guestMeals: safeJsonParse<Record<string, string> | null>(response.guestMeals, null),
+    guestDietary: safeJsonParse<Record<string, string> | null>(response.guestDietary, null),
     songRequests: response.songRequests,
     dietaryNotes: response.dietaryNotes,
     message: response.message,

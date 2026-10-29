@@ -48,7 +48,7 @@ describe('buildSeatingExportRows', () => {
     expect(buildSeatingExportRows([], [declined])).toEqual([]);
   });
 
-  it('uses per-guest allergies and child seats, for guests and plus-ones', () => {
+  it('uses per-guest allergies and child seats, and keeps an unsplit household note', () => {
     const kids: SeatingExportInvitation = {
       id: 'inv3',
       guests: [{ id: 'g4', name: 'Eve Park', childSeat: null }, { id: 'g5', name: 'Finn Park', childSeat: 'high_chair' }],
@@ -62,9 +62,9 @@ describe('buildSeatingExportRows', () => {
       },
     };
     expect(buildSeatingExportRows([{ name: 'Table 3', assignments: [{ guestName: 'Finn Park', invitationId: 'inv3' }] }], [kids])).toEqual([
-      { guestName: 'Finn Park', table: 'Table 3', meal: '', dietary: '', childSeat: 'High chair' },
-      { guestName: 'Eve Park', table: 'Unassigned', meal: '', dietary: 'Peanuts', childSeat: '' },
-      { guestName: 'Gus Park', table: 'Unassigned', meal: 'Kids', dietary: 'Dairy', childSeat: 'Booster seat' },
+      { guestName: 'Finn Park', table: 'Table 3', meal: '', dietary: 'Household: old household note', childSeat: 'High chair' },
+      { guestName: 'Eve Park', table: 'Unassigned', meal: '', dietary: 'Peanuts; Household: old household note', childSeat: '' },
+      { guestName: 'Gus Park', table: 'Unassigned', meal: 'Kids', dietary: 'Dairy; Household: old household note', childSeat: 'Booster seat' },
     ]);
   });
 

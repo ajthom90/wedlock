@@ -7,11 +7,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { countRsvpPeople } from '@/lib/rsvpCounts';
 import { countMealChoices, pruneGuestMeals } from '@/lib/rsvpMeals';
+import { listAttendees } from '@/lib/attendees';
+import { childSeatLabel, parseGuestDietary, pruneGuestDietary } from '@/lib/guestNeeds';
+import { ChildSeatSelect } from '@/components/admin/ChildSeatSelect';
 
 interface Guest {
   id: string;
   name: string;
   isPrimary: boolean;
+  childSeat: string | null;
+}
+
+type EditPlusOne = { name: string; meal: string; dietary: string; childSeat: string | null };
+
+// A pre-per-guest household allergy note that still covers several people
+// and hasn't been split up yet — the couple should move it onto each guest.
+function needsDietaryReview(inv: Invitation): boolean {
+  const { attendees, unassignedDietary } = listAttendees(inv);
+  return Boolean(unassignedDietary) && attendees.length > 1;
 }
 
 interface RsvpResponse {
@@ -26,6 +39,7 @@ interface RsvpResponse {
   plusOneMeal?: string | null;
   songRequests: string | null;
   dietaryNotes: string | null;
+  guestDietary: string | null;
   message: string | null;
   submittedAt: string;
 }
@@ -84,7 +98,9 @@ export default function RsvpsPage() {
   const [editDietaryNotes, setEditDietaryNotes] = useState('');
   const [editAttendingGuests, setEditAttendingGuests] = useState<string[]>([]);
   const [editGuestMeals, setEditGuestMeals] = useState<Record<string, string>>({});
-  const [editPlusOnes, setEditPlusOnes] = useState<{ name: string; meal: string }[]>([]);
+  const [editGuestDietary, setEditGuestDietary] = useState<Record<string, string>>({});
+  const [editPlusOnes, setEditPlusOnes] = useState<EditPlusOne[]>([]);
+  const [childSeatsOn, setChildSeatsOn] = useState(false);
   const [editResponses, setEditResponses] = useState<Record<string, string>>({});
   const [editMailingAddress1, setEditMailingAddress1] = useState('');
   const [editMailingAddress2, setEditMailingAddress2] = useState('');
@@ -116,6 +132,10 @@ export default function RsvpsPage() {
 
   useEffect(() => {
     fetchInvitations();
+    fetch('/api/features')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((f) => setChildSeatsOn(f?.childSeats !== false))
+      .catch(() => setChildSeatsOn(false));
   }, [fetchInvitations]);
 
   useEffect(() => {
@@ -221,7 +241,7 @@ export default function RsvpsPage() {
     // slots are seeded from any existing response.
     const plusOneSlots = Array.from(
       { length: inv.plusOnesAllowed || 0 },
-      () => ({ name: '', meal: '' }),
+      (): EditPlusOne => ({ name: '', meal: '', dietary: '', childSeat: null }),
     );
 
     const safeParse = <T,>(raw: string | null | undefined, fallback: T): T => {
@@ -243,8 +263,20 @@ export default function RsvpsPage() {
       setEditGuestMeals(Object.fromEntries(
         Object.entries(safeParse<Record<string, string>>(inv.response.guestMeals, {})).filter(([id]) => validIds.has(id)),
       ));
-      const loadedPluses = safeParse<{ name: string; meal: string }[]>(inv.response.plusOnes, []);
-      setEditPlusOnes(plusOneSlots.map((slot, i) => loadedPluses[i] ? { name: loadedPluses[i].name || '', meal: loadedPluses[i].meal || '' } : slot));
+      const dietary = Object.fromEntries(
+        Object.entries(parseGuestDietary(inv.response.guestDietary)).filter(([id]) => validIds.has(id)),
+      );
+      // Same one-person-household rule as the public form: an old household
+      // note can only belong to them, so prefill it into their own box.
+      if (inv.guests.length === 1 && !Object.keys(dietary).length && inv.response.dietaryNotes?.trim()) {
+        dietary[inv.guests[0].id] = inv.response.dietaryNotes.trim();
+      }
+      setEditGuestDietary(dietary);
+      const loadedPluses = safeParse<Partial<EditPlusOne>[]>(inv.response.plusOnes, []);
+      setEditPlusOnes(plusOneSlots.map((slot, i) => loadedPluses[i] ? {
+        name: loadedPluses[i].name || '', meal: loadedPluses[i].meal || '',
+        dietary: loadedPluses[i].dietary || '', childSeat: loadedPluses[i].childSeat || null,
+      } : slot));
       setEditResponses(safeParse<Record<string, string>>(inv.response.responses, {}));
     } else {
       setEditAttending('yes');
@@ -254,6 +286,7 @@ export default function RsvpsPage() {
       setEditDietaryNotes('');
       setEditAttendingGuests([]);
       setEditGuestMeals({});
+      setEditGuestDietary({});
       setEditPlusOnes(plusOneSlots);
       setEditResponses({});
     }
@@ -263,7 +296,7 @@ export default function RsvpsPage() {
     setEditAttendingGuests((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]);
   };
 
-  const updateEditPlusOne = (index: number, patch: Partial<{ name: string; meal: string }>) => {
+  const updateEditPlusOne = (index: number, patch: Partial<EditPlusOne>) => {
     setEditPlusOnes((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
   };
 
@@ -283,17 +316,27 @@ export default function RsvpsPage() {
             : editAttendingGuests.length + namedPlusOnes.length)
         : 0;
       const prunedMeals = pruneGuestMeals(editGuestMeals, editAttendingGuests);
+      const prunedDietary = pruneGuestDietary(editGuestDietary, editAttendingGuests);
+      // A one-person household's old note was moved into their own box when
+      // the editor opened, so saving clears the household copy.
+      const householdDietary = selectedInvitation.guests.length === 1 && Object.keys(prunedDietary).length
+        ? '' : editDietaryNotes.trim();
 
       const body = {
         attending: editAttending,
         guestCount: computedGuestCount,
         message: editMessage.trim() || null,
         songRequests: editSongRequests.trim() || null,
-        dietaryNotes: editDietaryNotes.trim() || null,
+        dietaryNotes: householdDietary || null,
         responses: editResponses,
         guestMeals: Object.keys(prunedMeals).length > 0 ? prunedMeals : null,
+        guestDietary: Object.keys(prunedDietary).length > 0 ? prunedDietary : null,
         attendingGuests: editAttendingGuests.length > 0 ? editAttendingGuests : null,
-        plusOnes: namedPlusOnes.map((p) => ({ name: p.name.trim(), meal: p.meal || '' })),
+        plusOnes: namedPlusOnes.map((p) => ({
+          name: p.name.trim(), meal: p.meal || '', dietary: p.dietary.trim(),
+          // Leave stored seats alone while the feature is hidden.
+          childSeat: p.childSeat,
+        })),
         // Invitation-level fields (persisted by the PUT route to the Invitation, not RsvpResponse).
         mailingAddress1: editMailingAddress1.trim() || null,
         mailingAddress2: editMailingAddress2.trim() || null,
@@ -330,9 +373,14 @@ export default function RsvpsPage() {
   const copyDietarySummary = async () => {
     // One-line-per-guest rollup of every dietary restriction captured in the
     // RSVP flow. Formatted for the caterer.
-    const lines = scoped
-      .filter((inv) => inv.response?.dietaryNotes?.trim())
-      .map((inv) => `${inv.householdName}: ${inv.response!.dietaryNotes!.trim()}`);
+    const lines = scoped.flatMap((inv) => {
+      const { attendees, unassignedDietary } = listAttendees(inv);
+      const out = attendees
+        .filter((a) => a.dietary)
+        .map((a) => `${a.name} (${inv.householdName}): ${a.dietary}`);
+      if (unassignedDietary) out.push(`${inv.householdName} (whole household): ${unassignedDietary}`);
+      return out;
+    });
     if (lines.length === 0) {
       alert('No dietary notes to copy yet.');
       return;
@@ -360,7 +408,7 @@ export default function RsvpsPage() {
     // seating chart / name-card workflows all get a complete roster with
     // per-person meal choices. Households that haven't responded or declined
     // still get a single row to make pending/declined visible.
-    const headers = ['Household', 'Code', 'Email', 'Status', 'Guest Count', 'Attendee', 'Attendee Type', 'Meal', 'Message', 'Song Requests', 'Dietary Notes', 'Submitted At'];
+    const headers = ['Household', 'Code', 'Email', 'Status', 'Guest Count', 'Attendee', 'Attendee Type', 'Meal', 'Allergies / Dietary', ...(childSeatsOn ? ['Child Seat'] : []), 'Message', 'Song Requests', 'Household Dietary Notes', 'Submitted At'];
     const rows: string[][] = [];
     for (const inv of scoped) {
       const baseCols = [
@@ -383,34 +431,39 @@ export default function RsvpsPage() {
       };
       const attendingIds = parse<string[]>(inv.response?.attendingGuests, []);
       const guestMeals = parse<Record<string, string>>(inv.response?.guestMeals, {});
-      const plusOnes = parse<{ name: string; meal?: string }[]>(inv.response?.plusOnes, []);
-      const guestsById = new Map(inv.guests.map((g) => [g.id, g.name]));
+      const plusOnes = parse<{ name: string; meal?: string; dietary?: string; childSeat?: string }[]>(inv.response?.plusOnes, []);
+      const guestsById = new Map(inv.guests.map((g) => [g.id, g]));
+      const resolved = listAttendees(inv);
+      const dietaryById = new Map(resolved.attendees.filter((a) => a.guestId).map((a) => [a.guestId!, a.dietary]));
+      const needCols = (dietary: string, seat: string | null | undefined) =>
+        [dietary, ...(childSeatsOn ? [childSeatLabel(seat)] : [])];
+      const emptyNeeds = needCols('', null);
 
       // No response yet — single placeholder row so the household still shows.
       if (!inv.response) {
-        rows.push([...baseCols, '', '', '', ...tailCols]);
+        rows.push([...baseCols, '', '', '', ...emptyNeeds, ...tailCols]);
         continue;
       }
 
       // Declined — one row with empty attendee fields; the Status column carries the signal.
       if (inv.response.attending !== 'yes') {
-        rows.push([...baseCols, '', '', '', ...tailCols]);
+        rows.push([...baseCols, '', '', '', ...emptyNeeds, ...tailCols]);
         continue;
       }
 
       // Attending — one row per attending primary guest, then one per plus-one.
       for (const id of attendingIds) {
-        const name = guestsById.get(id) ?? 'Removed guest';
-        rows.push([...baseCols, name, 'primary', guestMeals[id] || '', ...tailCols]);
+        const g = guestsById.get(id);
+        rows.push([...baseCols, g?.name ?? 'Removed guest', 'primary', guestMeals[id] || '', ...needCols(dietaryById.get(id) ?? '', g?.childSeat), ...tailCols]);
       }
       for (const p of plusOnes) {
         if (!p?.name) continue;
-        rows.push([...baseCols, p.name, 'plus-one', p.meal || '', ...tailCols]);
+        rows.push([...baseCols, p.name, 'plus-one', p.meal || '', ...needCols(p.dietary?.trim() ?? '', p.childSeat), ...tailCols]);
       }
       // Attending household with zero attendees recorded — still emit one row so the
       // invitation doesn't drop out of the export entirely.
       if (attendingIds.length === 0 && plusOnes.length === 0) {
-        rows.push([...baseCols, '', '', '', ...tailCols]);
+        rows.push([...baseCols, '', '', '', ...emptyNeeds, ...tailCols]);
       }
     }
     const csv = [headers, ...rows].map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -643,6 +696,11 @@ export default function RsvpsPage() {
                       {inv.isWeddingParty && (
                         <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Wedding Party</span>
                       )}
+                      {needsDietaryReview(inv) && (
+                        <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full" title="This RSVP has one allergy note for the whole household. Edit it to put each person's allergies next to their name.">
+                          Allergies need review
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-gray-500">{inv.guests.map((g) => g.name).join(', ')}</p>
                   </div>
@@ -712,25 +770,39 @@ export default function RsvpsPage() {
                           <p className="text-sm font-medium mb-2">Who will be attending?</p>
                           <div className="space-y-2">
                             {selectedInvitation.guests.map((g) => (
-                              <label key={g.id} className="flex items-center gap-3 p-2 border rounded-md">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4"
-                                  checked={attendingSet.has(g.id)}
-                                  onChange={() => toggleEditAttendingGuest(g.id)}
-                                />
-                                <span className="flex-1 text-sm">{g.name}</span>
-                                {mealOption && attendingSet.has(g.id) && (
-                                  <select
-                                    className="text-sm border border-gray-300 rounded px-2 py-1"
-                                    value={editGuestMeals[g.id] || ''}
-                                    onChange={(e) => setEditGuestMeals({ ...editGuestMeals, [g.id]: e.target.value })}
-                                  >
-                                    <option value="">{mealOption.label}…</option>
-                                    {mealOption.choices.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                                  </select>
+                              <div key={g.id} className="p-2 border rounded-md space-y-2">
+                                <label className="flex items-center gap-3">
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4"
+                                    checked={attendingSet.has(g.id)}
+                                    onChange={() => toggleEditAttendingGuest(g.id)}
+                                  />
+                                  <span className="flex-1 text-sm">
+                                    {g.name}
+                                    {childSeatsOn && g.childSeat && <span className="ml-2 text-xs text-sky-700">{childSeatLabel(g.childSeat)} (set on Invitations)</span>}
+                                  </span>
+                                  {mealOption && attendingSet.has(g.id) && (
+                                    <select
+                                      className="text-sm border border-gray-300 rounded px-2 py-1"
+                                      value={editGuestMeals[g.id] || ''}
+                                      onChange={(e) => setEditGuestMeals({ ...editGuestMeals, [g.id]: e.target.value })}
+                                    >
+                                      <option value="">{mealOption.label}…</option>
+                                      {mealOption.choices.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                                    </select>
+                                  )}
+                                </label>
+                                {attendingSet.has(g.id) && (
+                                  <Input
+                                    className="text-sm"
+                                    placeholder={`Allergies or dietary needs for ${g.name}`}
+                                    value={editGuestDietary[g.id] || ''}
+                                    onChange={(e) => setEditGuestDietary({ ...editGuestDietary, [g.id]: e.target.value })}
+                                    maxLength={300}
+                                  />
                                 )}
-                              </label>
+                              </div>
                             ))}
                           </div>
                         </div>
@@ -743,21 +815,35 @@ export default function RsvpsPage() {
                           </p>
                           <div className="space-y-2">
                             {editPlusOnes.map((p, i) => (
-                              <div key={i} className="flex gap-2">
-                                <Input
-                                  placeholder={`Plus-one ${i + 1} name`}
-                                  value={p.name}
-                                  onChange={(e) => updateEditPlusOne(i, { name: e.target.value })}
-                                />
-                                {mealOption && p.name.trim() && (
-                                  <select
-                                    className="text-sm border border-gray-300 rounded px-2 py-1"
-                                    value={p.meal}
-                                    onChange={(e) => updateEditPlusOne(i, { meal: e.target.value })}
-                                  >
-                                    <option value="">{mealOption.label}…</option>
-                                    {mealOption.choices.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                                  </select>
+                              <div key={i} className="space-y-2">
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder={`Plus-one ${i + 1} name`}
+                                    value={p.name}
+                                    onChange={(e) => updateEditPlusOne(i, { name: e.target.value })}
+                                  />
+                                  {mealOption && p.name.trim() && (
+                                    <select
+                                      className="text-sm border border-gray-300 rounded px-2 py-1"
+                                      value={p.meal}
+                                      onChange={(e) => updateEditPlusOne(i, { meal: e.target.value })}
+                                    >
+                                      <option value="">{mealOption.label}…</option>
+                                      {mealOption.choices.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                                    </select>
+                                  )}
+                                  {childSeatsOn && p.name.trim() && (
+                                    <ChildSeatSelect value={p.childSeat} onChange={(v) => updateEditPlusOne(i, { childSeat: v })} />
+                                  )}
+                                </div>
+                                {p.name.trim() && (
+                                  <Input
+                                    className="text-sm"
+                                    placeholder={`Allergies or dietary needs for ${p.name.trim()}`}
+                                    value={p.dietary}
+                                    onChange={(e) => updateEditPlusOne(i, { dietary: e.target.value })}
+                                    maxLength={300}
+                                  />
                                 )}
                               </div>
                             ))}
@@ -823,10 +909,20 @@ export default function RsvpsPage() {
                         <label className="block text-sm font-medium mb-1">Song Requests</label>
                         <Input value={editSongRequests} onChange={(e) => setEditSongRequests(e.target.value)} />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Dietary Notes</label>
-                        <Textarea rows={2} value={editDietaryNotes} onChange={(e) => setEditDietaryNotes(e.target.value)} />
-                      </div>
+                      {/* Household-wide note: the only allergy field for a
+                          head-count RSVP, otherwise shown just while an older
+                          note is still waiting to be split per person. */}
+                      {(selectedInvitation.guests.length === 0 || (selectedInvitation.guests.length > 1 && editDietaryNotes.trim())) && (
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            {selectedInvitation.guests.length === 0 ? 'Dietary Notes' : 'Household dietary note (from before per-guest allergies)'}
+                          </label>
+                          {selectedInvitation.guests.length > 0 && (
+                            <p className="text-xs text-amber-700 mb-1">Copy each person&apos;s allergies into their own box above, then clear this note.</p>
+                          )}
+                          <Textarea rows={2} value={editDietaryNotes} onChange={(e) => setEditDietaryNotes(e.target.value)} />
+                        </div>
+                      )}
                       <div>
                         <label className="block text-sm font-medium mb-1">Message for the Couple</label>
                         <Textarea rows={3} value={editMessage} onChange={(e) => setEditMessage(e.target.value)} />
@@ -911,12 +1007,28 @@ export default function RsvpsPage() {
                       <p className="text-sm">{selectedInvitation.response.songRequests}</p>
                     </div>
                   )}
-                  {selectedInvitation.response.dietaryNotes && (
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Dietary Notes</p>
-                      <p className="text-sm">{selectedInvitation.response.dietaryNotes}</p>
-                    </div>
-                  )}
+                  {(() => {
+                    const { attendees, unassignedDietary } = listAttendees(selectedInvitation);
+                    const withNeeds = attendees.filter((a) => a.dietary || (childSeatsOn && a.childSeat));
+                    if (withNeeds.length === 0 && !unassignedDietary) return null;
+                    return (
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 mb-1">Allergies &amp; seating needs</p>
+                        {withNeeds.map((a, i) => (
+                          <p key={i} className="text-sm">
+                            <span className="font-medium">{a.name}:</span>{' '}
+                            {[a.dietary, childSeatsOn ? childSeatLabel(a.childSeat) : ''].filter(Boolean).join(' · ')}
+                          </p>
+                        ))}
+                        {unassignedDietary && (
+                          <p className="text-sm mt-1">
+                            <span className="font-medium">Whole household:</span> {unassignedDietary}
+                            {attendees.length > 1 && <span className="block text-xs text-amber-700">From before per-guest allergies. Edit this RSVP to put it next to the right person.</span>}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {selectedInvitation.response.message && (
                     <div>
                       <p className="text-sm font-medium text-gray-500">Message</p>

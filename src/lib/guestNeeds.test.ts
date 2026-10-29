@@ -41,17 +41,19 @@ describe('parseGuestDietary', () => {
 
 describe('householdDietaryFallback', () => {
   it('gives a legacy note to the only attendee', () => {
-    expect(householdDietaryFallback({ householdNote: 'no nuts', attendeeCount: 1, hasPerPersonNotes: false }))
+    expect(householdDietaryFallback({ householdNote: 'no nuts', attendeeCount: 1, soleAttendeeHasOwnNote: false }))
       .toEqual({ soleAttendeeNote: 'no nuts', unassignedNote: '' });
   });
 
-  it('flags a legacy note shared by several attendees', () => {
-    expect(householdDietaryFallback({ householdNote: 'Bob: no shellfish', attendeeCount: 3, hasPerPersonNotes: false }))
-      .toEqual({ soleAttendeeNote: '', unassignedNote: 'Bob: no shellfish' });
+  it("lets the only attendee's own note replace the legacy one", () => {
+    expect(householdDietaryFallback({ householdNote: 'no nuts', attendeeCount: 1, soleAttendeeHasOwnNote: true }))
+      .toEqual({ soleAttendeeNote: '', unassignedNote: '' });
   });
 
-  it('treats the note as reviewed once per-person notes exist', () => {
-    expect(householdDietaryFallback({ householdNote: 'Bob: no shellfish', attendeeCount: 3, hasPerPersonNotes: true }))
+  it('keeps a legacy note shared by several attendees until it is cleared', () => {
+    expect(householdDietaryFallback({ householdNote: 'Bob: no shellfish', attendeeCount: 3, soleAttendeeHasOwnNote: false }))
+      .toEqual({ soleAttendeeNote: '', unassignedNote: 'Bob: no shellfish' });
+    expect(householdDietaryFallback({ householdNote: '  ', attendeeCount: 3, soleAttendeeHasOwnNote: false }))
       .toEqual({ soleAttendeeNote: '', unassignedNote: '' });
   });
 });

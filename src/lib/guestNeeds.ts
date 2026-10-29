@@ -62,20 +62,23 @@ export function parseGuestDietary(raw: string | null | undefined): Record<string
 // RSVPs saved before per-guest allergies have one household-wide note. It
 // isn't copied onto every person — "Bob: no shellfish" on Ann's name tent is
 // wrong — so it's read like this instead:
-//   - one attendee in the household → the note is theirs;
-//   - more than one → it stays a household note that the couple needs to
-//     split up on the RSVPs page (needsReview), and lists that can't show it
-//     per person show it as "Household: …" so nothing is silently dropped.
-// Once any per-person note exists the couple has started splitting it, so
-// the household note is treated as reviewed.
+//   - one attendee → the note is theirs (unless they've since entered their
+//     own, which replaces it);
+//   - more than one → it stays a household note until someone clears it.
+//     The RSVPs page flags it for review, and lists that show allergies per
+//     person show it as "Household: …" so it's never silently dropped.
+// The public form clears it once the guest has re-entered allergies per
+// person; the admin editor asks the couple to split it and clear it.
 export function householdDietaryFallback(args: {
   householdNote: string | null | undefined;
   attendeeCount: number;
-  hasPerPersonNotes: boolean;
+  soleAttendeeHasOwnNote: boolean;
 }): { soleAttendeeNote: string; unassignedNote: string } {
   const note = args.householdNote?.trim() ?? '';
-  if (!note || args.hasPerPersonNotes) return { soleAttendeeNote: '', unassignedNote: '' };
-  if (args.attendeeCount === 1) return { soleAttendeeNote: note, unassignedNote: '' };
+  if (!note) return { soleAttendeeNote: '', unassignedNote: '' };
+  if (args.attendeeCount === 1) {
+    return { soleAttendeeNote: args.soleAttendeeHasOwnNote ? '' : note, unassignedNote: '' };
+  }
   return { soleAttendeeNote: '', unassignedNote: note };
 }
 

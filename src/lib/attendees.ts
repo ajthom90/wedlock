@@ -89,7 +89,7 @@ export function listAttendees(inv: AttendeeInvitation): InvitationAttendees {
   const { soleAttendeeNote, unassignedNote } = householdDietaryFallback({
     householdNote: r.dietaryNotes,
     attendeeCount: out.length,
-    hasPerPersonNotes: out.some((a) => a.dietary),
+    soleAttendeeHasOwnNote: out.length === 1 && Boolean(out[0].dietary),
   });
   if (soleAttendeeNote) out[0] = { ...out[0], dietary: soleAttendeeNote };
   return { attendees: out, unassignedDietary: unassignedNote };
