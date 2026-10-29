@@ -75,3 +75,57 @@ describe('buildSeatingExportRows', () => {
     expect(rows[0]).toMatchObject({ guestName: 'Dee Lee', dietary: 'Gluten free', householdDietary: '' });
   });
 });
+
+describe('resolveSeatedGuests with seats linked to guests', () => {
+  // Bob Smith was seated as "Bob", then renamed on the Invitations page. The
+  // Guest row (g2) keeps its id, so the linked seat still finds him.
+  const renamed: SeatingExportInvitation = {
+    ...smiths,
+    guests: [{ id: 'g1', name: 'Ann Smith' }, { id: 'g2', name: 'Robert Smith', childSeat: 'booster' }],
+    response: { ...smiths.response!, guestDietary: JSON.stringify({ g2: 'Peanuts' }), dietaryNotes: null },
+  };
+
+  it('keeps a renamed guest at their table with their current name, meal, allergies and child seat', () => {
+    const rows = resolveSeatedGuests(
+      [{ name: 'T1', assignments: [{ guestName: 'Bob', invitationId: 'inv1', guestId: 'g2', guest: { name: 'Robert Smith' } }] }],
+      [renamed],
+    );
+    expect(rows[0]).toMatchObject({ guestName: 'Robert Smith', table: 'T1', meal: 'Fish', dietary: 'Peanuts', childSeat: 'booster', unlinked: false });
+    // …and isn't listed again as unseated.
+    expect(rows.filter((r) => r.guestName === 'Robert Smith')).toHaveLength(1);
+    expect(rows.map((r) => r.table)).toEqual(['T1', 'Unassigned', 'Unassigned']);
+  });
+
+  it('flags a seat that lost its guest and lists the guest as unseated, without borrowing their meal', () => {
+    const rows = resolveSeatedGuests([{ name: 'T1', assignments: [{ guestName: 'Bob', invitationId: 'inv1' }] }], [renamed]);
+    expect(rows[0]).toMatchObject({ guestName: 'Bob', table: 'T1', meal: '', dietary: '', unlinked: true });
+    expect(rows.find((r) => r.guestName === 'Robert Smith')).toMatchObject({ table: 'Unassigned', meal: 'Fish' });
+  });
+
+  it('keeps plus-one seats matched by name and not flagged', () => {
+    const rows = resolveSeatedGuests([{ name: 'T1', assignments: [{ guestName: 'Cal Jones', invitationId: 'inv1' }] }], [smiths]);
+    expect(rows[0]).toMatchObject({ guestName: 'Cal Jones', meal: 'Vegetarian', unlinked: false });
+  });
+
+  it('keeps a linked guest who has since declined in their seat, with no meal', () => {
+    const declined = { ...lees, response: { ...lees.response!, attending: 'no' } };
+    const rows = resolveSeatedGuests(
+      [{ name: 'T1', assignments: [{ guestName: 'Dee Lee', invitationId: 'inv2', guestId: 'g3', guest: { name: 'Dee Lee' } }] }],
+      [declined],
+    );
+    expect(rows).toEqual([expect.objectContaining({ guestName: 'Dee Lee', table: 'T1', meal: '', unlinked: false })]);
+  });
+
+  it('tells apart two guests with the same name in different households', () => {
+    const otherAnn: SeatingExportInvitation = {
+      id: 'inv9',
+      guests: [{ id: 'g9', name: 'Ann Smith' }],
+      response: { attending: 'yes', attendingGuests: JSON.stringify(['g9']), guestMeals: JSON.stringify({ g9: 'Beef' }), plusOnes: null, dietaryNotes: null },
+    };
+    const rows = resolveSeatedGuests(
+      [{ name: 'T1', assignments: [{ guestName: 'Ann Smith', invitationId: 'inv9', guestId: 'g9', guest: { name: 'Ann Smith' } }] }],
+      [smiths, otherAnn],
+    );
+    expect(rows.filter((r) => r.guestName === 'Ann Smith').map((r) => [r.table, r.meal])).toEqual([['T1', 'Beef'], ['Unassigned', 'Chicken']]);
+  });
+});

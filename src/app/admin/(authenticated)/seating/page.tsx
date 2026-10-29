@@ -7,17 +7,25 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ChildSeatBadge } from '@/components/admin/ChildSeatSelect';
 import { ReceptionSheetCard } from '@/components/admin/ReceptionSheetCard';
 import { listAttendees, type AttendeeInvitation } from '@/lib/attendees';
+import { isPlusOneSeat, normName, plusOnesOf } from '@/lib/seatLinking';
 
-// Child seat + allergies for one person, looked up by invitation + name the
-// same way the seating export matches assignments to attendees.
+// Child seat + allergies for one person, looked up by guest id for named
+// guests and by invitation + name for plus-ones (who have no Guest row).
 interface GuestNeeds { childSeat: string | null; dietary: string }
-const needsKey = (invitationId: string | null, name: string) => `${invitationId ?? ''}|${name.trim().toLowerCase()}`;
+const needsKey = (invitationId: string | null, name: string) => `${invitationId ?? ''}|${normName(name)}`;
+const idKey = (guestId: string) => `id:${guestId}`;
 
+// A seat links to its guest (guestId) so renames keep it; plus-one seats and
+// seats that lost their guest before links existed have guestName only.
 interface TableAssignment {
   id: string;
   guestName: string;
   invitationId: string | null;
+  guestId: string | null;
+  guest: { id: string; name: string; invitationId: string } | null;
 }
+
+const seatName = (a: TableAssignment) => a.guest?.name ?? a.guestName;
 
 interface Table {
   id: string;
@@ -33,6 +41,7 @@ interface UnseatedGuest {
   name: string;
   invitationId: string;
   householdName: string;
+  guestId: string | null; // null for plus-ones
 }
 
 export default function SeatingPage() {
@@ -47,14 +56,19 @@ export default function SeatingPage() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [needs, setNeeds] = useState<Map<string, GuestNeeds>>(new Map());
+  const [plusOnes, setPlusOnes] = useState<{ invitationId: string; name: string }[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [features, setFeatures] = useState<{ childSeats?: boolean; nameTents?: boolean; dietaryNotes?: boolean; receptionSheet?: boolean }>({});
 
   useEffect(() => {
     fetch('/api/features').then((r) => (r.ok ? r.json() : {})).then(setFeatures).catch(() => setFeatures({}));
   }, []);
 
-  const needsFor = (invitationId: string | null, name: string): GuestNeeds | undefined =>
-    needs.get(needsKey(invitationId, name)) ?? needs.get(needsKey(null, name));
+  const needsFor = (invitationId: string | null, name: string, guestId?: string | null): GuestNeeds | undefined =>
+    guestId ? needs.get(idKey(guestId)) : needs.get(needsKey(invitationId, name));
+  // Unlinked and not a plus-one: the seat lost its guest and needs fixing.
+  const isFlagged = (a: TableAssignment) => !a.guestId && !isPlusOneSeat(a, plusOnes);
+  const flaggedSeats = tables.flatMap((t) => t.assignments.filter(isFlagged).map((a) => ({ table: t, assignment: a })));
   const fetchTables = useCallback(async () => {
     try {
       const res = await fetch('/api/tables');
@@ -77,10 +91,13 @@ export default function SeatingPage() {
         const invitations = await invitationsRes.json();
         const tablesData = await tablesRes.json();
 
-        const assignedNames = new Set<string>();
+        // Named guests are seated by id; plus-ones by household + name.
+        const seatedIds = new Set<string>();
+        const seatedByName = new Set<string>();
         tablesData.forEach((table: Table) => {
           table.assignments?.forEach((a: TableAssignment) => {
-            assignedNames.add(a.guestName.toLowerCase());
+            if (a.guestId) seatedIds.add(a.guestId);
+            else seatedByName.add(needsKey(a.invitationId, a.guestName));
           });
         });
 
@@ -113,13 +130,14 @@ export default function SeatingPage() {
           const guestsById = new Map(inv.guests.map((g) => [g.id, g.name]));
           const attendingIds = safeParse<string[]>(inv.response.attendingGuests, []);
           attendingIds.forEach((id) => {
-            const name = guestsById.get(id) ?? id;
-            if (!assignedNames.has(name.toLowerCase())) {
+            const name = guestsById.get(id);
+            if (name !== undefined && !seatedIds.has(id)) {
               attendingGuests.push({
                 key: `${inv.id}-${id}`,
                 name,
                 invitationId: inv.id,
                 householdName: inv.householdName,
+                guestId: id,
               });
             }
           });
@@ -127,12 +145,13 @@ export default function SeatingPage() {
           const pluses = safeParse<{ name: string }[]>(inv.response.plusOnes, []);
           pluses.forEach((p, idx) => {
             if (!p?.name) return;
-            if (!assignedNames.has(p.name.toLowerCase())) {
+            if (!seatedByName.has(needsKey(inv.id, p.name))) {
               attendingGuests.push({
                 key: `${inv.id}-plusone-${idx}`,
                 name: p.name,
                 invitationId: inv.id,
                 householdName: inv.householdName,
+                guestId: null,
               });
             }
           });
@@ -146,12 +165,11 @@ export default function SeatingPage() {
           // a same-named guest's badges from another household.
           for (const a of listAttendees(inv).attendees) {
             const n = { childSeat: a.childSeat, dietary: a.dietary };
-            needsMap.set(needsKey(inv.id, a.name), n);
-            // Name-only fallback for assignments saved without an invitation.
-            if (!needsMap.has(needsKey(null, a.name))) needsMap.set(needsKey(null, a.name), n);
+            needsMap.set(a.guestId ? idKey(a.guestId) : needsKey(inv.id, a.name), n);
           }
         });
         setNeeds(needsMap);
+        setPlusOnes((invitations as InvitationFromApi[]).flatMap((inv) => (inv.response?.attending === 'yes' ? plusOnesOf(inv) : [])));
       }
     } catch (error) {
       console.error('Failed to fetch unseated guests:', error);
@@ -247,17 +265,30 @@ export default function SeatingPage() {
     if (updated) setSelectedTable(updated);
   }, []);
 
-  // Create a new assignment by POSTing to /api/tables/assign. When called for
-  // an unseated guest we know their invitationId so we wire it through; when
-  // moving an existing assignment, the caller passes it through from the row.
-  const createAssignment = useCallback(async (args: {
-    tableId: string; guestName: string; invitationId: string | null;
-  }) => {
+  // Seat someone by POSTing to /api/tables/assign: a named guest by id, a
+  // plus-one by name + invitation.
+  const createAssignment = useCallback(async (tableId: string, guest: UnseatedGuest) => {
     const res = await fetch('/api/tables/assign', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(args),
+      body: JSON.stringify(guest.guestId
+        ? { tableId, guestId: guest.guestId }
+        : { tableId, guestName: guest.name, invitationId: guest.invitationId }),
     });
+    return res.ok;
+  }, []);
+
+  // Move a seat (tableId) or link a flagged seat to a guest (guestId).
+  const patchAssignment = useCallback(async (assignmentId: string, patch: { tableId?: string; guestId?: string }) => {
+    const res = await fetch('/api/tables/assign', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assignmentId, ...patch }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      setError(body?.error ?? 'Could not update the seat');
+    }
     return res.ok;
   }, []);
 
@@ -274,11 +305,7 @@ export default function SeatingPage() {
     if (!selectedTable) return;
     setSaving(true);
     try {
-      const ok = await createAssignment({
-        tableId: selectedTable.id,
-        guestName: guest.name,
-        invitationId: guest.invitationId,
-      });
+      const ok = await createAssignment(selectedTable.id, guest);
       if (ok) {
         await fetchAll();
         await refreshSelectedTable(selectedTable.id);
@@ -297,11 +324,7 @@ export default function SeatingPage() {
       // Sequential to keep order stable in the table view (the API doesn't
       // accept bulk inserts and parallel creates can interleave).
       for (const g of guests) {
-        await createAssignment({
-          tableId: selectedTable.id,
-          guestName: g.name,
-          invitationId,
-        });
+        await createAssignment(selectedTable.id, { ...g, invitationId });
       }
       await fetchAll();
       await refreshSelectedTable(selectedTable.id);
@@ -325,24 +348,31 @@ export default function SeatingPage() {
     }
   };
 
-  // Move an existing assignment to a different table. Implemented as
-  // delete + create since the API doesn't support patching tableId. We
-  // snapshot the name/invitationId from the assignment row before deleting.
+  // Move a seat to a different table; it keeps its guest link.
   const handleMoveAssignment = async (assignment: TableAssignment, toTableId: string) => {
     if (!selectedTable) return;
     setSaving(true);
     try {
-      const removed = await deleteAssignment(assignment.id);
-      if (!removed) return;
-      await createAssignment({
-        tableId: toTableId,
-        guestName: assignment.guestName,
-        invitationId: assignment.invitationId,
-      });
+      if (!(await patchAssignment(assignment.id, { tableId: toTableId }))) return;
       await fetchAll();
       await refreshSelectedTable(selectedTable.id);
     } catch (error) {
       console.error('Failed to move assignment:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Link a flagged seat to the guest it was meant for.
+  const handleLinkAssignment = async (assignment: TableAssignment, guestId: string) => {
+    setSaving(true);
+    setError(null);
+    try {
+      if (!(await patchAssignment(assignment.id, { guestId }))) return;
+      await fetchAll();
+      if (selectedTable) await refreshSelectedTable(selectedTable.id);
+    } catch (error) {
+      console.error('Failed to link seat:', error);
     } finally {
       setSaving(false);
     }
@@ -365,6 +395,29 @@ export default function SeatingPage() {
           </a>
         </div>
       </div>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {flaggedSeats.length > 0 && (
+        <Card className="border-red-300 bg-red-50">
+          <CardContent className="py-4 space-y-2">
+            <p className="text-sm font-medium text-red-800">
+              {flaggedSeats.length === 1 ? '1 seat isn’t' : `${flaggedSeats.length} seats aren’t`} linked to a guest
+            </p>
+            <p className="text-sm text-red-700">
+              These were seated by a name that no longer matches anyone on the guest list, so they have no meal, allergies or
+              child seat. Open the table, then link each seat to the right guest or remove it.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {flaggedSeats.map(({ table, assignment }) => (
+                <Button key={assignment.id} size="sm" variant="outline" onClick={() => setSelectedTable(table)}>
+                  {table.name}: {assignment.guestName}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {features.receptionSheet !== false && <ReceptionSheetCard />}
 
@@ -437,11 +490,31 @@ export default function SeatingPage() {
                   ) : (
                     <div className="space-y-2">
                       {selectedTable.assignments?.map((assignment) => (
-                        <div key={assignment.id} className="flex items-center gap-2 py-2 px-3 bg-gray-50 rounded">
+                        <div key={assignment.id} className={`flex flex-wrap items-center gap-2 py-2 px-3 rounded ${isFlagged(assignment) ? 'bg-red-50' : 'bg-gray-50'}`}>
                           <span className="flex-1 text-sm">
-                            {assignment.guestName}
-                            <NeedsBadges needs={needsFor(assignment.invitationId, assignment.guestName)} features={features} />
+                            {seatName(assignment)}
+                            {isFlagged(assignment) ? (
+                              <span className="ml-1 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">Not linked to a guest</span>
+                            ) : (
+                              <NeedsBadges needs={needsFor(assignment.invitationId, assignment.guestName, assignment.guestId)} features={features} />
+                            )}
                           </span>
+                          {isFlagged(assignment) && (
+                            <select
+                              className="text-xs border border-red-300 rounded px-2 py-1 bg-white"
+                              value=""
+                              onChange={(e) => {
+                                if (e.target.value) handleLinkAssignment(assignment, e.target.value);
+                              }}
+                              disabled={saving}
+                              title="Link this seat to a guest"
+                            >
+                              <option value="">Link to guest…</option>
+                              {linkChoices(assignment, unseatedGuests).map((g) => (
+                                <option key={g.key} value={g.guestId!}>{g.name} ({g.householdName})</option>
+                              ))}
+                            </select>
+                          )}
                           <select
                             className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
                             value=""
@@ -534,6 +607,16 @@ export default function SeatingPage() {
   );
 }
 
+// Guests a flagged seat could be linked to: unseated named guests, the seat's
+// own household first, then the rest by name.
+function linkChoices(seat: TableAssignment, unseated: UnseatedGuest[]): UnseatedGuest[] {
+  return unseated
+    .filter((g) => g.guestId)
+    .sort((a, b) =>
+      Number(b.invitationId === seat.invitationId) - Number(a.invitationId === seat.invitationId) ||
+      a.name.localeCompare(b.name));
+}
+
 // Unseated guests grouped by household. Households with 2+ unseated members
 // get a "seat whole household" shortcut, which is the most common case for
 // wedding seating. onAssignOne/onAssignHousehold are only wired when a table
@@ -563,7 +646,7 @@ function UnseatedList({
   needsFor,
   features,
 }: {
-  needsFor: (invitationId: string | null, name: string) => GuestNeeds | undefined;
+  needsFor: (invitationId: string | null, name: string, guestId?: string | null) => GuestNeeds | undefined;
   features: { childSeats?: boolean; dietaryNotes?: boolean };
   guests: UnseatedGuest[];
   onAssignOne?: (guest: UnseatedGuest) => void;
@@ -604,7 +687,7 @@ function UnseatedList({
               <div key={g.key} className="flex items-center gap-2 px-3 py-2">
                 <span className="flex-1 text-sm">
                   {g.name}
-                  <NeedsBadges needs={needsFor(g.invitationId, g.name)} features={features} />
+                  <NeedsBadges needs={needsFor(g.invitationId, g.name, g.guestId)} features={features} />
                 </span>
                 {onAssignOne && (
                   <Button size="sm" disabled={saving} onClick={() => onAssignOne(g)}>

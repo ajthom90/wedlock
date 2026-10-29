@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isAuthenticated } from '@/lib/auth';
+import { ensureSeatsLinked } from '@/lib/seatLinkingDb';
 
 export async function GET() {
   try {
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const tables = await prisma.seatingTable.findMany({ include: { assignments: true }, orderBy: { name: 'asc' } });
+    await ensureSeatsLinked();
+    const tables = await prisma.seatingTable.findMany({ include: { assignments: { include: { guest: { select: { id: true, name: true, invitationId: true } } } } }, orderBy: { name: 'asc' } });
     return NextResponse.json(tables);
   } catch (error) {
     console.error('Error fetching tables:', error);

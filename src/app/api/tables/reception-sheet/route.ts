@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 import prisma from '@/lib/prisma';
 import { isAuthenticated } from '@/lib/auth';
+import { ensureSeatsLinked } from '@/lib/seatLinkingDb';
 import { getFeatures, getSiteSettings } from '@/lib/settings';
 import { parseRsvpChoices } from '@/lib/rsvpChoices';
 import { buildReceptionSheet, RECEPTION_SHEET_NAME } from '@/lib/receptionSheet';
@@ -12,12 +13,13 @@ import { buildReceptionSheet, RECEPTION_SHEET_NAME } from '@/lib/receptionSheet'
 export async function GET() {
   try {
     if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    await ensureSeatsLinked();
 
     const features = await getFeatures();
     if (!features.receptionSheet) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const [tables, invitations, mealOptions, site] = await Promise.all([
-      prisma.seatingTable.findMany({ include: { assignments: true } }),
+      prisma.seatingTable.findMany({ include: { assignments: { include: { guest: { select: { id: true, name: true, invitationId: true } } } } } }),
       prisma.invitation.findMany({ include: { guests: { orderBy: { order: 'asc' } }, response: true } }),
       prisma.rsvpOption.findMany({ where: { type: 'meal' }, orderBy: { order: 'asc' } }),
       getSiteSettings(),
