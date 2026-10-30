@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.22.0",
+    "date": "2026-10-30",
+    "changes": [
+      { "type": "feature", "text": "Download Alphabetical List on the Seating page — an Excel file of every guest as Last Name, First Name and Table, sorted by last name, for escort cards or a check-in table. Tables show the way they're printed on name tents (\"Table 5\", or \"Head Table\" for a table without a number). Suffixes like \"Jr.\" and surname prefixes like \"van der\" stay with the last name, and attending guests without a seat yet are listed as Unassigned. Can be hidden with the Alphabetical seating list toggle on the Features page." }
+    ]
+  },
+  {
     "version": "2.21.0",
     "date": "2026-10-29",
     "changes": [
