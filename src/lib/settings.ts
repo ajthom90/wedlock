@@ -82,6 +82,8 @@ export interface FeatureSettings {
   // Reception Seating spreadsheet for vendors (meal counts, colors, A/H/B)
   // from the Seating page.
   receptionSheet: boolean;
+  // Alphabetical Last Name / First Name / Table list from the Seating page.
+  alphabeticalSeating: boolean;
 
   // Custom pages — when off, the Pages admin still lets the couple edit
   // built-in titles/URLs, but the "+ New custom page" button is hidden.
@@ -166,6 +168,7 @@ const defaultFeatures: FeatureSettings = {
   childSeats: true,
   nameTents: true,
   receptionSheet: true,
+  alphabeticalSeating: true,
 
   customPages: true,
 

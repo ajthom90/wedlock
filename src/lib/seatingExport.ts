@@ -4,7 +4,7 @@
 
 import { listAttendees, type Attendee, type AttendeeInvitation } from './attendees';
 import { childSeatLabel, type ChildSeat } from './guestNeeds';
-import { compareTables } from './tableNumbers';
+import { compareTables, tableLabel } from './tableNumbers';
 
 export interface SeatingExportAssignment {
   guestName: string;
@@ -136,4 +136,51 @@ export function buildSeatingExportRows(
     dietary: [g.dietary, g.householdDietary && `Household: ${g.householdDietary}`].filter(Boolean).join('; '),
     childSeat: childSeatLabel(g.childSeat),
   }));
+}
+
+// Escort-card / check-in list: Last Name, First Name, Table, by last name.
+export interface AlphabeticalSeatingRow {
+  lastName: string;
+  firstName: string;
+  table: string;
+}
+
+const NAME_SUFFIXES = new Set(['jr', 'sr', 'ii', 'iii', 'iv', 'md', 'phd', 'esq']);
+const SURNAME_PARTICLES = new Set(['van', 'von', 'der', 'den', 'de', 'del', 'della', 'da', 'di', 'du', 'la', 'le']);
+
+/**
+ * Splits a free-text guest name into first/last for an alphabetical list.
+ * Keeps suffixes ("Jr.") and lowercase surname particles ("van der Berg") with
+ * the last name. A single-word name is treated as a last name.
+ */
+export function splitGuestName(full: string): { firstName: string; lastName: string } {
+  const parts = full.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return { firstName: '', lastName: parts[0] ?? '' };
+
+  let end = parts.length;
+  while (end > 2 && NAME_SUFFIXES.has(parts[end - 1].replace(/[.,]/g, '').toLowerCase())) end--;
+  let start = end - 1;
+  while (start > 1 && SURNAME_PARTICLES.has(parts[start - 1])) start--;
+
+  const strip = (s: string) => s.replace(/,$/, '');
+  const suffix = parts.slice(end).join(' ');
+  const last = strip(parts.slice(start, end).join(' '));
+  return {
+    firstName: strip(parts.slice(0, start).join(' ')),
+    lastName: suffix ? `${last} ${suffix}` : last,
+  };
+}
+
+export function buildAlphabeticalSeatingRows(
+  tables: SeatingExportTable[],
+  invitations: SeatingExportInvitation[],
+): AlphabeticalSeatingRow[] {
+  const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+  return resolveSeatedGuests(tables, invitations)
+    .map((g) => ({
+      ...splitGuestName(g.guestName),
+      // What's printed on the table: "Table 5", or the name ("Head Table").
+      table: g.table === UNASSIGNED_TABLE ? UNASSIGNED_TABLE : tableLabel({ name: g.table, number: g.tableNumber }),
+    }))
+    .sort((a, b) => cmp(a.lastName, b.lastName) || cmp(a.firstName, b.firstName));
 }

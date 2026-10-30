@@ -25,6 +25,7 @@ interface FeatureSettings {
   childSeats: boolean;
   nameTents: boolean;
   receptionSheet: boolean;
+  alphabeticalSeating: boolean;
   customPages: boolean;
   sitePasswordEnabled: boolean;
   rsvpConfirmationEmails: boolean;
@@ -53,6 +54,7 @@ const DEFAULTS: FeatureSettings = {
   childSeats: true,
   nameTents: true,
   receptionSheet: true,
+  alphabeticalSeating: true,
   customPages: true,
   sitePasswordEnabled: false,
   rsvpConfirmationEmails: false,
@@ -110,6 +112,8 @@ const ADMIN_TOOLS: ToggleDescriptor[] = [
     description: 'Show the Print Name Tents button on the Seating page — a PDF of Avery 3328 tent cards with each seated guest’s name and table.' },
   { key: 'receptionSheet', label: 'Reception seating sheet',
     description: 'Show the Reception Sheet download on the Seating page — a spreadsheet for the caterer and venue with meal counts and colors, vendor meals, and each guest’s table, meal, allergies (A) and high chair or booster (H / B).' },
+  { key: 'alphabeticalSeating', label: 'Alphabetical seating list',
+    description: 'Show the Download Alphabetical List button on the Seating page — a spreadsheet of every guest as Last Name, First Name and Table, sorted by last name, for escort cards or a check-in table.' },
   { key: 'customPages', label: 'Custom pages',
     description: 'Allow creating fully custom pages (title + WYSIWYG body) from the Pages admin. Built-in title/URL editing stays available either way.' },
 ];

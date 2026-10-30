@@ -61,7 +61,7 @@ export default function SeatingPage() {
   const [needs, setNeeds] = useState<Map<string, GuestNeeds>>(new Map());
   const [plusOnes, setPlusOnes] = useState<{ invitationId: string; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [features, setFeatures] = useState<{ childSeats?: boolean; nameTents?: boolean; dietaryNotes?: boolean; receptionSheet?: boolean }>({});
+  const [features, setFeatures] = useState<{ childSeats?: boolean; nameTents?: boolean; dietaryNotes?: boolean; receptionSheet?: boolean; alphabeticalSeating?: boolean }>({});
 
   useEffect(() => {
     fetch('/api/features').then((r) => (r.ok ? r.json() : {})).then(setFeatures).catch(() => setFeatures({}));
@@ -396,6 +396,11 @@ export default function SeatingPage() {
           {features.nameTents !== false && (
             <a href="/admin/seating/name-tents">
               <Button size="sm" variant="outline">Print Name Tents</Button>
+            </a>
+          )}
+          {features.alphabeticalSeating !== false && (
+            <a href="/api/tables/alphabetical">
+              <Button size="sm" variant="outline">Download Alphabetical List</Button>
             </a>
           )}
           <a href="/api/tables/export">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSeatingExportRows, compareTableNames, resolveSeatedGuests, type SeatingExportInvitation } from './seatingExport';
+import { buildAlphabeticalSeatingRows, buildSeatingExportRows, compareTableNames, resolveSeatedGuests, splitGuestName, type SeatingExportInvitation } from './seatingExport';
 
 const smiths: SeatingExportInvitation = {
   id: 'inv1',
@@ -147,5 +147,37 @@ describe('resolveSeatedGuests with seats linked to guests', () => {
       [smiths, otherAnn],
     );
     expect(rows.filter((r) => r.guestName === 'Ann Smith').map((r) => [r.table, r.meal])).toEqual([['T1', 'Beef'], ['Unassigned', 'Chicken']]);
+  });
+});
+
+describe('splitGuestName', () => {
+  it.each([
+    ['Ann Smith', 'Ann', 'Smith'],
+    ['Mary Ann Smith', 'Mary Ann', 'Smith'],
+    ['Joe Smith Jr.', 'Joe', 'Smith Jr.'],
+    ['Joe Smith, III', 'Joe', 'Smith III'],
+    ['Pieter van der Berg', 'Pieter', 'van der Berg'],
+    ['Cher', '', 'Cher'],
+    ['  Dee   Lee ', 'Dee', 'Lee'],
+  ])('%s', (full, firstName, lastName) => {
+    expect(splitGuestName(full)).toEqual({ firstName, lastName });
+  });
+});
+
+describe('buildAlphabeticalSeatingRows', () => {
+  it('sorts by last name, then first, with the printed table label', () => {
+    const rows = buildAlphabeticalSeatingRows(
+      [
+        { name: 'Friends', number: 12, assignments: [{ guestName: 'Dee Lee', invitationId: 'inv2' }] },
+        { name: 'Head Table', number: null, assignments: [{ guestName: 'Bob Smith', invitationId: 'inv1' }, { guestName: 'Cal Jones', invitationId: 'inv1' }] },
+      ],
+      [smiths, lees],
+    );
+    expect(rows).toEqual([
+      { lastName: 'Jones', firstName: 'Cal', table: 'Head Table' },
+      { lastName: 'Lee', firstName: 'Dee', table: 'Table 12' },
+      { lastName: 'Smith', firstName: 'Ann', table: 'Unassigned' },
+      { lastName: 'Smith', firstName: 'Bob', table: 'Head Table' },
+    ]);
   });
 });
