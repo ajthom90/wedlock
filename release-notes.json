@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.27.0",
+    "date": "2026-11-02",
+    "changes": [
+      { "type": "feature", "text": "Magic wand for allergies on name tents: on the Name Tents page, under \"Allergy mark, bottom left\", choose Magic Wand in place of the letter A. It prints ½\" across in the bottom-left corner of both halves of the card, only for guests with an allergy or dietary restriction of their own. The choice is saved for next time." },
+      { "type": "feature", "text": "Colors for the allergy, high chair and booster marks: each mark on the Name Tents page now has a color dropdown beside its picture, saved for next time. The color applies to the picture, or to the letter if you keep it. Choose from the meal colors plus Blaze Orange, which is offered only for these marks. Black stays the default." }
+    ]
+  },
+  {
     "version": "2.26.0",
     "date": "2026-11-02",
     "changes": [
