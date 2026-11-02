@@ -192,9 +192,10 @@ describe('layoutTentPanel', () => {
     expect(ops.some((o) => o.kind === 'circle')).toBe(false);
     const icon = ops.find((o) => o.kind === 'icon')!;
     if (icon.kind !== 'icon') throw new Error('no icon');
-    expect(icon.size).toBe(36);
-    expect(icon.x + 18).toBeCloseTo(W - PX);
-    expect(icon.y - 18).toBeCloseTo(PY);
+    // 80% of the ½" circle, in the corner, centred on the circle's middle line.
+    expect(icon.size).toBeCloseTo(28.8);
+    expect(icon.x + icon.size / 2).toBeCloseTo(W - PX);
+    expect(icon.y).toBeCloseTo(PY + 18);
     expect(icon.paths.length).toBeGreaterThan(0);
     expect(icon.color).toEqual(rgb(0x1f / 255, 0x5f / 255, 0xd1 / 255));
 
@@ -209,6 +210,7 @@ describe('layoutTentPanel', () => {
     const icon = ops.find((o) => o.kind === 'icon')!;
     if (icon.kind !== 'icon') throw new Error('no icon');
     expect(icon.viewBox).toBe(512);
+    expect(icon.size).toBeCloseTo(22.4);
     expect(icon.x + icon.size / 2).toBeCloseTo(W - PX);
     expect(icon.y + icon.size / 2).toBeCloseTo(H - PY);
     const name = texts(ops).find((o) => o.text === 'Ann Smith')!;
@@ -220,8 +222,9 @@ describe('layoutTentPanel', () => {
     expect(texts(ops).some((o) => o.text === 'A')).toBe(false);
     const icon = ops.find((o) => o.kind === 'icon')!;
     if (icon.kind !== 'icon') throw new Error('no icon');
+    expect(icon.size).toBeCloseTo(28.8);
     expect(icon.x - icon.size / 2).toBeCloseTo(PX);
-    expect(icon.y - icon.size / 2).toBeCloseTo(PY);
+    expect(icon.y).toBeCloseTo(PY + 18);
   });
 
   it('draws the marks in their colors, letters too, and black by default', async () => {

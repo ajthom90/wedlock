@@ -158,8 +158,12 @@ const MARK_SIZE = 20;
 const MARK_CAP = 0.72; // Helvetica-Bold cap height as a share of its size
 const MARK_GAP = 4;    // between a mark band and the text
 // A child-seat icon in the top band: smaller than the meal mark so the name
-// keeps room, but still about ⅖" — readable from standing height.
-const ICON_MARK_SIZE = 28;
+// keeps room, but still about ⅓" — readable from standing height.
+const ICON_MARK_SIZE = 22.4;
+// Pictures in the bottom corners (meal icon, allergy icon): 80% of the ½"
+// circle, so they don't crowd the card. They keep to the corner, centred
+// on the band's middle line like the circle and the letters.
+const ICON_SIZE = CIRCLE_DIAMETER * 0.8;
 
 // When no theme font loads, the fallback Helvetica can only encode
 // Windows-1252 and throws on anything else, which would fail the whole PDF.
@@ -314,7 +318,7 @@ export function layoutTentPanel(
   const mealRgb = content.mealColor ? rgb(...hexToRgb01(content.mealColor)) : null;
   const icon = findMealIcon(content.mealIcon);
   if (icon) {
-    ops.push({ kind: 'icon', x: mealX, y: circleY, size: CIRCLE_DIAMETER, paths: icon.paths, viewBox: iconViewBox(icon), color: mealRgb ?? INK });
+    ops.push({ kind: 'icon', x: width - padX - ICON_SIZE / 2, y: circleY, size: ICON_SIZE, paths: icon.paths, viewBox: iconViewBox(icon), color: mealRgb ?? INK });
   } else if (mealRgb) {
     ops.push({ kind: 'circle', x: mealX, y: circleY, radius: CIRCLE_DIAMETER / 2, color: mealRgb });
   }
@@ -322,7 +326,7 @@ export function layoutTentPanel(
   const allergyIcon = findMarkIcon(content.allergyIcon);
   const allergyRgb = markRgb(content.allergyColor);
   if (content.allergyMark && allergyIcon) {
-    const s = CIRCLE_DIAMETER;
+    const s = ICON_SIZE;
     ops.push({ kind: 'icon', x: padX + s / 2, y: circleY, size: s, paths: allergyIcon.paths, viewBox: iconViewBox(allergyIcon), color: allergyRgb });
   } else if (content.allergyMark) {
     ops.push({ kind: 'text', text: 'A', font: markFont, size: MARK_SIZE, x: padX, y: circleY - markCapH / 2, color: allergyRgb });
