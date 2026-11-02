@@ -87,20 +87,30 @@ export interface ResolvedFonts {
  * fonts whole (Dancing Script, Josefin Sans), but its subsetting garbles
  * others (Great Vibes), so a trial save in a scratch document picks the mode.
  * Throws when the bytes aren't a font at all, like embedFont.
+ *
+ * Ligatures and contextual alternates are turned off: pdf-lib draws the
+ * substituted glyph (the joined "ffi" in Chaffins, "ff" in Steffen, or an
+ * alternate "f") but spaces the text as if the original letters were there,
+ * leaving gaps in fonts like Playfair Display, Crimson Text, Cormorant and
+ * Great Vibes. Printing each letter as itself avoids that.
  */
 export async function embedFontFile(doc: PDFDocument, bytes: ArrayBuffer | Uint8Array): Promise<PDFFont> {
   doc.registerFontkit(fontkit);
+  const features = NO_LIGATURES;
   try {
     const trial = await PDFDocument.create();
     trial.registerFontkit(fontkit);
-    const font = await trial.embedFont(bytes);
+    const font = await trial.embedFont(bytes, { features });
     trial.addPage().drawText('Aa', { font, size: 10 });
     await trial.save();
   } catch {
-    return doc.embedFont(bytes, { subset: true });
+    return doc.embedFont(bytes, { subset: true, features });
   }
-  return doc.embedFont(bytes);
+  return doc.embedFont(bytes, { features });
 }
+
+// OpenType features to switch off when laying out text (see embedFontFile).
+const NO_LIGATURES = { liga: false, clig: false, dlig: false, calt: false };
 
 // Embeds theme fonts with graceful fallbacks: body → Helvetica, heading →
 // body, bodyBold → the body font itself when a theme body loaded (a custom
