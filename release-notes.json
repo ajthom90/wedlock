@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.28.0",
+    "date": "2026-11-02",
+    "changes": [
+      { "type": "feature", "text": "Fonts on name tents: a new Fonts card on the Name Tents page sets the font for each kind of text, namely the guest name, the table name, the small print, and the corner letters (A / H / B). Choose any Google font from the Theme page or a font you've uploaded on the Fonts page. Choices are saved for next time. Left on their defaults, the cards print as before." },
+      { "type": "feature", "text": "The vendor spreadsheet (Reception Sheet) explains the name tent pictures: when allergies, boosters or high chairs are marked with a picture on the name tents, a \"Name Tent Marks\" legend beside the A / B / H counts names each one (e.g. \"Blaze Orange Magic Wand\"). Marks still printed as letters aren't listed." },
+      { "type": "fix", "text": "Every Google font on the Theme page now prints correctly on PDFs (name tents, mailing labels and invitation cards). Seven of them, such as Dancing Script, used to print as Lato, and Josefin Sans, Dancing Script and Cormorant Garamond could make the PDF fail. Cormorant Garamond prints as the near-identical Cormorant, because Google's Cormorant Garamond file can't be embedded in a PDF." }
+    ]
+  },
+  {
     "version": "2.27.0",
     "date": "2026-11-02",
     "changes": [
