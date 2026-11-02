@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { MEAL_COLORS, findMealColor } from '@/lib/mealColors';
+import { MEAL_ICONS, findMealIcon } from '@/lib/mealIcons';
+import { MealCodeSwatch } from '@/components/admin/MealCodeSwatch';
 
 interface RsvpOption {
   id: string;
@@ -15,10 +17,10 @@ interface RsvpOption {
   order: number;
 }
 
-type ChoiceRow = { name: string; description: string; color: string };
+type ChoiceRow = { name: string; description: string; color: string; icon: string };
 
 // Parse the stored choices JSON, tolerating both legacy string[] and the new
-// [{ name, description?, color? }] shape. Always returns rows with every field
+// [{ name, description?, color?, icon? }] shape. Always returns rows with every field
 // so the admin form can edit them uniformly.
 function parseChoiceRows(raw: string): ChoiceRow[] {
   try {
@@ -26,13 +28,14 @@ function parseChoiceRows(raw: string): ChoiceRow[] {
     if (!Array.isArray(parsed)) return [EMPTY_ROW];
     const rows = parsed
       .map((c: unknown): ChoiceRow | null => {
-        if (typeof c === 'string') return c.trim() ? { name: c.trim(), description: '', color: '' } : null;
+        if (typeof c === 'string') return c.trim() ? { name: c.trim(), description: '', color: '', icon: '' } : null;
         if (c && typeof c === 'object') {
-          const r = c as { name?: unknown; description?: unknown; color?: unknown };
+          const r = c as { name?: unknown; description?: unknown; color?: unknown; icon?: unknown };
           const name = typeof r.name === 'string' ? r.name.trim() : '';
           const description = typeof r.description === 'string' ? r.description : '';
           const color = findMealColor(r.color)?.name ?? '';
-          return name ? { name, description, color } : null;
+          const icon = findMealIcon(r.icon)?.name ?? '';
+          return name ? { name, description, color, icon } : null;
         }
         return null;
       })
@@ -43,13 +46,8 @@ function parseChoiceRows(raw: string): ChoiceRow[] {
   }
 }
 
-const EMPTY_ROW: ChoiceRow = { name: '', description: '', color: '' };
+const EMPTY_ROW: ChoiceRow = { name: '', description: '', color: '', icon: '' };
 
-function ColorDot({ color }: { color: string }) {
-  const c = findMealColor(color);
-  if (!c) return null;
-  return <span className="inline-block h-3 w-3 rounded-full border border-gray-400 align-middle" style={{ backgroundColor: c.hex }} aria-hidden />;
-}
 
 export default function RsvpConfigPage() {
   const [options, setOptions] = useState<RsvpOption[]>([]);
@@ -108,14 +106,21 @@ export default function RsvpConfigPage() {
     if (!label.trim()) return;
     setSaving(true);
     try {
-      // Colors only mean something for meals (they print on name tents).
+      // Colors and icons only mean something for meals (they print on name
+      // tents and the reception sheet).
       const cleanedChoices = choiceRows
-        .map((r) => ({ name: r.name.trim(), description: r.description.trim(), color: type === 'meal' ? r.color : '' }))
+        .map((r) => ({
+          name: r.name.trim(),
+          description: r.description.trim(),
+          color: type === 'meal' ? r.color : '',
+          icon: type === 'meal' ? r.icon : '',
+        }))
         .filter((r) => r.name)
         .map((r) => ({
           name: r.name,
           ...(r.description ? { description: r.description } : {}),
           ...(r.color ? { color: r.color } : {}),
+          ...(r.icon ? { icon: r.icon } : {}),
         }));
       const body = {
         type,
@@ -205,9 +210,9 @@ export default function RsvpConfigPage() {
                   <ul className="space-y-1">
                     {parseChoiceRows(opt.choices).filter((r) => r.name).map((r) => (
                       <li key={r.name} className="text-sm text-gray-600">
-                        {opt.type === 'meal' && r.color && <><ColorDot color={r.color} /> </>}
+                        {opt.type === 'meal' && (r.color || r.icon) && <><MealCodeSwatch color={r.color} icon={r.icon} size={16} /> </>}
                         <span className="font-medium">{r.name}</span>
-                        {opt.type === 'meal' && r.color && <span className="text-gray-500"> ({r.color})</span>}
+                        {opt.type === 'meal' && (r.color || r.icon) && <span className="text-gray-500"> ({[r.color, r.icon].filter(Boolean).join(' ')})</span>}
                         {r.description && <span className="text-gray-500"> — {r.description}</span>}
                       </li>
                     ))}
@@ -226,7 +231,7 @@ export default function RsvpConfigPage() {
       {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-2xl">
+          <Card className="w-full max-w-3xl">
             <CardHeader>
               <CardTitle>{editingId ? 'Edit RSVP Option' : 'Add RSVP Option'}</CardTitle>
             </CardHeader>
@@ -254,7 +259,7 @@ export default function RsvpConfigPage() {
                   <label className="block text-sm font-medium mb-1">Choices</label>
                   <p className="text-xs text-gray-500 mb-2">
                     Add one row per option.
-                    {type === 'meal' && ' Description is optional — if set, guests see it alongside the meal name in a menu block on the RSVP form. Color is optional too — it prints as a dot on each guest’s name tent so servers can spot the meal at a glance.'}
+                    {type === 'meal' && ' Description is optional — if set, guests see it alongside the meal name in a menu block on the RSVP form. Color and icon are optional too — together they make the meal’s code on the Reception Sheet (e.g. “Blue Rooster”), and print on each guest’s name tent so servers can spot the meal at a glance: the icon in that color, or a dot in the color when there’s no icon.'}
                   </p>
                   <div className="space-y-2">
                     {choiceRows.map((row, i) => (
@@ -275,7 +280,9 @@ export default function RsvpConfigPage() {
                         )}
                         {type === 'meal' && (
                           <div className="flex items-center gap-1 shrink-0">
-                            <span className="inline-block h-4 w-4 rounded-full border border-gray-400" style={{ backgroundColor: findMealColor(row.color)?.hex ?? 'transparent' }} aria-hidden />
+                            <span className="inline-flex h-6 w-6 items-center justify-center" aria-hidden>
+                              <MealCodeSwatch color={row.color} icon={row.icon} size={row.icon ? 24 : 16} />
+                            </span>
                             <select
                               className="px-2 py-2 border border-gray-300 rounded-md text-sm"
                               value={row.color}
@@ -284,6 +291,15 @@ export default function RsvpConfigPage() {
                             >
                               <option value="">No color</option>
                               {MEAL_COLORS.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                            </select>
+                            <select
+                              className="px-2 py-2 border border-gray-300 rounded-md text-sm"
+                              value={row.icon}
+                              aria-label="Name tent icon"
+                              onChange={(e) => setChoiceRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, icon: e.target.value } : r)))}
+                            >
+                              <option value="">No icon</option>
+                              {MEAL_ICONS.map((ic) => <option key={ic.name} value={ic.name}>{ic.name}</option>)}
                             </select>
                           </div>
                         )}

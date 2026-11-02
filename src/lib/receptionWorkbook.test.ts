@@ -42,7 +42,7 @@ describe('receptionWorkbookBuffer', () => {
     const ws = wb.getWorksheet('Reception Seating')!;
     expect(sheet.headerRow).toBe(9);
     expect(ws.getCell('A8').value).toBeNull();
-    expect((ws.getRow(9).values as unknown[]).slice(1)).toEqual(['Guest Name', 'Table#', 'Meal Choice', 'Dietary Restrictions', 'H / B', 'A', 'Color Code']);
+    expect((ws.getRow(9).values as unknown[]).slice(1)).toEqual(['Guest Name', 'Table#', 'Meal Choice', 'Dietary Restrictions', 'H / B', 'A', 'Color/Image Code']);
     expect(ws.getCell('A10').value).toBe('Ann Lee');
     expect(ws.getCell('B10').value).toBe('Head Table');
     expect(ws.getCell('B11').value).toBe(7);
@@ -92,7 +92,7 @@ describe('receptionWorkbookBuffer', () => {
     expect(ws.getCell('F10').alignment.horizontal).toBe('center');
 
     for (const a of ['A2', 'C2', 'G10']) expect((ws.getCell(a).fill as ExcelJS.FillPattern | undefined)?.pattern ?? 'none').toBe('none');
-    expect(ws.columns.map((c) => c.width)).toEqual([30, 10.5546875, 25.5546875, 34.44140625, 7.33203125, 3.6640625, 10.44140625]);
+    expect(ws.columns.map((c) => c.width)).toEqual([30, 10.5546875, 25.5546875, 34.44140625, 7.33203125, 3.6640625, 16.5]);
     expect([1, 4, 6, 7, 9].map((r) => ws.getRow(r).height)).toEqual([15, 15, 15, 15, 15]);
     expect(ws.views[0]).toMatchObject({ state: 'frozen', ySplit: 9 });
   });

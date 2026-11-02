@@ -16,6 +16,16 @@ describe('parseRsvpChoices', () => {
     ]);
   });
 
+  it('keeps a known icon, normalizing its case, and drops an unknown one', () => {
+    expect(parseRsvpChoices(JSON.stringify([
+      { name: 'Chicken', color: 'Blue', icon: 'rooster' },
+      { name: 'Beef', icon: 'Unicorn' },
+    ]))).toEqual([
+      { name: 'Chicken', color: 'Blue', icon: 'Rooster' },
+      { name: 'Beef' },
+    ]);
+  });
+
   it('drops a color that is not in the palette', () => {
     expect(parseRsvpChoices(JSON.stringify([{ name: 'Beef', color: 'Chartreuse' }, { name: 'Fish', color: 7 }])))
       .toEqual([{ name: 'Beef' }, { name: 'Fish' }]);

@@ -3,6 +3,10 @@
 // meal choice by name (e.g. "Red"); the RGB values here are what prints.
 // They're picked to stay distinct from each other on an inkjet, including
 // Red vs Pink vs Purple, which couples commonly use side by side.
+//
+// A meal can also carry an icon (see mealIcons.ts); color and icon together
+// make its code, e.g. "Blue Rooster".
+import { findMealIcon, type MealIcon } from './mealIcons';
 
 export interface MealColor {
   name: string;
@@ -53,4 +57,35 @@ export function buildMealColorMap(choices: { name: string; color?: string }[]): 
 
 export function mealColorFor(meal: string, map: Map<string, MealColor>): MealColor | null {
   return map.get(meal.trim().toLowerCase()) ?? null;
+}
+
+/** A meal's color and icon; either may be missing, never both (see buildMealCodeMap). */
+export interface MealCode {
+  color: MealColor | null;
+  icon: MealIcon | null;
+}
+
+/**
+ * Meal name → color and icon for every meal choice that has either. Keys are
+ * trimmed and lower-cased so a guest's stored meal matches regardless of case.
+ */
+export function buildMealCodeMap(choices: { name: string; color?: string; icon?: string }[]): Map<string, MealCode> {
+  const map = new Map<string, MealCode>();
+  for (const c of choices) {
+    const color = findMealColor(c.color);
+    const icon = findMealIcon(c.icon);
+    const key = c.name.trim().toLowerCase();
+    if ((color || icon) && key) map.set(key, { color, icon });
+  }
+  return map;
+}
+
+export function mealCodeFor(meal: string, map: Map<string, MealCode>): MealCode | null {
+  return map.get(meal.trim().toLowerCase()) ?? null;
+}
+
+/** "Blue Rooster", or just "Blue" / "Rooster" when only one is set; '' for none. */
+export function mealCodeLabel(code: MealCode | null): string {
+  if (!code) return '';
+  return [code.color?.name, code.icon?.name].filter(Boolean).join(' ');
 }

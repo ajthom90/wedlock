@@ -20,7 +20,7 @@ const inv = (
 });
 
 const mealChoices = [
-  { name: 'Beef', color: 'Red' },
+  { name: 'Beef', color: 'Red', icon: 'Cow' },
   { name: 'Chicken', color: 'Blue' },
   { name: "Kid's Meal", color: 'Pink' },
   { name: 'Fish' },
@@ -85,8 +85,8 @@ describe('buildReceptionSheet', () => {
 
   it('lays out the summary block, header and guest rows like the couple’s sheet', () => {
     expect(sheetToText(sheet.rows)).toBe([
-      'Meal Choice\t\tColor Code',
-      'Beef\t3\tRed',
+      'Meal Choice\t\tColor/Image Code',
+      'Beef\t3\tRed Cow',
       'Chicken\t2\tBlue',
       "Kid's Meal\t2\tPink",
       'Fish\t0',
@@ -95,14 +95,14 @@ describe('buildReceptionSheet', () => {
       'Vegetarian Vendor Meal\t1\tBooster Chairs (B)\t1',
       'Total:\t12\tHeight Chairs (H)\t1',
       '',
-      'Guest Name\tTable#\tMeal Choice\tDietary Restrictions\tH / B\tA\tColor Code',
+      'Guest Name\tTable#\tMeal Choice\tDietary Restrictions\tH / B\tA\tColor/Image Code',
       'Bo Lee\tHead Table\tChicken\t\t\t\tBlue',
-      'Ann Lee\tHead Table\tBeef\tGluten Free\t\tA\tRed',
-      'Cy Park\t2\tBeef\t\t\t\tRed',
+      'Ann Lee\tHead Table\tBeef\tGluten Free\t\tA\tRed Cow',
+      'Cy Park\t2\tBeef\t\t\t\tRed Cow',
       "Di Park\t2\tKid's Meal\t\tH\t\tPink",
       "Ed Park\t2\tKid's Meal\t\tB\t\tPink",
       'Flo Ng\t10\tChicken\tHousehold: Shellfish\t\t\tBlue',
-      'Gil Ng\t10\tBeef\tHousehold: Shellfish\t\t\tRed',
+      'Gil Ng\t10\tBeef\tHousehold: Shellfish\t\t\tRed Cow',
       'Hal Ito\tUnassigned',
     ].join('\n'));
     expect(sheet.headerRow).toBe(11);
@@ -125,7 +125,7 @@ describe('buildReceptionSheet', () => {
       vendorMeals: [{ name: 'Crew', count: -2 }, { name: 'Band', count: Number.NaN }],
     });
     expect(sheetToText(s.rows).split('\n').slice(0, 6)).toEqual([
-      'Meal Choice\t\tColor Code',
+      'Meal Choice\t\tColor/Image Code',
       'Beef\t0\tRed',
       'Lobster\t1',
       'Crew\t0\tAllergens / Restrictions (A)\t0',
@@ -140,7 +140,7 @@ describe('buildReceptionSheet', () => {
 
   it('lists any number of vendor meals and adds them all to the total', () => {
     expect(summary([{ name: 'DJ', count: 2 }, { name: 'Photo', count: 3 }, { name: 'Planner (GF)', count: 1 }])).toEqual([
-      'Meal Choice\t\tColor Code',
+      'Meal Choice\t\tColor/Image Code',
       'Beef\t1\tRed',
       'DJ\t2',
       'Photo\t3\tAllergens / Restrictions (A)\t0',
@@ -151,14 +151,14 @@ describe('buildReceptionSheet', () => {
 
   it('keeps A and B off the meal rows when there are fewer than two vendor meals', () => {
     expect(summary([{ name: 'Crew', count: 4 }])).toEqual([
-      'Meal Choice\t\tColor Code',
+      'Meal Choice\t\tColor/Image Code',
       'Beef\t1\tRed',
       'Crew\t4\tAllergens / Restrictions (A)\t0',
       '\t\tBooster Chairs (B)\t0',
       'Total:\t5\tHeight Chairs (H)\t0',
     ]);
     expect(summary([])).toEqual([
-      'Meal Choice\t\tColor Code',
+      'Meal Choice\t\tColor/Image Code',
       'Beef\t1\tRed',
       '\t\tAllergens / Restrictions (A)\t0',
       '\t\tBooster Chairs (B)\t0',

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { MEAL_COLORS, buildMealColorMap, findMealColor, hexToRgb01, mealColorFor } from './mealColors';
+import { MEAL_COLORS, buildMealCodeMap, buildMealColorMap, findMealColor, hexToRgb01, mealCodeFor, mealCodeLabel, mealColorFor } from './mealColors';
+import { MEAL_ICONS, findMealIcon } from './mealIcons';
 
 describe('MEAL_COLORS', () => {
   it('has unique names and valid hex values', () => {
@@ -44,5 +45,42 @@ describe('buildMealColorMap', () => {
     expect(mealColorFor(" Kid's Meal ", map)?.name).toBe('Pink');
     expect(mealColorFor('Standard Vendor Meals', map)).toBeNull();
     expect(mealColorFor('', map)).toBeNull();
+  });
+});
+
+describe('meal codes (color + icon)', () => {
+  const codes = buildMealCodeMap([
+    { name: 'Chicken', color: 'Blue', icon: 'Rooster' },
+    { name: 'Beef', color: 'red', icon: 'cow' },
+    { name: 'Pasta', color: 'Yellow' },
+    { name: 'No Meal', icon: 'Star' },
+    { name: 'Vendor Meal' },
+  ]);
+
+  it('reads the caterer-style code, case-insensitively', () => {
+    expect(mealCodeLabel(mealCodeFor(' chicken ', codes))).toBe('Blue Rooster');
+    expect(mealCodeLabel(mealCodeFor('Beef', codes))).toBe('Red Cow');
+  });
+
+  it('uses whichever half is set, and nothing for a meal with neither', () => {
+    expect(mealCodeLabel(mealCodeFor('Pasta', codes))).toBe('Yellow');
+    expect(mealCodeLabel(mealCodeFor('No Meal', codes))).toBe('Star');
+    expect(mealCodeFor('Vendor Meal', codes)).toBeNull();
+    expect(mealCodeLabel(null)).toBe('');
+  });
+});
+
+describe('MEAL_ICONS', () => {
+  it('has unique names, each with at least one path', () => {
+    expect(new Set(MEAL_ICONS.map((i) => i.name.toLowerCase())).size).toBe(MEAL_ICONS.length);
+    for (const i of MEAL_ICONS) {
+      expect(i.paths.length, i.name).toBeGreaterThan(0);
+      for (const d of i.paths) expect(d, i.name).toMatch(/^[Mm]/);
+    }
+  });
+
+  it('includes the icons caterers commonly use', () => {
+    for (const name of ['Rooster', 'Cow', 'Wheat', 'Heart', 'Star', 'Fish', 'Pig']) expect(findMealIcon(name)?.name).toBe(name);
+    expect(findMealIcon('unicorn')).toBeNull();
   });
 });

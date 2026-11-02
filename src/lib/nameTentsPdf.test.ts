@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { composeTentContent, layoutTentPanel, markBandsFor, renderNameTentsPdf, tableDisplayName, wrapText, type DrawOp } from './nameTentsPdf';
 import { TENT_CARD_FORMATS } from './tentCardFormats';
-import { buildMealColorMap } from './mealColors';
+import { buildMealCodeMap } from './mealColors';
 import type { SeatedGuest } from './seatingExport';
 
 const format3328 = TENT_CARD_FORMATS.find((f) => f.code === '3328')!;
@@ -75,7 +75,9 @@ describe('composeTentContent', () => {
     expect(c.details).toEqual([]);
   });
 
-  const colors = buildMealColorMap([{ name: 'Chicken', color: 'Blue' }, { name: 'Beef', color: 'Red' }, { name: 'Vendor Meal' }]);
+  const colors = buildMealCodeMap([
+    { name: 'Chicken', color: 'Blue', icon: 'Rooster' }, { name: 'Beef', color: 'Red' }, { name: 'No Meal', icon: 'Star' }, { name: 'Vendor Meal' },
+  ]);
   const marksOn = { ...allOff, showMealColor: true, showAllergyMark: true, showChildSeatMark: true };
 
   it('adds the meal color, A and H/B marks when turned on', () => {
@@ -85,11 +87,18 @@ describe('composeTentContent', () => {
       .toMatchObject({ mealColor: '#D62828', allergyMark: false, childSeatMark: 'B' });
   });
 
+  it('adds the meal icon alongside its color', () => {
+    expect(composeTentContent(guest({ meal: 'Chicken' }), marksOn, colors)).toMatchObject({ mealColor: '#1F5FD1', mealIcon: 'Rooster' });
+    expect(composeTentContent(guest({ meal: 'Beef' }), marksOn, colors)).toMatchObject({ mealColor: '#D62828', mealIcon: '' });
+    expect(composeTentContent(guest({ meal: 'no meal' }), marksOn, colors)).toMatchObject({ mealColor: '', mealIcon: 'Star' });
+  });
+
   it('leaves the circle off for a meal with no color, and marks off when turned off', () => {
     expect(composeTentContent(guest({ meal: 'Vendor Meal' }), marksOn, colors).mealColor).toBe('');
     expect(composeTentContent(guest({ meal: '' }), marksOn, colors).mealColor).toBe('');
     const off = composeTentContent(guest({ childSeat: 'booster' }), allOff, colors);
     expect(off).not.toHaveProperty('mealColor');
+    expect(off).not.toHaveProperty('mealIcon');
     expect(off).not.toHaveProperty('allergyMark');
     expect(off).not.toHaveProperty('childSeatMark');
   });
@@ -150,9 +159,25 @@ describe('layoutTentPanel', () => {
     expect(detail.x + detail.font.widthOfTextAtSize(detail.text, detail.size)).toBeLessThan(W - PX - 36);
   });
 
-  it('prints no circle or letters for a guest with nothing to mark', async () => {
-    const ops = await layout({ name: 'Ann Smith', table: 'Table 1', details: [], mealColor: '', allergyMark: false, childSeatMark: '' });
+  it('prints the meal icon in its color instead of the circle, dark when it has no color', async () => {
+    const ops = await layout({ name: 'Ann Smith', table: 'Table 1', details: [], mealColor: '#1F5FD1', mealIcon: 'Rooster', allergyMark: false, childSeatMark: '' });
     expect(ops.some((o) => o.kind === 'circle')).toBe(false);
+    const icon = ops.find((o) => o.kind === 'icon')!;
+    if (icon.kind !== 'icon') throw new Error('no icon');
+    expect(icon.size).toBe(36);
+    expect(icon.x + 18).toBeCloseTo(W - PX);
+    expect(icon.y - 18).toBeCloseTo(PY);
+    expect(icon.paths.length).toBeGreaterThan(0);
+    expect(icon.color).toEqual(rgb(0x1f / 255, 0x5f / 255, 0xd1 / 255));
+
+    const plain = await layout({ name: 'Ann Smith', table: 'Table 1', details: [], mealColor: '', mealIcon: 'Star', allergyMark: false, childSeatMark: '' });
+    const star = plain.find((o) => o.kind === 'icon')!;
+    expect(star.kind === 'icon' && star.color).toEqual(rgb(0.12, 0.12, 0.12));
+  });
+
+  it('prints no circle or letters for a guest with nothing to mark', async () => {
+    const ops = await layout({ name: 'Ann Smith', table: 'Table 1', details: [], mealColor: '', mealIcon: '', allergyMark: false, childSeatMark: '' });
+    expect(ops.some((o) => o.kind === 'circle' || o.kind === 'icon')).toBe(false);
     expect(texts(ops).map((o) => o.text)).toEqual(['Ann Smith', 'Table 1']);
   });
 
@@ -224,8 +249,8 @@ describe('renderNameTentsPdf', () => {
     expect(bytes.length).toBeGreaterThan(0);
   });
 
-  it('renders meal circles and corner marks on both halves', async () => {
-    const colors = buildMealColorMap([{ name: 'Chicken', color: 'Blue' }]);
+  it('renders meal icons, circles and corner marks on both halves', async () => {
+    const colors = buildMealCodeMap([{ name: 'Chicken', color: 'Blue' }, { name: 'Beef', color: 'Red', icon: 'Cow' }]);
     const marked = [guest(), guest({ childSeat: 'booster', meal: 'Beef' })].map((g) => composeTentContent(g, {
       ...allOff, showTable: true, showMealColor: true, showAllergyMark: true, showChildSeatMark: true,
     }, colors));

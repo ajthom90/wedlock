@@ -6,7 +6,7 @@
 // writes the grid out with ExcelJS. Pure — no Prisma/ExcelJS.
 
 import { tableDisplayName } from './nameTentsPdf';
-import { buildMealColorMap, mealColorFor } from './mealColors';
+import { buildMealCodeMap, mealCodeFor, mealCodeLabel } from './mealColors';
 import type { RsvpChoice } from './rsvpChoices';
 import { parseVendorMeals, type VendorMeal } from './vendorMeals';
 import {
@@ -46,7 +46,7 @@ export const RECEPTION_SHEET_NAME = 'Reception Seating';
 // vendors who already work from that sheet see the same words.
 export const LABELS = {
   mealChoice: 'Meal Choice',
-  colorCode: 'Color Code',
+  colorCode: 'Color/Image Code',
   total: 'Total:',
   allergens: 'Allergens / Restrictions (A)',
   boosters: 'Booster Chairs (B)',
@@ -54,7 +54,7 @@ export const LABELS = {
   noMeal: 'No meal chosen',
 } as const;
 
-export const GUEST_HEADERS = ['Guest Name', 'Table#', 'Meal Choice', 'Dietary Restrictions', 'H / B', 'A', 'Color Code'];
+export const GUEST_HEADERS = ['Guest Name', 'Table#', 'Meal Choice', 'Dietary Restrictions', 'H / B', 'A', 'Color/Image Code'];
 
 /**
  * What goes in the Table# cell: the table's number when it has one;
@@ -94,8 +94,9 @@ export function buildReceptionSheet(args: {
   vendorMeals: VendorMeal[];
 }): ReceptionSheet {
   const guests = orderForSheet(resolveSeatedGuests(args.tables, args.invitations));
-  const colors = buildMealColorMap(args.mealChoices);
-  const colorName = (meal: string) => mealColorFor(meal, colors)?.name ?? '';
+  // A meal's code is its color and icon, e.g. "Blue Rooster".
+  const codes = buildMealCodeMap(args.mealChoices);
+  const colorName = (meal: string) => mealCodeLabel(mealCodeFor(meal, codes));
 
   // Meal counts in the order the meals are set up on RSVP Configuration, then
   // any meal a guest has that's no longer offered, then guests with none, so

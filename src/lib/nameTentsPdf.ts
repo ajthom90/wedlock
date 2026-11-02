@@ -3,7 +3,8 @@ import type { TentCardFormat } from './tentCardFormats';
 import type { SeatedGuest } from './seatingExport';
 import { childSeatLabel } from './guestNeeds';
 import { computeLabelPositions, embedThemeFonts, type LabelFontBytes, type ResolvedFonts } from './mailingLabelsPdf';
-import { hexToRgb01, mealColorFor, type MealColor } from './mealColors';
+import { hexToRgb01, mealCodeFor, type MealCode } from './mealColors';
+import { findMealIcon, MEAL_ICON_VIEWBOX } from './mealIcons';
 import { tableLabel } from './tableNumbers';
 
 // Printable table name tents: one folded card per seated guest with their
@@ -12,7 +13,8 @@ import { tableLabel } from './tableNumbers';
 // depends on pdf-lib, so the admin page builds the PDF in the browser.
 //
 // Servers can also get corner marks they read at a glance, without reading
-// small print: a ½" circle in the meal's color bottom right, "A" bottom left
+// small print: a ½" mark for the meal bottom right — its icon in its color
+// (a blue rooster), or a circle in its color when it has no icon — "A" bottom left
 // when the guest has an allergy or dietary restriction, and "H" (high chair)
 // or "B" (booster) top right.
 
@@ -24,6 +26,7 @@ export interface TentContent {
   // print run, so no space is kept for it; '' / false means this guest just
   // has nothing to show there.
   mealColor?: string;            // '#RRGGBB' or ''
+  mealIcon?: string;             // a MEAL_ICONS name or ''; set whenever mealColor is
   allergyMark?: boolean;
   childSeatMark?: 'H' | 'B' | '';
 }
@@ -51,7 +54,7 @@ export function tableDisplayName(raw: string): string {
 export function composeTentContent(
   guest: SeatedGuest,
   opts: TentOptions,
-  mealColors: Map<string, MealColor> = new Map(),
+  mealCodes: Map<string, MealCode> = new Map(),
 ): TentContent {
   const details: string[] = [];
   if (opts.showChildSeat && guest.childSeat) details.push(childSeatLabel(guest.childSeat));
@@ -65,7 +68,11 @@ export function composeTentContent(
     table: opts.showTable ? tableLabel({ name: guest.table, number: guest.tableNumber }) : '',
     details,
   };
-  if (opts.showMealColor) content.mealColor = mealColorFor(guest.meal, mealColors)?.hex ?? '';
+  if (opts.showMealColor) {
+    const code = mealCodeFor(guest.meal, mealCodes);
+    content.mealColor = code?.color?.hex ?? '';
+    content.mealIcon = code?.icon?.name ?? '';
+  }
   if (opts.showAllergyMark) content.allergyMark = Boolean(ownDietary);
   if (opts.showChildSeatMark) {
     content.childSeatMark = guest.childSeat === 'high_chair' ? 'H' : guest.childSeat === 'booster' ? 'B' : '';
@@ -147,7 +154,9 @@ function encodable(font: PDFFont, text: string): string {
 
 export type DrawOp =
   | { kind: 'text'; text: string; font: PDFFont; size: number; x: number; y: number }
-  | { kind: 'circle'; x: number; y: number; radius: number; color: RGB };
+  | { kind: 'circle'; x: number; y: number; radius: number; color: RGB }
+  // An icon's SVG paths, drawn size points square centred on (x, y).
+  | { kind: 'icon'; x: number; y: number; size: number; paths: string[]; color: RGB };
 
 /** Which mark bands a print run keeps clear, decided once for every card so names line up across a table. */
 export interface MarkBands { top: boolean; bottom: boolean }
@@ -155,7 +164,7 @@ export interface MarkBands { top: boolean; bottom: boolean }
 export function markBandsFor(tents: TentContent[]): MarkBands {
   return {
     top: tents.some((t) => t.childSeatMark !== undefined),
-    bottom: tents.some((t) => t.mealColor !== undefined || t.allergyMark !== undefined),
+    bottom: tents.some((t) => t.mealColor !== undefined || t.mealIcon !== undefined || t.allergyMark !== undefined),
   };
 }
 
@@ -247,9 +256,13 @@ export function layoutTentPanel(
   const ops = placeLines(lines, width, bottomY, topY);
 
   const circleY = padY + CIRCLE_DIAMETER / 2;
-  if (content.mealColor) {
-    const [r, g, b] = hexToRgb01(content.mealColor);
-    ops.push({ kind: 'circle', x: width - padX - CIRCLE_DIAMETER / 2, y: circleY, radius: CIRCLE_DIAMETER / 2, color: rgb(r, g, b) });
+  const mealX = width - padX - CIRCLE_DIAMETER / 2;
+  const mealRgb = content.mealColor ? rgb(...hexToRgb01(content.mealColor)) : null;
+  const icon = findMealIcon(content.mealIcon);
+  if (icon) {
+    ops.push({ kind: 'icon', x: mealX, y: circleY, size: CIRCLE_DIAMETER, paths: icon.paths, color: mealRgb ?? INK });
+  } else if (mealRgb) {
+    ops.push({ kind: 'circle', x: mealX, y: circleY, radius: CIRCLE_DIAMETER / 2, color: mealRgb });
   }
   if (content.allergyMark) {
     ops.push({ kind: 'text', text: 'A', font: markFont, size: MARK_SIZE, x: padX, y: circleY - markCapH / 2 });
@@ -278,6 +291,20 @@ function drawPanel(page: PDFPage, ops: DrawOp[], left: number, bottom: number, w
     const y = flipped ? bottom + height - op.y : bottom + op.y;
     if (op.kind === 'circle') {
       page.drawCircle({ x, y, size: op.radius, color: op.color, borderColor: INK, borderWidth: 0.5 });
+    } else if (op.kind === 'icon') {
+      // drawSvgPath puts the icon's top-left corner at its origin and rotates
+      // about it, so the flipped copy starts from the opposite corner.
+      const half = op.size / 2;
+      const scale = op.size / MEAL_ICON_VIEWBOX;
+      for (const path of op.paths) {
+        page.drawSvgPath(path, {
+          x: flipped ? x + half : x - half,
+          y: flipped ? y - half : y + half,
+          scale,
+          rotate: flipped ? degrees(180) : undefined,
+          color: op.color,
+        });
+      }
     } else {
       page.drawText(op.text, { x, y, size: op.size, font: op.font, color: INK, rotate: flipped ? degrees(180) : undefined });
     }

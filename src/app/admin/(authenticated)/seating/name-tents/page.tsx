@@ -13,7 +13,8 @@ import { resolveSeatedGuests, UNASSIGNED_TABLE, type SeatingExportInvitation, ty
 import { fetchThemeFontBytes } from '@/lib/themeFontBytes';
 import type { LabelFontBytes } from '@/lib/mailingLabelsPdf';
 import { parseRsvpChoices, type RsvpChoice } from '@/lib/rsvpChoices';
-import { buildMealColorMap, mealColorFor } from '@/lib/mealColors';
+import { buildMealCodeMap, mealCodeFor } from '@/lib/mealColors';
+import { MealCodeSwatch } from '@/components/admin/MealCodeSwatch';
 
 interface Features { nameTents?: boolean; childSeats?: boolean; dietaryNotes?: boolean }
 
@@ -75,8 +76,8 @@ export default function NameTentsPage() {
     showChildSeatMark: options.showChildSeatMark && childSeatsOn,
     showAllergyMark: options.showAllergyMark && allergiesOn,
   };
-  const mealColors = useMemo(() => buildMealColorMap(mealChoices), [mealChoices]);
-  const coloredMeals = mealChoices.filter((c) => c.color);
+  const mealCodes = useMemo(() => buildMealCodeMap(mealChoices), [mealChoices]);
+  const coloredMeals = mealChoices.filter((c) => mealCodeFor(c.name, mealCodes));
 
   const seated = useMemo(() => resolveSeatedGuests(tables, invitations), [tables, invitations]);
   const unseatedCount = seated.filter((g) => g.table === UNASSIGNED_TABLE).length;
@@ -85,12 +86,12 @@ export default function NameTentsPage() {
   const printing = seated.filter((g) => g.table !== UNASSIGNED_TABLE && selectedTables.has(tableKey(g.table, g.tableNumber)));
   // Households still on one shared allergy note: it can't go on any single
   // card, so warn before the couple prints without it.
-  // Guests whose meal has no color print with no circle; name the meals so
+  // Guests whose meal has no color or icon print with no mark; name the meals so
   // the couple can fix them on RSVP Configuration before printing.
   const uncoloredMeals = [...new Set(
-    printing.filter((g) => !mealColorFor(g.meal, mealColors)).map((g) => g.meal.trim() || 'No meal chosen'),
+    printing.filter((g) => !mealCodeFor(g.meal, mealCodes)).map((g) => g.meal.trim() || 'No meal chosen'),
   )];
-  const uncoloredGuests = printing.filter((g) => !mealColorFor(g.meal, mealColors)).length;
+  const uncoloredGuests = printing.filter((g) => !mealCodeFor(g.meal, mealCodes)).length;
   const unsplitHouseholds = new Set(
     printing.filter((g) => g.householdDietary && g.invitationId).map((g) => g.invitationId),
   ).size;
@@ -127,7 +128,7 @@ export default function NameTentsPage() {
       const bytes = await renderNameTentsPdf({
         format,
         startPosition,
-        tents: printing.map((g) => composeTentContent(g, effectiveOptions, mealColors)),
+        tents: printing.map((g) => composeTentContent(g, effectiveOptions, mealCodes)),
         fonts: fontBytesRef.current,
         bothSides,
         outline,
@@ -246,27 +247,27 @@ export default function NameTentsPage() {
             <p className="text-sm font-medium">Corner marks for servers</p>
             <p className="text-xs text-gray-500 mb-2">Big enough to read at a glance from standing height, on both halves of the card.</p>
           </div>
-          {checkbox(options.showMealColor ?? false, (v) => setOptions({ ...options, showMealColor: v }), 'Meal color circle, bottom right', 'A ½" circle in the color set for each meal on RSVP Configuration.')}
+          {checkbox(options.showMealColor ?? false, (v) => setOptions({ ...options, showMealColor: v }), 'Meal mark, bottom right', 'The icon and color set for each meal on RSVP Configuration, ½" across — a blue rooster, say. A meal with a color but no icon prints as a circle in that color.')}
           {options.showMealColor && (
             <div className="ml-6 text-xs text-gray-600 space-y-1">
               {coloredMeals.length > 0 ? (
                 <div className="flex flex-wrap gap-x-3 gap-y-1">
                   {coloredMeals.map((c) => (
                     <span key={c.name} className="inline-flex items-center gap-1">
-                      <span className="inline-block h-3 w-3 rounded-full border border-gray-400" style={{ backgroundColor: mealColors.get(c.name.toLowerCase())?.hex }} aria-hidden />
+                      <MealCodeSwatch color={c.color} icon={c.icon} size={14} />
                       {c.name}
                     </span>
                   ))}
                 </div>
               ) : (
                 <p className="text-amber-800">
-                  No meal has a color yet. Set them on <Link href="/admin/rsvp-config" className="underline">RSVP Configuration</Link>.
+                  No meal has a color or icon yet. Set them on <Link href="/admin/rsvp-config" className="underline">RSVP Configuration</Link>.
                 </p>
               )}
               {coloredMeals.length > 0 && uncoloredGuests > 0 && (
                 <p className="text-amber-800">
-                  {uncoloredGuests} card{uncoloredGuests === 1 ? '' : 's'} will print with no circle because their meal has no
-                  color: {uncoloredMeals.join(', ')}. Set colors on <Link href="/admin/rsvp-config" className="underline">RSVP Configuration</Link>.
+                  {uncoloredGuests} card{uncoloredGuests === 1 ? '' : 's'} will print with no meal mark because their meal has no
+                  color or icon: {uncoloredMeals.join(', ')}. Set them on <Link href="/admin/rsvp-config" className="underline">RSVP Configuration</Link>.
                 </p>
               )}
             </div>

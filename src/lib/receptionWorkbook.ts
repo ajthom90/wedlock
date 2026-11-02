@@ -2,7 +2,7 @@
 // ExcelJS, formatted like the couple's own sheet: the summary boxed in
 // medium and thin borders with A1:B1 merged, its counts as live formulas
 // (COUNTIF over the guest list, SUM for the total) so they follow any edit
-// the caterer makes, Color Code looked up from the summary with VLOOKUP, a
+// the caterer makes, Color/Image Code looked up from the summary with VLOOKUP, a
 // medium rule under the guest header, the rows above the guest list frozen,
 // and the couple's column widths. Every formula carries its result, so the
 // sheet reads right even where nothing recalculates. No fills: the couple's
@@ -12,8 +12,9 @@ import ExcelJS from 'exceljs';
 import { RECEPTION_SHEET_NAME, type ReceptionSheet, type SheetCell } from './receptionSheet';
 
 // Column widths and the 15pt rows (the ones with a medium rule) as the
-// couple's sheet has them.
-const COLUMN_WIDTHS = [30, 10.5546875, 25.5546875, 34.44140625, 7.33203125, 3.6640625, 10.44140625];
+// couple's sheet has them, except Color/Image Code (G), widened from
+// 10.4 to fit codes like "Yellow Wheat".
+const COLUMN_WIDTHS = [30, 10.5546875, 25.5546875, 34.44140625, 7.33203125, 3.6640625, 16.5];
 const RULED_ROW_HEIGHT = 15;
 
 const FONT: Partial<ExcelJS.Font> = { name: 'Calibri', size: 11, family: 2, color: { theme: 1 } };
@@ -58,7 +59,7 @@ export function buildReceptionWorkbook(sheet: ReceptionSheet): ExcelJS.Workbook 
   };
   const border = (r: number, c: number, b: Partial<ExcelJS.Borders>) => { cell(r, c).border = b; };
 
-  // Summary header: "Meal Choice" across A1:B1, "Color Code" boxed above the colors.
+  // Summary header: "Meal Choice" across A1:B1, "Color/Image Code" boxed above the codes.
   // B1 is styled before the merge: once merged, its style is A1's.
   border(1, 1, { left: MEDIUM, bottom: MEDIUM });
   border(1, 2, { bottom: MEDIUM });
@@ -105,7 +106,7 @@ export function buildReceptionWorkbook(sheet: ReceptionSheet): ExcelJS.Workbook 
   }
 
   // Guest list: bold header over a medium rule, H / B and A centered, Table#
-  // right-aligned whether it's a number or a name, Color Code looked up.
+  // right-aligned whether it's a number or a name, Color/Image Code looked up.
   const lookup = `$A$${s.firstMealRow}:$C$${s.lastMealRow}`;
   for (let c = 1; c <= COLUMN_WIDTHS.length; c++) {
     cell(headerRow, c).font = { name: 'Calibri', size: 11, family: 2, bold: true };
