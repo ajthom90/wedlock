@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.23.0",
+    "date": "2026-11-02",
+    "changes": [
+      { "type": "feature", "text": "Lock RSVPs once submitted: turn off the new \"Guests can edit their RSVP\" toggle in the RSVP section of the Features page. Guests who haven't replied can still RSVP, but once a response is in, the RSVP page shows what they submitted, with a note to contact you for changes, instead of the form. The thank-you screen no longer offers Update Response, and confirmation emails ask guests to get in touch instead of linking to the RSVP page. You can still edit any response from the RSVPs page. On by default, so nothing changes until you turn it off." }
+    ]
+  },
+  {
     "version": "2.22.0",
     "date": "2026-10-30",
     "changes": [
