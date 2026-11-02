@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.24.0",
+    "date": "2026-11-02",
+    "changes": [
+      { "type": "feature", "text": "Close RSVPs with the new \"Accept RSVPs\" switch at the top of the RSVP section on the Features page. While RSVPs are closed — the switch is off, or the deadline has passed with \"close RSVPs after the deadline\" on in Settings — the RSVP Now button on the home page and the RSVP menu link are hidden, and the RSVP page says RSVPs are closed straight away instead of asking for an invitation code first. You can still edit responses from the RSVPs page. On by default, so nothing changes until you turn it off." }
+    ]
+  },
+  {
     "version": "2.23.0",
     "date": "2026-11-02",
     "changes": [
