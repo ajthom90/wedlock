@@ -194,7 +194,7 @@ describe('layoutTentPanel', () => {
     expect(texts(ops).some((o) => o.text === 'H')).toBe(false);
     const icon = ops.find((o) => o.kind === 'icon')!;
     if (icon.kind !== 'icon') throw new Error('no icon');
-    expect(icon.viewBox).toBe(24);
+    expect(icon.viewBox).toBe(512);
     expect(icon.x + icon.size / 2).toBeCloseTo(W - PX);
     expect(icon.y + icon.size / 2).toBeCloseTo(H - PY);
     const name = texts(ops).find((o) => o.text === 'Ann Smith')!;
