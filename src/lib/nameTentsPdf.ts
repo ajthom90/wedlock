@@ -4,7 +4,7 @@ import type { SeatedGuest } from './seatingExport';
 import { childSeatLabel } from './guestNeeds';
 import { computeLabelPositions, embedThemeFonts, type LabelFontBytes, type ResolvedFonts } from './mailingLabelsPdf';
 import { hexToRgb01, mealCodeFor, type MealCode } from './mealColors';
-import { findMealIcon, iconViewBox } from './mealIcons';
+import { findMealIcon, findSeatIcon, iconViewBox } from './mealIcons';
 import { tableLabel } from './tableNumbers';
 
 // Printable table name tents: one folded card per seated guest with their
@@ -30,7 +30,7 @@ export interface TentContent {
   mealIcon?: string;             // a MEAL_ICONS name or ''; set whenever mealColor is
   allergyMark?: boolean;
   childSeatMark?: 'H' | 'B' | '';
-  childSeatIcon?: string;        // a MEAL_ICONS name drawn in place of the letter
+  childSeatIcon?: string;        // a SEAT_ICONS name drawn in place of the letter
 }
 
 export interface TentOptions {
@@ -41,7 +41,7 @@ export interface TentOptions {
   showMealColor?: boolean;
   showAllergyMark?: boolean;
   showChildSeatMark?: boolean;
-  // Icons (MEAL_ICONS names) to print instead of the H / B letters; '' or
+  // Icons (SEAT_ICONS names) to print instead of the H / B letters; '' or
   // missing keeps the letter.
   highChairIcon?: string;
   boosterIcon?: string;
@@ -82,7 +82,7 @@ export function composeTentContent(
   if (opts.showAllergyMark) content.allergyMark = Boolean(ownDietary);
   if (opts.showChildSeatMark) {
     content.childSeatMark = guest.childSeat === 'high_chair' ? 'H' : guest.childSeat === 'booster' ? 'B' : '';
-    const icon = findMealIcon(content.childSeatMark === 'H' ? opts.highChairIcon : content.childSeatMark === 'B' ? opts.boosterIcon : '');
+    const icon = findSeatIcon(content.childSeatMark === 'H' ? opts.highChairIcon : content.childSeatMark === 'B' ? opts.boosterIcon : '');
     if (icon) content.childSeatIcon = icon.name;
   }
   return content;
@@ -283,7 +283,7 @@ export function layoutTentPanel(
   if (content.allergyMark) {
     ops.push({ kind: 'text', text: 'A', font: markFont, size: MARK_SIZE, x: padX, y: circleY - markCapH / 2 });
   }
-  const seatIcon = findMealIcon(content.childSeatIcon);
+  const seatIcon = findSeatIcon(content.childSeatIcon);
   if (content.childSeatMark && seatIcon) {
     const s = ICON_MARK_SIZE;
     ops.push({ kind: 'icon', x: width - padX - s / 2, y: height - padY - s / 2, size: s, paths: seatIcon.paths, viewBox: iconViewBox(seatIcon), color: INK });

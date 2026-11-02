@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MEAL_COLORS, buildMealCodeMap, buildMealColorMap, findMealColor, hexToRgb01, mealCodeFor, mealCodeLabel, mealColorFor } from './mealColors';
-import { MEAL_ICONS, findMealIcon } from './mealIcons';
+import { MEAL_ICONS, SEAT_ICONS, findMealIcon, findSeatIcon } from './mealIcons';
 
 describe('MEAL_COLORS', () => {
   it('has unique names and valid hex values', () => {
@@ -82,5 +82,12 @@ describe('MEAL_ICONS', () => {
   it('includes the icons caterers commonly use', () => {
     for (const name of ['Rooster', 'Cow', 'Wheat', 'Heart', 'Star', 'Fish', 'Pig']) expect(findMealIcon(name)?.name).toBe(name);
     expect(findMealIcon('unicorn')).toBeNull();
+  });
+
+  it('keeps the high chair / booster landmarks out of the meal icons', () => {
+    expect(SEAT_ICONS.map((i) => i.name)).toEqual(['Colosseum', 'Leaning Tower']);
+    expect(findSeatIcon('leaning tower')?.name).toBe('Leaning Tower');
+    expect(findMealIcon('Colosseum')).toBeNull();
+    expect(findSeatIcon('Rooster')).toBeNull();
   });
 });

@@ -1,12 +1,12 @@
 import { findMealColor } from '@/lib/mealColors';
-import { findMealIcon, iconViewBox } from '@/lib/mealIcons';
+import { findMealIcon, findSeatIcon, iconViewBox } from '@/lib/mealIcons';
 
 // A meal's mark as it prints on name tents: its icon in its color (dark when
 // no color is set), or a dot in its color when it has no icon. Renders
-// nothing when the meal has neither.
+// nothing when the meal has neither. Also previews high chair / booster icons.
 export function MealCodeSwatch({ color, icon, size = 12 }: { color?: string; icon?: string; size?: number }) {
   const c = findMealColor(color);
-  const i = findMealIcon(icon);
+  const i = findMealIcon(icon) ?? findSeatIcon(icon);
   if (i) {
     return (
       <svg width={size} height={size} viewBox={`0 0 ${iconViewBox(i)} ${iconViewBox(i)}`} className="inline-block align-middle shrink-0" aria-hidden>

@@ -15,7 +15,7 @@ import type { LabelFontBytes } from '@/lib/mailingLabelsPdf';
 import { parseRsvpChoices, type RsvpChoice } from '@/lib/rsvpChoices';
 import { buildMealCodeMap, mealCodeFor } from '@/lib/mealColors';
 import { MealCodeSwatch } from '@/components/admin/MealCodeSwatch';
-import { MEAL_ICONS } from '@/lib/mealIcons';
+import { SEAT_ICONS } from '@/lib/mealIcons';
 
 interface Features { nameTents?: boolean; childSeats?: boolean; dietaryNotes?: boolean }
 
@@ -113,7 +113,7 @@ export default function NameTentsPage() {
         onChange={(e) => saveSeatIcon(key, e.target.value)}
       >
         <option value="">Letter {letter}</option>
-        {MEAL_ICONS.map((ic) => <option key={ic.name} value={ic.name}>{ic.name}</option>)}
+        {SEAT_ICONS.map((ic) => <option key={ic.name} value={ic.name}>{ic.name}</option>)}
       </select>
     </label>
   );
