@@ -9,7 +9,7 @@
 // sheet has none. Shared by both seating downloads on the admin Seating page.
 
 import ExcelJS from 'exceljs';
-import { RECEPTION_SHEET_NAME, type ReceptionSheet, type SheetCell } from './receptionSheet';
+import { LEGEND_COLUMN, RECEPTION_SHEET_NAME, type ReceptionSheet, type SheetCell } from './receptionSheet';
 
 // Column widths and the 15pt rows (the ones with a medium rule) as the
 // couple's sheet has them, except Color/Image Code (G), widened from
@@ -28,7 +28,7 @@ export function countifCriterion(text: string): string {
 }
 
 export function buildReceptionWorkbook(sheet: ReceptionSheet): ExcelJS.Workbook {
-  const { rows, headerRow, summary: s } = sheet;
+  const { rows, headerRow, summary: s, legendRows } = sheet;
   const firstGuest = headerRow + 1;
   const lastGuest = Math.max(rows.length, firstGuest);
   const col = (letter: string) => `$${letter}$${firstGuest}:$${letter}$${lastGuest}`;
@@ -119,6 +119,12 @@ export function buildReceptionWorkbook(sheet: ReceptionSheet): ExcelJS.Workbook 
     if (typeof value(r, 2) === 'string') cell(r, 2).alignment = { horizontal: 'right' };
     cell(r, 7).value = { formula: `IFERROR(VLOOKUP(C${r},${lookup},3,FALSE)&"","")`, result: String(value(r, 7) ?? '') };
   }
+
+  // Legend in E: a bold heading, then each picture beside its count.
+  legendRows.forEach((r, i) => {
+    if (i === 0) cell(r, LEGEND_COLUMN + 1).font = BOLD;
+    cell(r, LEGEND_COLUMN + 1).alignment = { horizontal: 'left', indent: 1 };
+  });
 
   for (const r of [1, s.lastMealRow, s.lastVendorRow, s.totalRow, headerRow]) ws.getRow(r).height = RULED_ROW_HEIGHT;
   return wb;

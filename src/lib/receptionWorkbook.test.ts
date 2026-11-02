@@ -98,6 +98,25 @@ describe('receptionWorkbookBuffer', () => {
   });
 });
 
+describe('receptionWorkbookBuffer legend', () => {
+  it('writes the name tent marks legend in E beside the counts, with a bold heading', async () => {
+    const withLegend = buildReceptionSheet({
+      tables: [{ name: 'Head Table', number: null, assignments: [{ guestName: 'Ann Lee', invitationId: 'a' }] }],
+      invitations: [invitation], mealChoices: [], vendorMeals: [],
+      tentMarks: { allergyIcon: 'Magic Wand', allergyColor: 'Blaze Orange' },
+    });
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await receptionWorkbookBuffer(withLegend)) as unknown as ExcelJS.Buffer);
+    const ws = wb.worksheets[0];
+    const r = withLegend.summary.allergensRow;
+    expect(ws.getCell(r - 1, 5).value).toBe('Name Tent Marks');
+    expect(ws.getCell(r - 1, 5).font?.bold).toBe(true);
+    expect(ws.getCell(r, 3).value).toBe('Allergens / Restrictions (A)');
+    expect(ws.getCell(r, 5).value).toBe('Blaze Orange Magic Wand');
+    expect(ws.getCell(r, 5).alignment?.horizontal).toBe('left');
+  });
+});
+
 describe('countifCriterion', () => {
   it('quotes the text and escapes what COUNTIF would read as wildcards', () => {
     expect(countifCriterion('Beef')).toBe('"Beef"');

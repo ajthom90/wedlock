@@ -18,5 +18,6 @@ export async function loadReceptionSheet(): Promise<ReceptionSheet> {
     invitations,
     mealChoices: mealOptions.flatMap((o) => parseRsvpChoices(o.choices)),
     vendorMeals: site.vendorMeals,
+    tentMarks: site,
   });
 }

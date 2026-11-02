@@ -6,7 +6,8 @@
 // writes the grid out with ExcelJS. Pure — no Prisma/ExcelJS.
 
 import { tableDisplayName } from './nameTentsPdf';
-import { buildMealCodeMap, mealCodeFor, mealCodeLabel } from './mealColors';
+import { buildMealCodeMap, findMarkColor, mealCodeFor, mealCodeLabel } from './mealColors';
+import { findMarkIcon } from './mealIcons';
 import type { RsvpChoice } from './rsvpChoices';
 import { parseVendorMeals, type VendorMeal } from './vendorMeals';
 import {
@@ -38,7 +39,25 @@ export interface ReceptionSheet {
   /** 1-based row number of the "Guest Name" header row. */
   headerRow: number;
   summary: SummaryLayout;
+  /** Rows (1-based, heading first) of the name-tent marks legend in column E; empty when there's none. */
+  legendRows: number[];
 }
+
+/** The pictures the couple chose for the name tents' corner marks (site settings). */
+export interface TentMarkSettings {
+  allergyIcon?: string;
+  allergyColor?: string;
+  highChairIcon?: string;
+  highChairColor?: string;
+  boosterIcon?: string;
+  boosterColor?: string;
+}
+
+/**
+ * Column (0-based) of the legend: E, beside the A / B / H counts in C:D. E
+ * to G are empty in the summary, so each description spills across them.
+ */
+export const LEGEND_COLUMN = 4;
 
 export const RECEPTION_SHEET_NAME = 'Reception Seating';
 
@@ -52,7 +71,27 @@ export const LABELS = {
   boosters: 'Booster Chairs (B)',
   highChairs: 'Height Chairs (H)',
   noMeal: 'No meal chosen',
+  legend: 'Name Tent Marks',
 } as const;
+
+/**
+ * One legend line per corner mark that prints as a picture on the name
+ * tents, saying which column letter it stands for: e.g. "Allergens /
+ * Restrictions (A)" → "Blaze Orange Magic Wand". Marks still printed as
+ * letters need no key, so they're left out.
+ */
+export function tentMarkLegend(marks: TentMarkSettings = {}): [typeof LABELS.allergens | typeof LABELS.boosters | typeof LABELS.highChairs, string][] {
+  const lines: [typeof LABELS.allergens | typeof LABELS.boosters | typeof LABELS.highChairs, string | undefined, string | undefined][] = [
+    [LABELS.allergens, marks.allergyIcon, marks.allergyColor],
+    [LABELS.boosters, marks.boosterIcon, marks.boosterColor],
+    [LABELS.highChairs, marks.highChairIcon, marks.highChairColor],
+  ];
+  return lines.flatMap(([label, iconName, colorName]): [typeof label, string][] => {
+    const icon = findMarkIcon(iconName);
+    if (!icon) return [];
+    return [[label, `${findMarkColor(colorName)?.name ?? 'Black'} ${icon.name}`]];
+  });
+}
 
 export const GUEST_HEADERS = ['Guest Name', 'Table#', 'Meal Choice', 'Dietary Restrictions', 'H / B', 'A', 'Color/Image Code'];
 
@@ -92,6 +131,7 @@ export function buildReceptionSheet(args: {
   invitations: SeatingExportInvitation[];
   mealChoices: RsvpChoice[];
   vendorMeals: VendorMeal[];
+  tentMarks?: TentMarkSettings;
 }): ReceptionSheet {
   const guests = orderForSheet(resolveSeatedGuests(args.tables, args.invitations));
   // A meal's code is its color and icon, e.g. "Blue Rooster".
@@ -172,7 +212,24 @@ export function buildReceptionSheet(args: {
       colorName(g.meal) || null,
     ]);
   }
-  return { rows, headerRow, summary };
+
+  // The legend sits in E beside each A / B / H count, under a heading on the
+  // row above, so vendors reading those columns know which picture each
+  // letter is on the tents.
+  const legend = tentMarkLegend(args.tentMarks);
+  const legendRows: number[] = [];
+  const put = (rowNum: number, text: string) => {
+    const row = rows[rowNum - 1];
+    while (row.length < LEGEND_COLUMN) row.push(null);
+    row[LEGEND_COLUMN] = text;
+    legendRows.push(rowNum);
+  };
+  if (legend.length) {
+    const rowFor = { [LABELS.allergens]: summary.allergensRow, [LABELS.boosters]: summary.boostersRow, [LABELS.highChairs]: summary.highChairsRow };
+    put(summary.allergensRow - 1, LABELS.legend);
+    for (const [label, description] of legend) put(rowFor[label], description);
+  }
+  return { rows, headerRow, summary, legendRows };
 }
 
 /**

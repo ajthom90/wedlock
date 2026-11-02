@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildReceptionSheet, sheetTableValue, sheetToText } from './receptionSheet';
+import { buildReceptionSheet, sheetTableValue, sheetToText, tentMarkLegend } from './receptionSheet';
 import type { SeatingExportInvitation } from './seatingExport';
 
 const inv = (
@@ -164,5 +164,53 @@ describe('buildReceptionSheet', () => {
       '\t\tBooster Chairs (B)\t0',
       'Total:\t1\tHeight Chairs (H)\t0',
     ]);
+  });
+});
+
+describe('name tent marks legend', () => {
+  const marks = {
+    allergyIcon: 'Magic Wand', allergyColor: 'Blaze Orange',
+    highChairIcon: 'Leaning Tower', highChairColor: '',
+    boosterIcon: 'Colosseum', boosterColor: 'Blue',
+  };
+
+  it('describes each mark printed as a picture, in A / B / H order, Black by default', () => {
+    expect(tentMarkLegend(marks)).toEqual([
+      ['Allergens / Restrictions (A)', 'Blaze Orange Magic Wand'],
+      ['Booster Chairs (B)', 'Blue Colosseum'],
+      ['Height Chairs (H)', 'Black Leaning Tower'],
+    ]);
+  });
+
+  it('leaves out marks still printed as letters, and unknown pictures', () => {
+    expect(tentMarkLegend({ allergyIcon: 'Magic Wand', boosterIcon: 'Rooster', highChairColor: 'Red' }))
+      .toEqual([['Allergens / Restrictions (A)', 'Black Magic Wand']]);
+    expect(tentMarkLegend()).toEqual([]);
+  });
+
+  it('puts each description in E beside its A / B / H count, without moving anything else', () => {
+    const args = { tables: [], invitations: [inv('a', [{ name: 'Ann Lee', meal: 'Beef' }])], mealChoices: [{ name: 'Beef', color: 'Red' }], vendorMeals: [] };
+    const plain = buildReceptionSheet(args);
+    const withLegend = buildReceptionSheet({ ...args, tentMarks: marks });
+    const { allergensRow, boostersRow, highChairsRow } = withLegend.summary;
+    expect(plain.legendRows).toEqual([]);
+    expect(withLegend.legendRows).toEqual([allergensRow - 1, allergensRow, boostersRow, highChairsRow]);
+    expect(withLegend.headerRow).toBe(plain.headerRow);
+    expect(withLegend.summary).toEqual(plain.summary);
+    const e = (r: number) => withLegend.rows[r - 1][4];
+    expect(e(allergensRow - 1)).toBe('Name Tent Marks');
+    expect(withLegend.rows[allergensRow - 1].slice(2)).toEqual(['Allergens / Restrictions (A)', 0, 'Blaze Orange Magic Wand']);
+    expect(e(boostersRow)).toBe('Blue Colosseum');
+    expect(e(highChairsRow)).toBe('Black Leaning Tower');
+    // Every other cell is as before.
+    const strip = (rows: (string | number | null)[][]) => sheetToText(rows.map((r) => r.slice(0, 4)));
+    expect(strip(withLegend.rows)).toBe(strip(plain.rows));
+  });
+
+  it('leaves the rows of marks printed as letters blank in E', () => {
+    const args = { tables: [], invitations: [inv('a', [{ name: 'Ann Lee', meal: 'Beef' }])], mealChoices: [], vendorMeals: [] };
+    const sheet = buildReceptionSheet({ ...args, tentMarks: { boosterIcon: 'Colosseum' } });
+    expect(sheet.legendRows).toEqual([sheet.summary.allergensRow - 1, sheet.summary.boostersRow]);
+    expect(sheet.rows[sheet.summary.allergensRow - 1][4] ?? null).toBeNull();
   });
 });
