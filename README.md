@@ -52,7 +52,7 @@ All content (couple names, dates, venues, events, photos, copy, colors, fonts) i
 - **Theme** — primary/accent/background colors, heading and body fonts.
 - **Custom fonts** — upload `.woff2`/`.ttf`/`.otf` files and they appear in the font picker.
 - **Navigation editor** — reorder, rename, hide, or nest any nav item (one level of dropdowns).
-- **Feature flags** — toggle any major module on or off. When off, both the public page and the nav link disappear; when on, they return. Covers: per-guest meal selection, song requests, dietary notes, plus-ones, RSVP address, weather widget, story timeline, transportation, honeymoon fund, photo wall, trivia, guest photo uploads, guest book (off / public / moderated), vendor contacts, budget tracker, child seats, name tents, reception seating sheet, alphabetical seating list, and site-wide password gate.
+- **Feature flags** — toggle any major module on or off. When off, both the public page and the nav link disappear; when on, they return. Covers: per-guest meal selection, song requests, dietary notes, plus-ones, RSVP address, guest RSVP editing, weather widget, story timeline, transportation, honeymoon fund, photo wall, trivia, guest photo uploads, guest book (off / public / moderated), vendor contacts, budget tracker, child seats, name tents, reception seating sheet, alphabetical seating list, and site-wide password gate.
 - **Site password gate** — optional global password to gate the public site.
 
 ### System

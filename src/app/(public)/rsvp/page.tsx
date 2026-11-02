@@ -217,13 +217,45 @@ function RSVPForm() {
   const isDeadlinePassed = () => { if (!settings.rsvpDeadline || !settings.rsvpCloseAfterDeadline) return false; const d = new Date(settings.rsvpDeadline); d.setHours(23,59,59,999); return new Date() > d; };
   const toggleGuest = (id: string) => setAttendingGuests(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
 
-  if (submitted) return <div className="container mx-auto px-4 py-16"><div className="max-w-xl mx-auto text-center"><h1 className="text-4xl font-heading font-bold text-primary mb-4">Thank You!</h1><p className="text-foreground/70 mb-8">{attending === 'yes' ? "We can't wait to celebrate with you!" : 'We will miss you! Thank you for letting us know.'}</p><Button onClick={() => { setSubmitted(false); lookupInvitation(invitation.code); }}>Update Response</Button></div></div>;
+  if (submitted) return <div className="container mx-auto px-4 py-16"><div className="max-w-xl mx-auto text-center"><h1 className="text-4xl font-heading font-bold text-primary mb-4">Thank You!</h1><p className="text-foreground/70 mb-8">{attending === 'yes' ? "We can't wait to celebrate with you!" : 'We will miss you! Thank you for letting us know.'}</p>{features.rsvpEditing !== false ? <Button onClick={() => { setSubmitted(false); lookupInvitation(invitation.code); }}>Update Response</Button> : <p className="text-sm text-foreground/60">Need to make a change? Please contact us directly.</p>}</div></div>;
 
   if (!invitation) return (
     <div className="container mx-auto px-4 py-16"><div className="max-w-md mx-auto"><h1 className="text-4xl font-heading font-bold text-center text-primary mb-8">RSVP</h1><Card><CardContent className="py-8"><form onSubmit={(e) => { e.preventDefault(); if (code.trim()) lookupInvitation(code.trim()); }} className="space-y-4"><Input label="Invitation Code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Enter your invitation code" required /><p className="text-sm text-foreground/60">An invitation code will be accompanying your formal invitation.</p>{error && <p className="text-red-600 text-sm">{error}</p>}<Button type="submit" className="w-full" isLoading={loading}>Find Invitation</Button></form></CardContent></Card></div></div>
   );
 
   if (isDeadlinePassed()) return <div className="container mx-auto px-4 py-16 text-center"><h1 className="text-4xl font-heading font-bold text-primary mb-4">RSVP Closed</h1><p className="text-foreground/70">The RSVP deadline has passed. Please contact us directly if you need to make changes.</p></div>;
+
+  // Guest editing turned off and this invitation already responded: show what
+  // was submitted instead of the form. The API rejects edits regardless.
+  if (invitation.response && features.rsvpEditing === false) {
+    const r = invitation.response;
+    let names: string[] = [];
+    try {
+      const ids: string[] = r.attendingGuests ? JSON.parse(r.attendingGuests) : [];
+      names = ids.map((id) => invitation.guests.find((g: Guest) => g.id === id)?.name).filter(Boolean) as string[];
+    } catch { /* fall back to the head count */ }
+    try {
+      const extras: { name: string }[] = r.plusOnes ? JSON.parse(r.plusOnes) : [];
+      names = [...names, ...extras.map((p) => p.name).filter(Boolean)];
+    } catch { /* ignore */ }
+    return (
+      <div className="container mx-auto px-4 py-16"><div className="max-w-xl mx-auto text-center">
+        <h1 className="text-4xl font-heading font-bold text-primary mb-2">RSVP Received</h1>
+        <p className="text-foreground/70 mb-8">{/^the\s/i.test(invitation.householdName) ? '' : 'The '}{invitation.householdName} Household</p>
+        <Card><CardContent className="py-8 space-y-3">
+          {r.attending === 'yes' ? (<>
+            <p className="font-medium">You&apos;re attending — we can&apos;t wait to celebrate with you!</p>
+            {names.length > 0
+              ? <p className="text-sm text-foreground/70">{names.join(', ')}</p>
+              : r.guestCount > 0 && <p className="text-sm text-foreground/70">{r.guestCount} {r.guestCount === 1 ? 'guest' : 'guests'}</p>}
+          </>) : (
+            <p className="font-medium">You&apos;ve let us know you can&apos;t make it. We&apos;ll miss you!</p>
+          )}
+          <p className="text-sm text-foreground/60 pt-2">RSVPs can no longer be changed online. Please contact us directly if you need to make a change.</p>
+        </CardContent></Card>
+      </div></div>
+    );
+  }
 
   const mealOption = rsvpOptions.find((o: any) => o.type === 'meal');
 

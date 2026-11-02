@@ -129,6 +129,9 @@ function buildRsvpRecapBody(args: {
   rsvpDeadline: string;
   magicLink: string;
   coupleNames: string;
+  // False when guest RSVP editing is turned off: the link to update would
+  // only lead to a locked page, so ask them to get in touch instead.
+  allowEdits?: boolean;
 }): string {
   const lines: string[] = [];
   // Strip a leading "The " from the household name so "The Johnson Family"
@@ -164,11 +167,15 @@ function buildRsvpRecapBody(args: {
   if (args.songRequests) lines.push(`Song requests: ${args.songRequests}`, '');
   if (args.message) lines.push(`Your message: ${args.message}`, '');
 
-  const deadlineCopy = args.rsvpDeadline
-    ? `before ${formatDeadline(args.rsvpDeadline)}`
-    : 'anytime';
-  lines.push(`Need to make a change ${deadlineCopy}? Update your RSVP here:`);
-  lines.push(args.magicLink);
+  if (args.allowEdits === false) {
+    lines.push('Need to make a change? Please get in touch with us directly.');
+  } else {
+    const deadlineCopy = args.rsvpDeadline
+      ? `before ${formatDeadline(args.rsvpDeadline)}`
+      : 'anytime';
+    lines.push(`Need to make a change ${deadlineCopy}? Update your RSVP here:`);
+    lines.push(args.magicLink);
+  }
   lines.push('');
   lines.push('Looking forward to it!');
   lines.push(args.coupleNames);
@@ -186,7 +193,7 @@ export async function sendRsvpConfirmation(
   // use it to translate stored guest IDs back to display names in the recap.
   invitation: Invitation & { guests?: { id: string; name: string }[] },
   response: RsvpResponse,
-  opts: { isUpdate: boolean },
+  opts: { isUpdate: boolean; allowEdits?: boolean },
 ): Promise<SendMailResult> {
   if (!invitation.contactEmail) return { ok: false, error: 'No contactEmail on invitation' };
 
@@ -216,6 +223,7 @@ export async function sendRsvpConfirmation(
     rsvpDeadline: site.rsvpDeadline,
     magicLink,
     coupleNames,
+    allowEdits: opts.allowEdits,
   });
 
   return sendMail({

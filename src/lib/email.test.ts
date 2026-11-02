@@ -289,6 +289,13 @@ describe('sendRsvpConfirmation', () => {
     expect(text).toContain('https://wedding.example.com/rsvp?code=ABC123');
   });
 
+  it('drops the update link when guest RSVP editing is off', async () => {
+    await sendRsvpConfirmation(baseInvitation as any, baseResponse as any, { isUpdate: false, allowEdits: false });
+    const text: string = sendMailMock.mock.calls[0][0].text;
+    expect(text).not.toContain('/rsvp?code=');
+    expect(text).toContain('Please get in touch with us directly.');
+  });
+
   it('resolves attending guest IDs to names via invitation.guests', async () => {
     await sendRsvpConfirmation(baseInvitation as any, baseResponse as any, { isUpdate: false });
     const text: string = sendMailMock.mock.calls[0][0].text;

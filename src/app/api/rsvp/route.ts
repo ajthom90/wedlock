@@ -54,6 +54,7 @@ export async function GET(request: Request) {
         rsvpPlusOnes: features.rsvpPlusOnes,
         rsvpAddress: features.rsvpAddress,
         rsvpCorrections: features.rsvpCorrections,
+        rsvpEditing: features.rsvpEditing,
         rsvpConfirmationEmails: features.rsvpConfirmationEmails,
         dayOfBroadcasts: features.dayOfBroadcasts,
       },
@@ -77,6 +78,12 @@ export async function POST(request: Request) {
     const invitation = await prisma.invitation.findUnique({ where: { code }, include: { guests: { select: { id: true } } } });
     if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
     const features = await getFeatures();
+    const existing = await prisma.rsvpResponse.findUnique({ where: { invitationId: invitation.id } });
+    // With editing off, a submitted RSVP is final for guests. Checked before
+    // any write so the address/email updates below don't sneak through.
+    if (existing && !features.rsvpEditing) {
+      return NextResponse.json({ error: 'Your RSVP has already been submitted and can no longer be changed. Please contact us directly if you need to make a change.' }, { status: 403 });
+    }
     // Validate the attendance fields against this invitation's limits BEFORE
     // writing anything, so a rejected submission leaves no partial state.
     const validation = validateRsvpSubmission(
@@ -118,7 +125,6 @@ export async function POST(request: Request) {
         data: { contactEmail: trimmed || null },
       });
     }
-    const existing = await prisma.rsvpResponse.findUnique({ where: { invitationId: invitation.id } });
     const cleanResponses = responses && typeof responses === 'object' && !Array.isArray(responses) ? responses : {};
     // High chairs / boosters on plus-ones are the couple's to set; keep the
     // stored ones rather than trusting the guest's resubmit. Allergies the
@@ -182,7 +188,7 @@ export async function POST(request: Request) {
         include: { guests: { orderBy: { order: 'asc' } } },
       });
       if (fresh?.contactEmail) {
-        sendRsvpConfirmation(fresh, response, { isUpdate: !!existing })
+        sendRsvpConfirmation(fresh, response, { isUpdate: !!existing, allowEdits: features.rsvpEditing })
           .catch((err) => console.error('RSVP confirmation send failed:', err));
       }
     }

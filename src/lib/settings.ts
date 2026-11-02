@@ -58,6 +58,9 @@ export interface FeatureSettings {
   rsvpPlusOnes: boolean;
   rsvpAddress: boolean;
   rsvpCorrections: boolean;
+  // Off locks an RSVP once it's submitted: guests can still respond for the
+  // first time, but can't change an existing response (admins still can).
+  rsvpEditing: boolean;
 
   // Public site modules
   weatherWidget: boolean;
@@ -149,6 +152,7 @@ const defaultFeatures: FeatureSettings = {
   rsvpPlusOnes: true,
   rsvpAddress: true,
   rsvpCorrections: true,
+  rsvpEditing: true,
 
   // Public modules — default ON so the new roadmap features are discoverable;
   // the couple can turn each off when they decide not to use it.

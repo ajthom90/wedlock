@@ -12,6 +12,7 @@ interface FeatureSettings {
   rsvpPlusOnes: boolean;
   rsvpAddress: boolean;
   rsvpCorrections: boolean;
+  rsvpEditing: boolean;
   weatherWidget: boolean;
   storyTimeline: boolean;
   transportation: boolean;
@@ -41,6 +42,7 @@ const DEFAULTS: FeatureSettings = {
   rsvpPlusOnes: true,
   rsvpAddress: true,
   rsvpCorrections: true,
+  rsvpEditing: true,
   weatherWidget: true,
   storyTimeline: true,
   transportation: true,
@@ -99,6 +101,8 @@ const RSVP_FIELDS: ToggleDescriptor[] = [
     description: 'Ask for a mailing address — useful for save-the-dates and thank-you cards.' },
   { key: 'rsvpCorrections', label: 'Corrections box',
     description: 'Show a "spot a typo?" textarea so guests can flag misspellings or wrong details. You manage submissions on the RSVP Corrections admin page.' },
+  { key: 'rsvpEditing', label: 'Guests can edit their RSVP',
+    description: 'Let guests change a response they already submitted. Turn off to lock RSVPs once submitted — guests who haven\u2019t responded yet can still RSVP, and you can still edit any response from the RSVPs admin page.' },
 ];
 
 const ADMIN_TOOLS: ToggleDescriptor[] = [
