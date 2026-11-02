@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.26.0",
+    "date": "2026-11-02",
+    "changes": [
+      { "type": "feature", "text": "Pictures for high chairs and boosters on name tents: on the Name Tents page, under \"High chair or booster mark, top right\", choose the Leaning Tower or the Colosseum for each in place of the letter H or B. The choice is saved for next time. The picture prints in black in the top-right corner of both halves of the card, and the space above the name grows to fit it on every card in the print run so names stay the same size. The Reception Sheet keeps the letters H and B." }
+    ]
+  },
+  {
     "version": "2.25.0",
     "date": "2026-11-02",
     "changes": [
