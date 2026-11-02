@@ -1,5 +1,5 @@
 import { findMealColor } from '@/lib/mealColors';
-import { findMealIcon, MEAL_ICON_VIEWBOX } from '@/lib/mealIcons';
+import { findMealIcon, iconViewBox } from '@/lib/mealIcons';
 
 // A meal's mark as it prints on name tents: its icon in its color (dark when
 // no color is set), or a dot in its color when it has no icon. Renders
@@ -9,7 +9,7 @@ export function MealCodeSwatch({ color, icon, size = 12 }: { color?: string; ico
   const i = findMealIcon(icon);
   if (i) {
     return (
-      <svg width={size} height={size} viewBox={`0 0 ${MEAL_ICON_VIEWBOX} ${MEAL_ICON_VIEWBOX}`} className="inline-block align-middle shrink-0" aria-hidden>
+      <svg width={size} height={size} viewBox={`0 0 ${iconViewBox(i)} ${iconViewBox(i)}`} className="inline-block align-middle shrink-0" aria-hidden>
         {i.paths.map((d, k) => <path key={k} d={d} fill={c?.hex ?? '#1f1f1f'} />)}
       </svg>
     );

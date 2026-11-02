@@ -4,7 +4,7 @@ import type { SeatedGuest } from './seatingExport';
 import { childSeatLabel } from './guestNeeds';
 import { computeLabelPositions, embedThemeFonts, type LabelFontBytes, type ResolvedFonts } from './mailingLabelsPdf';
 import { hexToRgb01, mealCodeFor, type MealCode } from './mealColors';
-import { findMealIcon, MEAL_ICON_VIEWBOX } from './mealIcons';
+import { findMealIcon, iconViewBox } from './mealIcons';
 import { tableLabel } from './tableNumbers';
 
 // Printable table name tents: one folded card per seated guest with their
@@ -16,7 +16,8 @@ import { tableLabel } from './tableNumbers';
 // small print: a ½" mark for the meal bottom right — its icon in its color
 // (a blue rooster), or a circle in its color when it has no icon — "A" bottom left
 // when the guest has an allergy or dietary restriction, and "H" (high chair)
-// or "B" (booster) top right.
+// or "B" (booster) top right — or an icon the couple picked for each, like a
+// Leaning Tower for a high chair.
 
 export interface TentContent {
   name: string;
@@ -29,6 +30,7 @@ export interface TentContent {
   mealIcon?: string;             // a MEAL_ICONS name or ''; set whenever mealColor is
   allergyMark?: boolean;
   childSeatMark?: 'H' | 'B' | '';
+  childSeatIcon?: string;        // a MEAL_ICONS name drawn in place of the letter
 }
 
 export interface TentOptions {
@@ -39,6 +41,10 @@ export interface TentOptions {
   showMealColor?: boolean;
   showAllergyMark?: boolean;
   showChildSeatMark?: boolean;
+  // Icons (MEAL_ICONS names) to print instead of the H / B letters; '' or
+  // missing keeps the letter.
+  highChairIcon?: string;
+  boosterIcon?: string;
 }
 
 /**
@@ -76,6 +82,8 @@ export function composeTentContent(
   if (opts.showAllergyMark) content.allergyMark = Boolean(ownDietary);
   if (opts.showChildSeatMark) {
     content.childSeatMark = guest.childSeat === 'high_chair' ? 'H' : guest.childSeat === 'booster' ? 'B' : '';
+    const icon = findMealIcon(content.childSeatMark === 'H' ? opts.highChairIcon : content.childSeatMark === 'B' ? opts.boosterIcon : '');
+    if (icon) content.childSeatIcon = icon.name;
   }
   return content;
 }
@@ -131,6 +139,9 @@ const CIRCLE_DIAMETER = 36;
 const MARK_SIZE = 20;
 const MARK_CAP = 0.72; // Helvetica-Bold cap height as a share of its size
 const MARK_GAP = 4;    // between a mark band and the text
+// A child-seat icon in the top band: smaller than the meal mark so the name
+// keeps room, but still about ⅖" — readable from standing height.
+const ICON_MARK_SIZE = 28;
 
 // When no theme font loads, the fallback Helvetica can only encode
 // Windows-1252 and throws on anything else, which would fail the whole PDF.
@@ -156,14 +167,19 @@ export type DrawOp =
   | { kind: 'text'; text: string; font: PDFFont; size: number; x: number; y: number }
   | { kind: 'circle'; x: number; y: number; radius: number; color: RGB }
   // An icon's SVG paths, drawn size points square centred on (x, y).
-  | { kind: 'icon'; x: number; y: number; size: number; paths: string[]; color: RGB };
+  | { kind: 'icon'; x: number; y: number; size: number; paths: string[]; viewBox: number; color: RGB };
 
-/** Which mark bands a print run keeps clear, decided once for every card so names line up across a table. */
-export interface MarkBands { top: boolean; bottom: boolean }
+/**
+ * Which mark bands a print run keeps clear, decided once for every card so
+ * names line up across a table. topIcon: some card has a child-seat icon,
+ * so the top band is icon-sized rather than letter-sized.
+ */
+export interface MarkBands { top: boolean; bottom: boolean; topIcon?: boolean }
 
 export function markBandsFor(tents: TentContent[]): MarkBands {
   return {
     top: tents.some((t) => t.childSeatMark !== undefined),
+    topIcon: tents.some((t) => t.childSeatIcon),
     bottom: tents.some((t) => t.mealColor !== undefined || t.mealIcon !== undefined || t.allergyMark !== undefined),
   };
 }
@@ -243,7 +259,7 @@ export function layoutTentPanel(
   const maxW = width - padX * 2;
   const markCapH = MARK_SIZE * MARK_CAP;
   const bottomY = padY + (bands.bottom ? CIRCLE_DIAMETER + MARK_GAP : 0);
-  const topY = height - padY - (bands.top ? markCapH + MARK_GAP : 0);
+  const topY = height - padY - (bands.top ? (bands.topIcon ? ICON_MARK_SIZE : markCapH) + MARK_GAP : 0);
   const detailsInBand = bands.bottom;
 
   // Shrink the name until the whole stack fits between the bands.
@@ -260,14 +276,18 @@ export function layoutTentPanel(
   const mealRgb = content.mealColor ? rgb(...hexToRgb01(content.mealColor)) : null;
   const icon = findMealIcon(content.mealIcon);
   if (icon) {
-    ops.push({ kind: 'icon', x: mealX, y: circleY, size: CIRCLE_DIAMETER, paths: icon.paths, color: mealRgb ?? INK });
+    ops.push({ kind: 'icon', x: mealX, y: circleY, size: CIRCLE_DIAMETER, paths: icon.paths, viewBox: iconViewBox(icon), color: mealRgb ?? INK });
   } else if (mealRgb) {
     ops.push({ kind: 'circle', x: mealX, y: circleY, radius: CIRCLE_DIAMETER / 2, color: mealRgb });
   }
   if (content.allergyMark) {
     ops.push({ kind: 'text', text: 'A', font: markFont, size: MARK_SIZE, x: padX, y: circleY - markCapH / 2 });
   }
-  if (content.childSeatMark) {
+  const seatIcon = findMealIcon(content.childSeatIcon);
+  if (content.childSeatMark && seatIcon) {
+    const s = ICON_MARK_SIZE;
+    ops.push({ kind: 'icon', x: width - padX - s / 2, y: height - padY - s / 2, size: s, paths: seatIcon.paths, viewBox: iconViewBox(seatIcon), color: INK });
+  } else if (content.childSeatMark) {
     const w = markFont.widthOfTextAtSize(content.childSeatMark, MARK_SIZE);
     ops.push({ kind: 'text', text: content.childSeatMark, font: markFont, size: MARK_SIZE, x: width - padX - w, y: height - padY - markCapH });
   }
@@ -295,7 +315,7 @@ function drawPanel(page: PDFPage, ops: DrawOp[], left: number, bottom: number, w
       // drawSvgPath puts the icon's top-left corner at its origin and rotates
       // about it, so the flipped copy starts from the opposite corner.
       const half = op.size / 2;
-      const scale = op.size / MEAL_ICON_VIEWBOX;
+      const scale = op.size / op.viewBox;
       for (const path of op.paths) {
         page.drawSvgPath(path, {
           x: flipped ? x + half : x - half,

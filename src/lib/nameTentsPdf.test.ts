@@ -103,6 +103,16 @@ describe('composeTentContent', () => {
     expect(off).not.toHaveProperty('childSeatMark');
   });
 
+  it('swaps H / B for the chosen icons, keeping the letter when none is chosen', () => {
+    const icons = { ...marksOn, highChairIcon: 'Leaning Tower', boosterIcon: 'Colosseum' };
+    expect(composeTentContent(guest({ childSeat: 'high_chair' }), icons, colors)).toMatchObject({ childSeatMark: 'H', childSeatIcon: 'Leaning Tower' });
+    expect(composeTentContent(guest({ childSeat: 'booster' }), icons, colors)).toMatchObject({ childSeatMark: 'B', childSeatIcon: 'Colosseum' });
+    expect(composeTentContent(guest({ childSeat: null }), icons, colors)).not.toHaveProperty('childSeatIcon');
+    expect(composeTentContent(guest({ childSeat: 'booster' }), { ...marksOn, highChairIcon: 'Leaning Tower', boosterIcon: '' }, colors))
+      .not.toHaveProperty('childSeatIcon');
+    expect(composeTentContent(guest({ childSeat: 'booster' }), { ...allOff, boosterIcon: 'Colosseum' }, colors)).not.toHaveProperty('childSeatIcon');
+  });
+
   it('only marks A for the guest’s own allergies', () => {
     expect(composeTentContent(guest({ dietary: '', householdDietary: 'Bob: shellfish' }), marksOn, colors).allergyMark).toBe(false);
   });
@@ -110,9 +120,13 @@ describe('composeTentContent', () => {
 
 describe('markBandsFor', () => {
   it('keeps bands for every card once a mark is on for the run', () => {
-    expect(markBandsFor([{ name: 'a', table: '', details: [] }])).toEqual({ top: false, bottom: false });
-    expect(markBandsFor([{ name: 'a', table: '', details: [], mealColor: '' }])).toEqual({ top: false, bottom: true });
-    expect(markBandsFor([{ name: 'a', table: '', details: [], childSeatMark: '' }])).toEqual({ top: true, bottom: false });
+    expect(markBandsFor([{ name: 'a', table: '', details: [] }])).toEqual({ top: false, bottom: false, topIcon: false });
+    expect(markBandsFor([{ name: 'a', table: '', details: [], mealColor: '' }])).toEqual({ top: false, bottom: true, topIcon: false });
+    expect(markBandsFor([{ name: 'a', table: '', details: [], childSeatMark: '' }])).toEqual({ top: true, bottom: false, topIcon: false });
+    expect(markBandsFor([
+      { name: 'a', table: '', details: [], childSeatMark: '' },
+      { name: 'b', table: '', details: [], childSeatMark: 'B', childSeatIcon: 'Colosseum' },
+    ])).toEqual({ top: true, bottom: false, topIcon: true });
   });
 });
 
@@ -173,6 +187,18 @@ describe('layoutTentPanel', () => {
     const plain = await layout({ name: 'Ann Smith', table: 'Table 1', details: [], mealColor: '', mealIcon: 'Star', allergyMark: false, childSeatMark: '' });
     const star = plain.find((o) => o.kind === 'icon')!;
     expect(star.kind === 'icon' && star.color).toEqual(rgb(0.12, 0.12, 0.12));
+  });
+
+  it('prints a chosen child-seat icon top right instead of the letter, with the name below it', async () => {
+    const ops = await layout({ name: 'Ann Smith', table: 'Table 1', details: [], childSeatMark: 'H', childSeatIcon: 'Leaning Tower' });
+    expect(texts(ops).some((o) => o.text === 'H')).toBe(false);
+    const icon = ops.find((o) => o.kind === 'icon')!;
+    if (icon.kind !== 'icon') throw new Error('no icon');
+    expect(icon.viewBox).toBe(24);
+    expect(icon.x + icon.size / 2).toBeCloseTo(W - PX);
+    expect(icon.y + icon.size / 2).toBeCloseTo(H - PY);
+    const name = texts(ops).find((o) => o.text === 'Ann Smith')!;
+    expect(name.y + name.size * 0.8).toBeLessThanOrEqual(icon.y - icon.size / 2);
   });
 
   it('prints no circle or letters for a guest with nothing to mark', async () => {

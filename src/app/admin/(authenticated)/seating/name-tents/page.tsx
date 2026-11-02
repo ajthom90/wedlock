@@ -15,6 +15,7 @@ import type { LabelFontBytes } from '@/lib/mailingLabelsPdf';
 import { parseRsvpChoices, type RsvpChoice } from '@/lib/rsvpChoices';
 import { buildMealCodeMap, mealCodeFor } from '@/lib/mealColors';
 import { MealCodeSwatch } from '@/components/admin/MealCodeSwatch';
+import { MEAL_ICONS } from '@/lib/mealIcons';
 
 interface Features { nameTents?: boolean; childSeats?: boolean; dietaryNotes?: boolean }
 
@@ -26,6 +27,9 @@ export default function NameTentsPage() {
   const [invitations, setInvitations] = useState<SeatingExportInvitation[]>([]);
   const [features, setFeatures] = useState<Features>({});
   const [mealChoices, setMealChoices] = useState<RsvpChoice[]>([]);
+  // Icons printed instead of H / B; saved as site settings so they stick.
+  const [seatIcons, setSeatIcons] = useState({ highChairIcon: '', boosterIcon: '' });
+  const [seatIconError, setSeatIconError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -48,8 +52,8 @@ export default function NameTentsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [t, i, f, o] = await Promise.all([
-          fetch('/api/tables'), fetch('/api/invitations'), fetch('/api/features'), fetch('/api/rsvp-options'),
+        const [t, i, f, o, s] = await Promise.all([
+          fetch('/api/tables'), fetch('/api/invitations'), fetch('/api/features'), fetch('/api/rsvp-options'), fetch('/api/settings'),
         ]);
         if (!t.ok || !i.ok) throw new Error('Failed to load seating');
         const tablesData = await t.json();
@@ -58,6 +62,10 @@ export default function NameTentsPage() {
         setFeatures(f.ok ? await f.json() : {});
         const rsvpOptions: { type: string; choices: string }[] = o.ok ? await o.json() : [];
         setMealChoices(rsvpOptions.filter((x) => x.type === 'meal').flatMap((x) => parseRsvpChoices(x.choices)));
+        if (s.ok) {
+          const { site } = await s.json();
+          setSeatIcons({ highChairIcon: site?.highChairIcon ?? '', boosterIcon: site?.boosterIcon ?? '' });
+        }
         setSelectedTables(new Set(tablesData.map((x: { name: string; number?: number | null }) => tableKey(x.name, x.number))));
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -75,7 +83,40 @@ export default function NameTentsPage() {
     showAllergies: options.showAllergies && allergiesOn,
     showChildSeatMark: options.showChildSeatMark && childSeatsOn,
     showAllergyMark: options.showAllergyMark && allergiesOn,
+    ...seatIcons,
   };
+
+  const saveSeatIcon = async (key: 'highChairIcon' | 'boosterIcon', value: string) => {
+    const previous = seatIcons;
+    setSeatIcons({ ...seatIcons, [key]: value });
+    setSeatIconError(null);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ site: { [key]: value } }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setSeatIcons(previous);
+      setSeatIconError('Couldn’t save that choice. Please try again.');
+    }
+  };
+
+  const seatIconSelect = (key: 'highChairIcon' | 'boosterIcon', label: string, letter: string) => (
+    <label className="flex items-center gap-2">
+      <span className="w-24">{label}</span>
+      <span className="inline-flex h-5 w-5 items-center justify-center font-bold text-gray-800" aria-hidden>
+        {seatIcons[key] ? <MealCodeSwatch icon={seatIcons[key]} size={20} /> : letter}
+      </span>
+      <select
+        className="px-2 py-1 border border-gray-300 rounded-md text-sm"
+        value={seatIcons[key]}
+        onChange={(e) => saveSeatIcon(key, e.target.value)}
+      >
+        <option value="">Letter {letter}</option>
+        {MEAL_ICONS.map((ic) => <option key={ic.name} value={ic.name}>{ic.name}</option>)}
+      </select>
+    </label>
+  );
   const mealCodes = useMemo(() => buildMealCodeMap(mealChoices), [mealChoices]);
   const coloredMeals = mealChoices.filter((c) => mealCodeFor(c.name, mealCodes));
 
@@ -273,7 +314,14 @@ export default function NameTentsPage() {
             </div>
           )}
           {allergiesOn && checkbox(options.showAllergyMark ?? false, (v) => setOptions({ ...options, showAllergyMark: v }), 'A for allergies, bottom left', 'When the guest has any allergy or dietary restriction of their own.')}
-          {childSeatsOn && checkbox(options.showChildSeatMark ?? false, (v) => setOptions({ ...options, showChildSeatMark: v }), 'H or B for a high chair or booster, top right')}
+          {childSeatsOn && checkbox(options.showChildSeatMark ?? false, (v) => setOptions({ ...options, showChildSeatMark: v }), 'High chair or booster mark, top right', 'The letter H or B, or a picture you choose for each — saved for next time.')}
+          {childSeatsOn && options.showChildSeatMark && (
+            <div className="ml-6 text-xs text-gray-600 space-y-1">
+              {seatIconSelect('highChairIcon', 'High chair', 'H')}
+              {seatIconSelect('boosterIcon', 'Booster', 'B')}
+              {seatIconError && <p className="text-red-600">{seatIconError}</p>}
+            </div>
+          )}
           {(effectiveOptions.showAllergies || effectiveOptions.showAllergyMark) && unsplitHouseholds > 0 && (
             <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
               {unsplitHouseholds} household{unsplitHouseholds === 1 ? ' still has' : 's still have'} one shared allergy
