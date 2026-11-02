@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MEAL_COLORS, buildMealCodeMap, buildMealColorMap, findMealColor, hexToRgb01, mealCodeFor, mealCodeLabel, mealColorFor } from './mealColors';
-import { MEAL_ICONS, SEAT_ICONS, findMealIcon, findSeatIcon } from './mealIcons';
+import { MEAL_ICONS, MARK_ICONS, findMealIcon, findMarkIcon } from './mealIcons';
 
 describe('MEAL_COLORS', () => {
   it('has unique names and valid hex values', () => {
@@ -85,9 +85,9 @@ describe('MEAL_ICONS', () => {
   });
 
   it('keeps the high chair / booster landmarks out of the meal icons', () => {
-    expect(SEAT_ICONS.map((i) => i.name)).toEqual(['Colosseum', 'Leaning Tower']);
-    expect(findSeatIcon('leaning tower')?.name).toBe('Leaning Tower');
+    expect(MARK_ICONS.map((i) => i.name)).toEqual(['Colosseum', 'Leaning Tower', 'Magic Wand']);
+    expect(findMarkIcon('leaning tower')?.name).toBe('Leaning Tower');
     expect(findMealIcon('Colosseum')).toBeNull();
-    expect(findSeatIcon('Rooster')).toBeNull();
+    expect(findMarkIcon('Rooster')).toBeNull();
   });
 });

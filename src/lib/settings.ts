@@ -44,10 +44,12 @@ export interface SiteSettings {
   // guests on any invitation, by name with a count. Shown on the Reception
   // Seating spreadsheet and added to its total. See lib/vendorMeals.ts.
   vendorMeals: VendorMeal[];
-  // Name tents' top-right mark for a high chair / booster: a SEAT_ICONS name
-  // (e.g. "Leaning Tower", "Colosseum"), or '' for the letter H / B.
+  // Name tents' marks for a high chair / booster (top right) and allergies
+  // (bottom left): a MARK_ICONS name (e.g. "Leaning Tower", "Colosseum",
+  // "Magic Wand"), or '' for the letter H / B / A.
   highChairIcon: string;
   boosterIcon: string;
+  allergyIcon: string;
 }
 
 export interface FeatureSettings {
@@ -149,6 +151,7 @@ const defaultSite: SiteSettings = {
   vendorMeals: [],
   highChairIcon: '',
   boosterIcon: '',
+  allergyIcon: '',
 };
 
 const defaultFeatures: FeatureSettings = {

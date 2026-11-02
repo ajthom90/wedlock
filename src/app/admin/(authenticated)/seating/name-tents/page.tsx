@@ -15,7 +15,7 @@ import type { LabelFontBytes } from '@/lib/mailingLabelsPdf';
 import { parseRsvpChoices, type RsvpChoice } from '@/lib/rsvpChoices';
 import { buildMealCodeMap, mealCodeFor } from '@/lib/mealColors';
 import { MealCodeSwatch } from '@/components/admin/MealCodeSwatch';
-import { SEAT_ICONS } from '@/lib/mealIcons';
+import { MARK_ICONS } from '@/lib/mealIcons';
 
 interface Features { nameTents?: boolean; childSeats?: boolean; dietaryNotes?: boolean }
 
@@ -27,8 +27,8 @@ export default function NameTentsPage() {
   const [invitations, setInvitations] = useState<SeatingExportInvitation[]>([]);
   const [features, setFeatures] = useState<Features>({});
   const [mealChoices, setMealChoices] = useState<RsvpChoice[]>([]);
-  // Icons printed instead of H / B; saved as site settings so they stick.
-  const [seatIcons, setSeatIcons] = useState({ highChairIcon: '', boosterIcon: '' });
+  // Icons printed instead of H / B / A; saved as site settings so they stick.
+  const [seatIcons, setSeatIcons] = useState({ highChairIcon: '', boosterIcon: '', allergyIcon: '' });
   const [seatIconError, setSeatIconError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +64,7 @@ export default function NameTentsPage() {
         setMealChoices(rsvpOptions.filter((x) => x.type === 'meal').flatMap((x) => parseRsvpChoices(x.choices)));
         if (s.ok) {
           const { site } = await s.json();
-          setSeatIcons({ highChairIcon: site?.highChairIcon ?? '', boosterIcon: site?.boosterIcon ?? '' });
+          setSeatIcons({ highChairIcon: site?.highChairIcon ?? '', boosterIcon: site?.boosterIcon ?? '', allergyIcon: site?.allergyIcon ?? '' });
         }
         setSelectedTables(new Set(tablesData.map((x: { name: string; number?: number | null }) => tableKey(x.name, x.number))));
       } catch (err) {
@@ -86,7 +86,7 @@ export default function NameTentsPage() {
     ...seatIcons,
   };
 
-  const saveSeatIcon = async (key: 'highChairIcon' | 'boosterIcon', value: string) => {
+  const saveSeatIcon = async (key: 'highChairIcon' | 'boosterIcon' | 'allergyIcon', value: string) => {
     const previous = seatIcons;
     setSeatIcons({ ...seatIcons, [key]: value });
     setSeatIconError(null);
@@ -101,7 +101,7 @@ export default function NameTentsPage() {
     }
   };
 
-  const seatIconSelect = (key: 'highChairIcon' | 'boosterIcon', label: string, letter: string) => (
+  const seatIconSelect = (key: 'highChairIcon' | 'boosterIcon' | 'allergyIcon', label: string, letter: string) => (
     <label className="flex items-center gap-2">
       <span className="w-24">{label}</span>
       <span className="inline-flex h-5 w-5 items-center justify-center font-bold text-gray-800" aria-hidden>
@@ -113,7 +113,7 @@ export default function NameTentsPage() {
         onChange={(e) => saveSeatIcon(key, e.target.value)}
       >
         <option value="">Letter {letter}</option>
-        {SEAT_ICONS.map((ic) => <option key={ic.name} value={ic.name}>{ic.name}</option>)}
+        {MARK_ICONS.map((ic) => <option key={ic.name} value={ic.name}>{ic.name}</option>)}
       </select>
     </label>
   );
@@ -313,7 +313,13 @@ export default function NameTentsPage() {
               )}
             </div>
           )}
-          {allergiesOn && checkbox(options.showAllergyMark ?? false, (v) => setOptions({ ...options, showAllergyMark: v }), 'A for allergies, bottom left', 'When the guest has any allergy or dietary restriction of their own.')}
+          {allergiesOn && checkbox(options.showAllergyMark ?? false, (v) => setOptions({ ...options, showAllergyMark: v }), 'Allergy mark, bottom left', 'When the guest has any allergy or dietary restriction of their own: the letter A, or a picture you choose — saved for next time.')}
+          {allergiesOn && options.showAllergyMark && (
+            <div className="ml-6 text-xs text-gray-600 space-y-1">
+              {seatIconSelect('allergyIcon', 'Allergies', 'A')}
+              {seatIconError && !(childSeatsOn && options.showChildSeatMark) && <p className="text-red-600">{seatIconError}</p>}
+            </div>
+          )}
           {childSeatsOn && checkbox(options.showChildSeatMark ?? false, (v) => setOptions({ ...options, showChildSeatMark: v }), 'High chair or booster mark, top right', 'The letter H or B, or a picture you choose for each — saved for next time.')}
           {childSeatsOn && options.showChildSeatMark && (
             <div className="ml-6 text-xs text-gray-600 space-y-1">

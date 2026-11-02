@@ -113,6 +113,13 @@ describe('composeTentContent', () => {
     expect(composeTentContent(guest({ childSeat: 'booster' }), { ...allOff, boosterIcon: 'Colosseum' }, colors)).not.toHaveProperty('childSeatIcon');
   });
 
+  it('swaps the A for the chosen allergy icon, only for guests with allergies', () => {
+    const wand = { ...marksOn, allergyIcon: 'Magic Wand' };
+    expect(composeTentContent(guest(), wand, colors)).toMatchObject({ allergyMark: true, allergyIcon: 'Magic Wand' });
+    expect(composeTentContent(guest({ dietary: '' }), wand, colors)).not.toHaveProperty('allergyIcon');
+    expect(composeTentContent(guest(), { ...allOff, allergyIcon: 'Magic Wand' }, colors)).not.toHaveProperty('allergyIcon');
+  });
+
   it('only marks A for the guest’s own allergies', () => {
     expect(composeTentContent(guest({ dietary: '', householdDietary: 'Bob: shellfish' }), marksOn, colors).allergyMark).toBe(false);
   });
@@ -199,6 +206,15 @@ describe('layoutTentPanel', () => {
     expect(icon.y + icon.size / 2).toBeCloseTo(H - PY);
     const name = texts(ops).find((o) => o.text === 'Ann Smith')!;
     expect(name.y + name.size * 0.8).toBeLessThanOrEqual(icon.y - icon.size / 2);
+  });
+
+  it('prints a chosen allergy icon bottom left instead of the A', async () => {
+    const ops = await layout({ name: 'Ann Smith', table: 'Table 1', details: [], allergyMark: true, allergyIcon: 'Magic Wand' });
+    expect(texts(ops).some((o) => o.text === 'A')).toBe(false);
+    const icon = ops.find((o) => o.kind === 'icon')!;
+    if (icon.kind !== 'icon') throw new Error('no icon');
+    expect(icon.x - icon.size / 2).toBeCloseTo(PX);
+    expect(icon.y - icon.size / 2).toBeCloseTo(PY);
   });
 
   it('prints no circle or letters for a guest with nothing to mark', async () => {

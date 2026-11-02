@@ -4,7 +4,7 @@ import type { SeatedGuest } from './seatingExport';
 import { childSeatLabel } from './guestNeeds';
 import { computeLabelPositions, embedThemeFonts, type LabelFontBytes, type ResolvedFonts } from './mailingLabelsPdf';
 import { hexToRgb01, mealCodeFor, type MealCode } from './mealColors';
-import { findMealIcon, findSeatIcon, iconViewBox } from './mealIcons';
+import { findMealIcon, findMarkIcon, iconViewBox } from './mealIcons';
 import { tableLabel } from './tableNumbers';
 
 // Printable table name tents: one folded card per seated guest with their
@@ -17,7 +17,7 @@ import { tableLabel } from './tableNumbers';
 // (a blue rooster), or a circle in its color when it has no icon — "A" bottom left
 // when the guest has an allergy or dietary restriction, and "H" (high chair)
 // or "B" (booster) top right — or an icon the couple picked for each, like a
-// Leaning Tower for a high chair.
+// Leaning Tower for a high chair or a magic wand for allergies.
 
 export interface TentContent {
   name: string;
@@ -29,8 +29,9 @@ export interface TentContent {
   mealColor?: string;            // '#RRGGBB' or ''
   mealIcon?: string;             // a MEAL_ICONS name or ''; set whenever mealColor is
   allergyMark?: boolean;
+  allergyIcon?: string;          // a MARK_ICONS name drawn in place of the A
   childSeatMark?: 'H' | 'B' | '';
-  childSeatIcon?: string;        // a SEAT_ICONS name drawn in place of the letter
+  childSeatIcon?: string;        // a MARK_ICONS name drawn in place of the letter
 }
 
 export interface TentOptions {
@@ -41,10 +42,11 @@ export interface TentOptions {
   showMealColor?: boolean;
   showAllergyMark?: boolean;
   showChildSeatMark?: boolean;
-  // Icons (SEAT_ICONS names) to print instead of the H / B letters; '' or
+  // Icons (MARK_ICONS names) to print instead of the H / B letters; '' or
   // missing keeps the letter.
   highChairIcon?: string;
   boosterIcon?: string;
+  allergyIcon?: string;
 }
 
 /**
@@ -79,10 +81,14 @@ export function composeTentContent(
     content.mealColor = code?.color?.hex ?? '';
     content.mealIcon = code?.icon?.name ?? '';
   }
-  if (opts.showAllergyMark) content.allergyMark = Boolean(ownDietary);
+  if (opts.showAllergyMark) {
+    content.allergyMark = Boolean(ownDietary);
+    const icon = content.allergyMark ? findMarkIcon(opts.allergyIcon) : null;
+    if (icon) content.allergyIcon = icon.name;
+  }
   if (opts.showChildSeatMark) {
     content.childSeatMark = guest.childSeat === 'high_chair' ? 'H' : guest.childSeat === 'booster' ? 'B' : '';
-    const icon = findSeatIcon(content.childSeatMark === 'H' ? opts.highChairIcon : content.childSeatMark === 'B' ? opts.boosterIcon : '');
+    const icon = findMarkIcon(content.childSeatMark === 'H' ? opts.highChairIcon : content.childSeatMark === 'B' ? opts.boosterIcon : '');
     if (icon) content.childSeatIcon = icon.name;
   }
   return content;
@@ -280,10 +286,14 @@ export function layoutTentPanel(
   } else if (mealRgb) {
     ops.push({ kind: 'circle', x: mealX, y: circleY, radius: CIRCLE_DIAMETER / 2, color: mealRgb });
   }
-  if (content.allergyMark) {
+  const allergyIcon = findMarkIcon(content.allergyIcon);
+  if (content.allergyMark && allergyIcon) {
+    const s = CIRCLE_DIAMETER;
+    ops.push({ kind: 'icon', x: padX + s / 2, y: circleY, size: s, paths: allergyIcon.paths, viewBox: iconViewBox(allergyIcon), color: INK });
+  } else if (content.allergyMark) {
     ops.push({ kind: 'text', text: 'A', font: markFont, size: MARK_SIZE, x: padX, y: circleY - markCapH / 2 });
   }
-  const seatIcon = findSeatIcon(content.childSeatIcon);
+  const seatIcon = findMarkIcon(content.childSeatIcon);
   if (content.childSeatMark && seatIcon) {
     const s = ICON_MARK_SIZE;
     ops.push({ kind: 'icon', x: width - padX - s / 2, y: height - padY - s / 2, size: s, paths: seatIcon.paths, viewBox: iconViewBox(seatIcon), color: INK });
