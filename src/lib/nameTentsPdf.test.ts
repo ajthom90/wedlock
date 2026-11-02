@@ -120,6 +120,13 @@ describe('composeTentContent', () => {
     expect(composeTentContent(guest(), { ...allOff, allergyIcon: 'Magic Wand' }, colors)).not.toHaveProperty('allergyIcon');
   });
 
+  it('colors the marks with the chosen mark colors, including Blaze Orange', () => {
+    const opts = { ...marksOn, allergyIcon: 'Magic Wand', allergyColor: 'Blaze Orange', highChairColor: 'Blue', boosterColor: '' };
+    expect(composeTentContent(guest({ childSeat: 'high_chair' }), opts, colors)).toMatchObject({ allergyColor: '#FF6700', childSeatColor: '#1F5FD1' });
+    expect(composeTentContent(guest({ dietary: '', childSeat: 'booster' }), opts, colors)).not.toHaveProperty('allergyColor');
+    expect(composeTentContent(guest({ dietary: '', childSeat: 'booster' }), opts, colors)).not.toHaveProperty('childSeatColor');
+  });
+
   it('only marks A for the guest’s own allergies', () => {
     expect(composeTentContent(guest({ dietary: '', householdDietary: 'Bob: shellfish' }), marksOn, colors).allergyMark).toBe(false);
   });
@@ -215,6 +222,16 @@ describe('layoutTentPanel', () => {
     if (icon.kind !== 'icon') throw new Error('no icon');
     expect(icon.x - icon.size / 2).toBeCloseTo(PX);
     expect(icon.y - icon.size / 2).toBeCloseTo(PY);
+  });
+
+  it('draws the marks in their colors, letters too, and black by default', async () => {
+    const ops = await layout({ name: 'Ann Smith', table: 'Table 1', details: [], allergyMark: true, allergyIcon: 'Magic Wand', allergyColor: '#FF6700', childSeatMark: 'H', childSeatColor: '#1F5FD1' });
+    const wand = ops.find((o) => o.kind === 'icon')!;
+    expect(wand.kind === 'icon' && wand.color).toEqual(rgb(1, 0x67 / 255, 0));
+    const h = texts(ops).find((o) => o.text === 'H')!;
+    expect(h.color).toEqual(rgb(0x1f / 255, 0x5f / 255, 0xd1 / 255));
+    const plain = await layout({ name: 'Ann Smith', table: 'Table 1', details: [], allergyMark: true });
+    expect(texts(plain).find((o) => o.text === 'A')!.color).toEqual(rgb(0.12, 0.12, 0.12));
   });
 
   it('prints no circle or letters for a guest with nothing to mark', async () => {

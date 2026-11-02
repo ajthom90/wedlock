@@ -46,10 +46,14 @@ export interface SiteSettings {
   vendorMeals: VendorMeal[];
   // Name tents' marks for a high chair / booster (top right) and allergies
   // (bottom left): a MARK_ICONS name (e.g. "Leaning Tower", "Colosseum",
-  // "Magic Wand"), or '' for the letter H / B / A.
+  // "Magic Wand"), or '' for the letter H / B / A. Each mark's color is a
+  // MARK_COLORS name, or '' for black.
   highChairIcon: string;
   boosterIcon: string;
   allergyIcon: string;
+  highChairColor: string;
+  boosterColor: string;
+  allergyColor: string;
 }
 
 export interface FeatureSettings {
@@ -152,6 +156,9 @@ const defaultSite: SiteSettings = {
   highChairIcon: '',
   boosterIcon: '',
   allergyIcon: '',
+  highChairColor: '',
+  boosterColor: '',
+  allergyColor: '',
 };
 
 const defaultFeatures: FeatureSettings = {

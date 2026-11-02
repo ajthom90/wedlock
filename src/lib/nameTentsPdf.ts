@@ -3,7 +3,7 @@ import type { TentCardFormat } from './tentCardFormats';
 import type { SeatedGuest } from './seatingExport';
 import { childSeatLabel } from './guestNeeds';
 import { computeLabelPositions, embedThemeFonts, type LabelFontBytes, type ResolvedFonts } from './mailingLabelsPdf';
-import { hexToRgb01, mealCodeFor, type MealCode } from './mealColors';
+import { findMarkColor, hexToRgb01, mealCodeFor, type MealCode } from './mealColors';
 import { findMealIcon, findMarkIcon, iconViewBox } from './mealIcons';
 import { tableLabel } from './tableNumbers';
 
@@ -30,8 +30,10 @@ export interface TentContent {
   mealIcon?: string;             // a MEAL_ICONS name or ''; set whenever mealColor is
   allergyMark?: boolean;
   allergyIcon?: string;          // a MARK_ICONS name drawn in place of the A
+  allergyColor?: string;         // '#RRGGBB' for the A or its icon; black when missing
   childSeatMark?: 'H' | 'B' | '';
   childSeatIcon?: string;        // a MARK_ICONS name drawn in place of the letter
+  childSeatColor?: string;       // '#RRGGBB' for the letter or its icon; black when missing
 }
 
 export interface TentOptions {
@@ -42,11 +44,15 @@ export interface TentOptions {
   showMealColor?: boolean;
   showAllergyMark?: boolean;
   showChildSeatMark?: boolean;
-  // Icons (MARK_ICONS names) to print instead of the H / B letters; '' or
-  // missing keeps the letter.
+  // Icons (MARK_ICONS names) to print instead of the H / B / A letters; ''
+  // or missing keeps the letter. Colors (MARK_COLORS names) apply to the
+  // letter or icon; '' or missing is black.
   highChairIcon?: string;
   boosterIcon?: string;
   allergyIcon?: string;
+  highChairColor?: string;
+  boosterColor?: string;
+  allergyColor?: string;
 }
 
 /**
@@ -85,11 +91,17 @@ export function composeTentContent(
     content.allergyMark = Boolean(ownDietary);
     const icon = content.allergyMark ? findMarkIcon(opts.allergyIcon) : null;
     if (icon) content.allergyIcon = icon.name;
+    const color = content.allergyMark ? findMarkColor(opts.allergyColor) : null;
+    if (color) content.allergyColor = color.hex;
   }
   if (opts.showChildSeatMark) {
     content.childSeatMark = guest.childSeat === 'high_chair' ? 'H' : guest.childSeat === 'booster' ? 'B' : '';
-    const icon = findMarkIcon(content.childSeatMark === 'H' ? opts.highChairIcon : content.childSeatMark === 'B' ? opts.boosterIcon : '');
+    const isH = content.childSeatMark === 'H';
+    const isB = content.childSeatMark === 'B';
+    const icon = findMarkIcon(isH ? opts.highChairIcon : isB ? opts.boosterIcon : '');
     if (icon) content.childSeatIcon = icon.name;
+    const color = findMarkColor(isH ? opts.highChairColor : isB ? opts.boosterColor : '');
+    if (color) content.childSeatColor = color.hex;
   }
   return content;
 }
@@ -170,7 +182,7 @@ function encodable(font: PDFFont, text: string): string {
 }
 
 export type DrawOp =
-  | { kind: 'text'; text: string; font: PDFFont; size: number; x: number; y: number }
+  | { kind: 'text'; text: string; font: PDFFont; size: number; x: number; y: number; color?: RGB }
   | { kind: 'circle'; x: number; y: number; radius: number; color: RGB }
   // An icon's SVG paths, drawn size points square centred on (x, y).
   | { kind: 'icon'; x: number; y: number; size: number; paths: string[]; viewBox: number; color: RGB };
@@ -286,20 +298,23 @@ export function layoutTentPanel(
   } else if (mealRgb) {
     ops.push({ kind: 'circle', x: mealX, y: circleY, radius: CIRCLE_DIAMETER / 2, color: mealRgb });
   }
+  const markRgb = (hex?: string) => (hex ? rgb(...hexToRgb01(hex)) : INK);
   const allergyIcon = findMarkIcon(content.allergyIcon);
+  const allergyRgb = markRgb(content.allergyColor);
   if (content.allergyMark && allergyIcon) {
     const s = CIRCLE_DIAMETER;
-    ops.push({ kind: 'icon', x: padX + s / 2, y: circleY, size: s, paths: allergyIcon.paths, viewBox: iconViewBox(allergyIcon), color: INK });
+    ops.push({ kind: 'icon', x: padX + s / 2, y: circleY, size: s, paths: allergyIcon.paths, viewBox: iconViewBox(allergyIcon), color: allergyRgb });
   } else if (content.allergyMark) {
-    ops.push({ kind: 'text', text: 'A', font: markFont, size: MARK_SIZE, x: padX, y: circleY - markCapH / 2 });
+    ops.push({ kind: 'text', text: 'A', font: markFont, size: MARK_SIZE, x: padX, y: circleY - markCapH / 2, color: allergyRgb });
   }
   const seatIcon = findMarkIcon(content.childSeatIcon);
+  const seatRgb = markRgb(content.childSeatColor);
   if (content.childSeatMark && seatIcon) {
     const s = ICON_MARK_SIZE;
-    ops.push({ kind: 'icon', x: width - padX - s / 2, y: height - padY - s / 2, size: s, paths: seatIcon.paths, viewBox: iconViewBox(seatIcon), color: INK });
+    ops.push({ kind: 'icon', x: width - padX - s / 2, y: height - padY - s / 2, size: s, paths: seatIcon.paths, viewBox: iconViewBox(seatIcon), color: seatRgb });
   } else if (content.childSeatMark) {
     const w = markFont.widthOfTextAtSize(content.childSeatMark, MARK_SIZE);
-    ops.push({ kind: 'text', text: content.childSeatMark, font: markFont, size: MARK_SIZE, x: width - padX - w, y: height - padY - markCapH });
+    ops.push({ kind: 'text', text: content.childSeatMark, font: markFont, size: MARK_SIZE, x: width - padX - w, y: height - padY - markCapH, color: seatRgb });
   }
 
   if (detailsInBand && content.details.length) {
@@ -336,7 +351,7 @@ function drawPanel(page: PDFPage, ops: DrawOp[], left: number, bottom: number, w
         });
       }
     } else {
-      page.drawText(op.text, { x, y, size: op.size, font: op.font, color: INK, rotate: flipped ? degrees(180) : undefined });
+      page.drawText(op.text, { x, y, size: op.size, font: op.font, color: op.color ?? INK, rotate: flipped ? degrees(180) : undefined });
     }
   }
 }

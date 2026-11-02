@@ -16,8 +16,11 @@ import { parseRsvpChoices, type RsvpChoice } from '@/lib/rsvpChoices';
 import { buildMealCodeMap, mealCodeFor } from '@/lib/mealColors';
 import { MealCodeSwatch } from '@/components/admin/MealCodeSwatch';
 import { MARK_ICONS } from '@/lib/mealIcons';
+import { MARK_COLORS, findMarkColor } from '@/lib/mealColors';
 
 interface Features { nameTents?: boolean; childSeats?: boolean; dietaryNotes?: boolean }
+
+type MarkKey = 'highChairIcon' | 'boosterIcon' | 'allergyIcon' | 'highChairColor' | 'boosterColor' | 'allergyColor';
 
 // Tables are picked by name + number, so two tables sharing a name stay apart.
 const tableKey = (name: string, number?: number | null) => `${number ?? ''}|${name}`;
@@ -27,8 +30,10 @@ export default function NameTentsPage() {
   const [invitations, setInvitations] = useState<SeatingExportInvitation[]>([]);
   const [features, setFeatures] = useState<Features>({});
   const [mealChoices, setMealChoices] = useState<RsvpChoice[]>([]);
-  // Icons printed instead of H / B / A; saved as site settings so they stick.
-  const [seatIcons, setSeatIcons] = useState({ highChairIcon: '', boosterIcon: '', allergyIcon: '' });
+  // Icons and colors for the H / B / A marks; saved as site settings so they stick.
+  const [seatIcons, setSeatIcons] = useState<Record<MarkKey, string>>({
+    highChairIcon: '', boosterIcon: '', allergyIcon: '', highChairColor: '', boosterColor: '', allergyColor: '',
+  });
   const [seatIconError, setSeatIconError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +69,9 @@ export default function NameTentsPage() {
         setMealChoices(rsvpOptions.filter((x) => x.type === 'meal').flatMap((x) => parseRsvpChoices(x.choices)));
         if (s.ok) {
           const { site } = await s.json();
-          setSeatIcons({ highChairIcon: site?.highChairIcon ?? '', boosterIcon: site?.boosterIcon ?? '', allergyIcon: site?.allergyIcon ?? '' });
+          setSeatIcons((prev) => Object.fromEntries(
+            (Object.keys(prev) as MarkKey[]).map((k) => [k, typeof site?.[k] === 'string' ? site[k] : '']),
+          ) as Record<MarkKey, string>);
         }
         setSelectedTables(new Set(tablesData.map((x: { name: string; number?: number | null }) => tableKey(x.name, x.number))));
       } catch (err) {
@@ -86,7 +93,7 @@ export default function NameTentsPage() {
     ...seatIcons,
   };
 
-  const saveSeatIcon = async (key: 'highChairIcon' | 'boosterIcon' | 'allergyIcon', value: string) => {
+  const saveSeatIcon = async (key: MarkKey, value: string) => {
     const previous = seatIcons;
     setSeatIcons({ ...seatIcons, [key]: value });
     setSeatIconError(null);
@@ -101,22 +108,37 @@ export default function NameTentsPage() {
     }
   };
 
-  const seatIconSelect = (key: 'highChairIcon' | 'boosterIcon' | 'allergyIcon', label: string, letter: string) => (
-    <label className="flex items-center gap-2">
-      <span className="w-24">{label}</span>
-      <span className="inline-flex h-5 w-5 items-center justify-center font-bold text-gray-800" aria-hidden>
-        {seatIcons[key] ? <MealCodeSwatch icon={seatIcons[key]} size={20} /> : letter}
-      </span>
-      <select
-        className="px-2 py-1 border border-gray-300 rounded-md text-sm"
-        value={seatIcons[key]}
-        onChange={(e) => saveSeatIcon(key, e.target.value)}
-      >
-        <option value="">Letter {letter}</option>
-        {MARK_ICONS.map((ic) => <option key={ic.name} value={ic.name}>{ic.name}</option>)}
-      </select>
-    </label>
-  );
+  const seatIconSelect = (mark: 'highChair' | 'booster' | 'allergy', label: string, letter: string) => {
+    const iconKey = `${mark}Icon` as MarkKey;
+    const colorKey = `${mark}Color` as MarkKey;
+    const color = seatIcons[colorKey];
+    return (
+      <div className="flex items-center gap-2">
+        <span className="w-24">{label}</span>
+        <span className="inline-flex h-5 w-5 items-center justify-center font-bold" style={{ color: findMarkColor(color)?.hex ?? '#1f1f1f' }} aria-hidden>
+          {seatIcons[iconKey] ? <MealCodeSwatch icon={seatIcons[iconKey]} color={color || 'Black'} size={20} /> : letter}
+        </span>
+        <select
+          className="px-2 py-1 border border-gray-300 rounded-md text-sm"
+          value={seatIcons[iconKey]}
+          aria-label={`${label} mark`}
+          onChange={(e) => saveSeatIcon(iconKey, e.target.value)}
+        >
+          <option value="">Letter {letter}</option>
+          {MARK_ICONS.map((ic) => <option key={ic.name} value={ic.name}>{ic.name}</option>)}
+        </select>
+        <select
+          className="px-2 py-1 border border-gray-300 rounded-md text-sm"
+          value={color}
+          aria-label={`${label} mark color`}
+          onChange={(e) => saveSeatIcon(colorKey, e.target.value)}
+        >
+          <option value="">Black</option>
+          {MARK_COLORS.filter((c) => c.name !== 'Black').map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+        </select>
+      </div>
+    );
+  };
   const mealCodes = useMemo(() => buildMealCodeMap(mealChoices), [mealChoices]);
   const coloredMeals = mealChoices.filter((c) => mealCodeFor(c.name, mealCodes));
 
@@ -313,18 +335,18 @@ export default function NameTentsPage() {
               )}
             </div>
           )}
-          {allergiesOn && checkbox(options.showAllergyMark ?? false, (v) => setOptions({ ...options, showAllergyMark: v }), 'Allergy mark, bottom left', 'When the guest has any allergy or dietary restriction of their own: the letter A, or a picture you choose — saved for next time.')}
+          {allergiesOn && checkbox(options.showAllergyMark ?? false, (v) => setOptions({ ...options, showAllergyMark: v }), 'Allergy mark, bottom left', 'When the guest has any allergy or dietary restriction of their own: the letter A or a picture, in the color you choose — saved for next time.')}
           {allergiesOn && options.showAllergyMark && (
             <div className="ml-6 text-xs text-gray-600 space-y-1">
-              {seatIconSelect('allergyIcon', 'Allergies', 'A')}
+              {seatIconSelect('allergy', 'Allergies', 'A')}
               {seatIconError && !(childSeatsOn && options.showChildSeatMark) && <p className="text-red-600">{seatIconError}</p>}
             </div>
           )}
-          {childSeatsOn && checkbox(options.showChildSeatMark ?? false, (v) => setOptions({ ...options, showChildSeatMark: v }), 'High chair or booster mark, top right', 'The letter H or B, or a picture you choose for each — saved for next time.')}
+          {childSeatsOn && checkbox(options.showChildSeatMark ?? false, (v) => setOptions({ ...options, showChildSeatMark: v }), 'High chair or booster mark, top right', 'The letter H or B or a picture for each, in the color you choose — saved for next time.')}
           {childSeatsOn && options.showChildSeatMark && (
             <div className="ml-6 text-xs text-gray-600 space-y-1">
-              {seatIconSelect('highChairIcon', 'High chair', 'H')}
-              {seatIconSelect('boosterIcon', 'Booster', 'B')}
+              {seatIconSelect('highChair', 'High chair', 'H')}
+              {seatIconSelect('booster', 'Booster', 'B')}
               {seatIconError && <p className="text-red-600">{seatIconError}</p>}
             </div>
           )}

@@ -27,6 +27,20 @@ export const MEAL_COLORS: MealColor[] = [
   { name: 'Black', hex: '#111111' },
 ];
 
+// Colors for the name tents' corner marks (allergy, high chair, booster):
+// the meal palette plus Blaze Orange, the hunter-safety orange. It's kept
+// out of the meal palette because it's too close to Orange to tell apart on
+// a meal circle, but a mark is a different shape, so it can't be mistaken.
+export const MARK_COLORS: MealColor[] = [...MEAL_COLORS, { name: 'Blaze Orange', hex: '#FF6700' }];
+
+/** The mark-color entry for a stored color name, case-insensitive; null if unknown. */
+export function findMarkColor(name: unknown): MealColor | null {
+  if (typeof name !== 'string') return null;
+  const key = name.trim().toLowerCase();
+  if (!key) return null;
+  return MARK_COLORS.find((c) => c.name.toLowerCase() === key) ?? null;
+}
+
 /** The palette entry for a stored color name, case-insensitive; null if unknown. */
 export function findMealColor(name: unknown): MealColor | null {
   if (typeof name !== 'string') return null;

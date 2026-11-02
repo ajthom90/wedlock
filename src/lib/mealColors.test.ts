@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MEAL_COLORS, buildMealCodeMap, buildMealColorMap, findMealColor, hexToRgb01, mealCodeFor, mealCodeLabel, mealColorFor } from './mealColors';
+import { MARK_COLORS, MEAL_COLORS, buildMealCodeMap, findMarkColor, buildMealColorMap, findMealColor, hexToRgb01, mealCodeFor, mealCodeLabel, mealColorFor } from './mealColors';
 import { MEAL_ICONS, MARK_ICONS, findMealIcon, findMarkIcon } from './mealIcons';
 
 describe('MEAL_COLORS', () => {
@@ -89,5 +89,14 @@ describe('MEAL_ICONS', () => {
     expect(findMarkIcon('leaning tower')?.name).toBe('Leaning Tower');
     expect(findMealIcon('Colosseum')).toBeNull();
     expect(findMarkIcon('Rooster')).toBeNull();
+  });
+});
+
+describe('MARK_COLORS', () => {
+  it('is the meal palette plus Blaze Orange, which meals can’t use', () => {
+    expect(MARK_COLORS.slice(0, MEAL_COLORS.length)).toEqual(MEAL_COLORS);
+    expect(findMarkColor('blaze orange')).toEqual({ name: 'Blaze Orange', hex: '#FF6700' });
+    expect(findMarkColor('Blue')?.hex).toBe('#1F5FD1');
+    expect(findMealColor('Blaze Orange')).toBeNull();
   });
 });
