@@ -10,12 +10,18 @@
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import { GOOGLE_FONTS } from './googleFonts';
 
-export const GOOGLE_FONT_MAP: Record<string, string> = {
-  'Playfair Display': 'Playfair+Display', 'Cormorant Garamond': 'Cormorant+Garamond',
-  'Great Vibes': 'Great+Vibes', Lato: 'Lato', 'Open Sans': 'Open+Sans',
-  Roboto: 'Roboto', Merriweather: 'Merriweather', Montserrat: 'Montserrat',
-};
+// Families whose Google file fontkit can't embed, mapped to a near-identical
+// family it can: Google's Cormorant Garamond prints with letters missing (it
+// can't be saved whole, and fontkit's subset garbles it); its parent design
+// Cormorant embeds cleanly.
+const PDF_SUBSTITUTES: Record<string, string> = { 'Cormorant Garamond': 'Cormorant' };
+
+// Every Google font the Theme page offers, by the css2 URL name used for PDFs.
+export const GOOGLE_FONT_MAP: Record<string, string> = Object.fromEntries(
+  GOOGLE_FONTS.map((f) => [f, (PDF_SUBSTITUTES[f] ?? f).replace(/ /g, '+')]),
+);
 
 export type FontWeight = 400 | 700;
 
@@ -68,7 +74,13 @@ async function loadGoogleFont(fontName: string, weight: FontWeight): Promise<Uin
 export async function loadPdfFont(family: string, weight: FontWeight, customFonts: CustomFontRef[]): Promise<Uint8Array> {
   const custom = customFonts.find((f) => f.family === family);
   if (custom) return loadCustomFont(custom.filename);
-  if (family in GOOGLE_FONT_MAP) return loadGoogleFont(family, weight);
+  if (family in GOOGLE_FONT_MAP) {
+    // Some families (Great Vibes, say) come in one weight only; use it for bold too.
+    try { return await loadGoogleFont(family, weight); } catch (err) {
+      if (weight === 400) throw err;
+      return loadGoogleFont(family, 400);
+    }
+  }
   console.warn(`Font "${family}" not found, falling back to Lato`);
   return loadGoogleFont('Lato', weight);
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { GOOGLE_FONTS } from '@/lib/googleFonts';
 
 interface ThemeSettings {
   primaryColor: string;
@@ -21,23 +22,6 @@ interface CustomFont {
   family: string;
 }
 
-const GOOGLE_FONTS = [
-  'Playfair Display',
-  'Lato',
-  'Montserrat',
-  'Open Sans',
-  'Roboto',
-  'Cormorant Garamond',
-  'Great Vibes',
-  'Dancing Script',
-  'Raleway',
-  'Merriweather',
-  'Oswald',
-  'Poppins',
-  'Libre Baskerville',
-  'Josefin Sans',
-  'Crimson Text',
-];
 
 function rgbToHex(rgbStr: string): string {
   const parts = rgbStr.trim().split(/\s+/).map(Number);

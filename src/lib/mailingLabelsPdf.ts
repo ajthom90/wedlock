@@ -81,6 +81,27 @@ export interface ResolvedFonts {
   bodyBold: PDFFont;
 }
 
+/**
+ * Embeds a font file, whole when fontkit can write it and as a subset (just
+ * the characters used) when it can't. fontkit fails to save some Google
+ * fonts whole (Dancing Script, Josefin Sans), but its subsetting garbles
+ * others (Great Vibes), so a trial save in a scratch document picks the mode.
+ * Throws when the bytes aren't a font at all, like embedFont.
+ */
+export async function embedFontFile(doc: PDFDocument, bytes: ArrayBuffer | Uint8Array): Promise<PDFFont> {
+  doc.registerFontkit(fontkit);
+  try {
+    const trial = await PDFDocument.create();
+    trial.registerFontkit(fontkit);
+    const font = await trial.embedFont(bytes);
+    trial.addPage().drawText('Aa', { font, size: 10 });
+    await trial.save();
+  } catch {
+    return doc.embedFont(bytes, { subset: true });
+  }
+  return doc.embedFont(bytes);
+}
+
 // Embeds theme fonts with graceful fallbacks: body → Helvetica, heading →
 // body, bodyBold → the body font itself when a theme body loaded (a custom
 // family usually has no separate bold file) or Helvetica-Bold otherwise.
@@ -93,15 +114,15 @@ export async function embedThemeFonts(doc: PDFDocument, fontBytes?: LabelFontByt
   let body = helvetica;
   let usedThemeBody = false;
   if (fontBytes?.body) {
-    try { body = await doc.embedFont(fontBytes.body); usedThemeBody = true; } catch { body = helvetica; }
+    try { body = await embedFontFile(doc, fontBytes.body); usedThemeBody = true; } catch { body = helvetica; }
   }
   let heading = body;
   if (fontBytes?.heading) {
-    try { heading = await doc.embedFont(fontBytes.heading); } catch { heading = body; }
+    try { heading = await embedFontFile(doc, fontBytes.heading); } catch { heading = body; }
   }
   let bodyBold: PDFFont | null = null;
   if (fontBytes?.bodyBold) {
-    try { bodyBold = await doc.embedFont(fontBytes.bodyBold); } catch { bodyBold = null; }
+    try { bodyBold = await embedFontFile(doc, fontBytes.bodyBold); } catch { bodyBold = null; }
   }
   if (!bodyBold) bodyBold = usedThemeBody ? body : await doc.embedFont(StandardFonts.HelveticaBold);
   return { heading, body, bodyBold };

@@ -152,7 +152,7 @@ describe('layoutTentPanel', () => {
     const doc = await PDFDocument.create();
     const font = await doc.embedFont(StandardFonts.Helvetica);
     const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-    const fonts = { heading: font, body: font, bodyBold: bold };
+    const fonts = { name: font, table: font, details: font };
     return layoutTentPanel(content, fonts, bold, markBandsFor([content]), W, H, PX, PY);
   }
 
@@ -314,6 +314,16 @@ describe('renderNameTentsPdf', () => {
       ...allOff, showTable: true, showMealColor: true, showAllergyMark: true, showChildSeatMark: true,
     }, colors));
     const bytes = await renderNameTentsPdf({ format: format3328, startPosition: 1, tents: marked, bothSides: true, outline: false });
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+  });
+
+  it('falls back to the default fonts when a chosen font file is unreadable', async () => {
+    const tents = [composeTentContent(guest({ childSeat: 'booster' }), { ...allOff, showTable: true, showChildSeatMark: true })];
+    const junk = new Uint8Array([1, 2, 3, 4]);
+    const bytes = await renderNameTentsPdf({
+      format: format3328, startPosition: 1, tents, bothSides: true, outline: false,
+      tentFonts: { name: junk, table: junk, details: junk, marks: junk },
+    });
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
   });
 

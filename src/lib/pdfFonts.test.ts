@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { loadPdfFont, _resetPdfFontCacheForTests } from './pdfFonts';
+import { GOOGLE_FONT_MAP, loadPdfFont, _resetPdfFontCacheForTests } from './pdfFonts';
+import { GOOGLE_FONTS } from './googleFonts';
 
 const FAKE_TTF = new Uint8Array([0x00, 0x01, 0x00, 0x00, 0x99]);
 
@@ -54,6 +55,25 @@ describe('loadPdfFont', () => {
     const bytes = await loadPdfFont('Definitely Not A Font', 400, []);
     expect(new Uint8Array(bytes)).toEqual(FAKE_TTF);
     expect(String(fetchMock.mock.calls[0][0])).toContain('family=Lato');
+    vi.unstubAllGlobals();
+  });
+
+  it('can load every Google font the Theme page offers', () => {
+    expect(Object.keys(GOOGLE_FONT_MAP)).toEqual(GOOGLE_FONTS);
+    expect(GOOGLE_FONT_MAP['Dancing Script']).toBe('Dancing+Script');
+    // fontkit can't embed Google's Cormorant Garamond; Cormorant stands in.
+    expect(GOOGLE_FONT_MAP['Cormorant Garamond']).toBe('Cormorant');
+  });
+
+  it('uses the regular weight for bold when a family has no bold', async () => {
+    const inner = mockGoogleFetch();
+    const fetchMock = vi.fn(async (url: string | URL) => (
+      String(url).includes('wght@700') ? ({ ok: false, statusText: 'Bad Request' } as unknown as Response) : inner(url)
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+    const bytes = await loadPdfFont('Great Vibes', 700, []);
+    expect(new Uint8Array(bytes)).toEqual(FAKE_TTF);
+    expect(String(fetchMock.mock.calls[1][0])).toContain('Great+Vibes:wght@400');
     vi.unstubAllGlobals();
   });
 

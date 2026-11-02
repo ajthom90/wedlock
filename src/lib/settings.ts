@@ -54,6 +54,13 @@ export interface SiteSettings {
   highChairColor: string;
   boosterColor: string;
   allergyColor: string;
+  // Name tents' fonts for the guest's name, the table, the small print and
+  // the corner letters: a font family (Google or custom), or '' for the
+  // default (theme heading / theme body / theme body / Helvetica Bold).
+  tentNameFont: string;
+  tentTableFont: string;
+  tentDetailsFont: string;
+  tentMarkFont: string;
 }
 
 export interface FeatureSettings {
@@ -159,6 +166,10 @@ const defaultSite: SiteSettings = {
   highChairColor: '',
   boosterColor: '',
   allergyColor: '',
+  tentNameFont: '',
+  tentTableFont: '',
+  tentDetailsFont: '',
+  tentMarkFont: '',
 };
 
 const defaultFeatures: FeatureSettings = {

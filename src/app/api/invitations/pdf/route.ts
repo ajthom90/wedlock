@@ -6,6 +6,7 @@ import { generateQRCode, buildRsvpUrl } from '@/lib/qr';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { loadPdfFont } from '@/lib/pdfFonts';
+import { embedFontFile } from '@/lib/mailingLabelsPdf';
 
 function base64ToUint8Array(dataUrl: string): Uint8Array {
   const base64 = atob(dataUrl.split(',')[1]);
@@ -35,9 +36,9 @@ export async function GET(request: Request) {
 
     const customFontRefs = customFonts.map((f) => ({ family: f.family, filename: f.filename }));
     let headingFont, bodyFont;
-    try { headingFont = await pdf.embedFont(await loadPdfFont(theme.headingFont, 400, customFontRefs)); }
+    try { headingFont = await embedFontFile(pdf, await loadPdfFont(theme.headingFont, 400, customFontRefs)); }
     catch { headingFont = await pdf.embedFont(StandardFonts.Helvetica); }
-    try { bodyFont = await pdf.embedFont(await loadPdfFont(theme.bodyFont, 400, customFontRefs)); }
+    try { bodyFont = await embedFontFile(pdf, await loadPdfFont(theme.bodyFont, 400, customFontRefs)); }
     catch { bodyFont = await pdf.embedFont(StandardFonts.Helvetica); }
 
     let page: any = null;

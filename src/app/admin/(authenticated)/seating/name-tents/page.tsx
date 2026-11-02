@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChildSeatBadge } from '@/components/admin/ChildSeatSelect';
 import { TENT_CARD_FORMATS, type TentCardFormat } from '@/lib/tentCardFormats';
-import { composeTentContent, type TentOptions } from '@/lib/nameTentsPdf';
+import { composeTentContent, type TentFontBytes, type TentOptions } from '@/lib/nameTentsPdf';
 import { tableHeading } from '@/lib/tableNumbers';
 import { resolveSeatedGuests, UNASSIGNED_TABLE, type SeatingExportInvitation, type SeatingExportTable } from '@/lib/seatingExport';
-import { fetchThemeFontBytes } from '@/lib/themeFontBytes';
+import { fetchPdfFontBytes, fetchThemeFontBytes } from '@/lib/themeFontBytes';
+import { GOOGLE_FONTS } from '@/lib/googleFonts';
 import type { LabelFontBytes } from '@/lib/mailingLabelsPdf';
 import { parseRsvpChoices, type RsvpChoice } from '@/lib/rsvpChoices';
 import { buildMealCodeMap, mealCodeFor } from '@/lib/mealColors';
@@ -20,7 +21,17 @@ import { MARK_COLORS, findMarkColor } from '@/lib/mealColors';
 
 interface Features { nameTents?: boolean; childSeats?: boolean; dietaryNotes?: boolean }
 
-type MarkKey = 'highChairIcon' | 'boosterIcon' | 'allergyIcon' | 'highChairColor' | 'boosterColor' | 'allergyColor';
+type FontKey = 'tentNameFont' | 'tentTableFont' | 'tentDetailsFont' | 'tentMarkFont';
+type MarkKey = 'highChairIcon' | 'boosterIcon' | 'allergyIcon' | 'highChairColor' | 'boosterColor' | 'allergyColor' | FontKey;
+
+// Each kind of text on a tent and the font setting that controls it. The
+// corner letters are bold, so their font is fetched at weight 700.
+const TENT_FONT_SLOTS: { key: FontKey; slot: keyof TentFontBytes; label: string; weight: 400 | 700 }[] = [
+  { key: 'tentNameFont', slot: 'name', label: 'Guest name', weight: 400 },
+  { key: 'tentTableFont', slot: 'table', label: 'Table name', weight: 400 },
+  { key: 'tentDetailsFont', slot: 'details', label: 'Small print', weight: 400 },
+  { key: 'tentMarkFont', slot: 'marks', label: 'Corner letters (A / H / B)', weight: 700 },
+];
 
 // Tables are picked by name + number, so two tables sharing a name stay apart.
 const tableKey = (name: string, number?: number | null) => `${number ?? ''}|${name}`;
@@ -33,7 +44,12 @@ export default function NameTentsPage() {
   // Icons and colors for the H / B / A marks; saved as site settings so they stick.
   const [seatIcons, setSeatIcons] = useState<Record<MarkKey, string>>({
     highChairIcon: '', boosterIcon: '', allergyIcon: '', highChairColor: '', boosterColor: '', allergyColor: '',
+    tentNameFont: '', tentTableFont: '', tentDetailsFont: '', tentMarkFont: '',
   });
+  const [themeFonts, setThemeFonts] = useState({ heading: '', body: '' });
+  const [customFonts, setCustomFonts] = useState<{ id: string; name: string; family: string }[]>([]);
+  // Chosen font files, by family and weight, so regenerating doesn't refetch.
+  const tentFontCache = useRef(new Map<string, ArrayBuffer | undefined>());
   const [seatIconError, setSeatIconError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,9 +73,11 @@ export default function NameTentsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [t, i, f, o, s] = await Promise.all([
+        const [t, i, f, o, s, cf] = await Promise.all([
           fetch('/api/tables'), fetch('/api/invitations'), fetch('/api/features'), fetch('/api/rsvp-options'), fetch('/api/settings'),
+          fetch('/api/fonts'),
         ]);
+        if (cf.ok) setCustomFonts(await cf.json());
         if (!t.ok || !i.ok) throw new Error('Failed to load seating');
         const tablesData = await t.json();
         setTables(tablesData);
@@ -68,7 +86,8 @@ export default function NameTentsPage() {
         const rsvpOptions: { type: string; choices: string }[] = o.ok ? await o.json() : [];
         setMealChoices(rsvpOptions.filter((x) => x.type === 'meal').flatMap((x) => parseRsvpChoices(x.choices)));
         if (s.ok) {
-          const { site } = await s.json();
+          const { site, theme } = await s.json();
+          setThemeFonts({ heading: theme?.headingFont ?? '', body: theme?.bodyFont ?? '' });
           setSeatIcons((prev) => Object.fromEntries(
             (Object.keys(prev) as MarkKey[]).map((k) => [k, typeof site?.[k] === 'string' ? site[k] : '']),
           ) as Record<MarkKey, string>);
@@ -188,11 +207,20 @@ export default function NameTentsPage() {
     try {
       const { renderNameTentsPdf } = await import('@/lib/nameTentsPdf');
       if (!fontBytesRef.current) fontBytesRef.current = await fetchThemeFontBytes();
+      const tentFonts: TentFontBytes = {};
+      await Promise.all(TENT_FONT_SLOTS.map(async ({ key, slot, weight }) => {
+        const family = seatIcons[key];
+        if (!family) return;
+        const cacheKey = `${family}|${weight}`;
+        if (!tentFontCache.current.has(cacheKey)) tentFontCache.current.set(cacheKey, await fetchPdfFontBytes(family, weight));
+        tentFonts[slot] = tentFontCache.current.get(cacheKey);
+      }));
       const bytes = await renderNameTentsPdf({
         format,
         startPosition,
         tents: printing.map((g) => composeTentContent(g, effectiveOptions, mealCodes)),
         fonts: fontBytesRef.current,
+        tentFonts,
         bothSides,
         outline,
         offsetXInches: parseOffset(offsetX),
@@ -357,6 +385,42 @@ export default function NameTentsPage() {
               on <Link href="/admin/rsvps" className="underline">RSVPs</Link> first.
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Fonts</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p className="text-xs text-gray-500">
+            Pick a font for each kind of text on the cards — any font from the Theme page, or one you’ve uploaded on
+            {' '}<Link href="/admin/fonts" className="underline">Fonts</Link>. Saved for next time.
+          </p>
+          {TENT_FONT_SLOTS.map(({ key, label }) => {
+            const fallback = key === 'tentNameFont' ? `Theme heading font${themeFonts.heading ? ` (${themeFonts.heading})` : ''}`
+              : key === 'tentMarkFont' ? 'Bold sans-serif (easiest to read)'
+              : `Theme body font${themeFonts.body ? ` (${themeFonts.body})` : ''}`;
+            return (
+              <label key={key} className="flex items-center gap-2">
+                <span className="w-48 shrink-0">{label}</span>
+                <select
+                  className="px-2 py-1 border border-gray-300 rounded-md text-sm"
+                  value={seatIcons[key]}
+                  onChange={(e) => saveSeatIcon(key, e.target.value)}
+                >
+                  <option value="">{fallback}</option>
+                  <optgroup label="Google Fonts">
+                    {GOOGLE_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
+                  </optgroup>
+                  {customFonts.length > 0 && (
+                    <optgroup label="Your uploaded fonts">
+                      {customFonts.map((f) => <option key={f.id} value={f.family}>{f.name}</option>)}
+                    </optgroup>
+                  )}
+                </select>
+              </label>
+            );
+          })}
+          {seatIconError && <p className="text-red-600 text-xs">{seatIconError}</p>}
         </CardContent>
       </Card>
 

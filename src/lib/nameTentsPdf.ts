@@ -2,7 +2,7 @@ import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage, t
 import type { TentCardFormat } from './tentCardFormats';
 import type { SeatedGuest } from './seatingExport';
 import { childSeatLabel } from './guestNeeds';
-import { computeLabelPositions, embedThemeFonts, type LabelFontBytes, type ResolvedFonts } from './mailingLabelsPdf';
+import { computeLabelPositions, embedFontFile, embedThemeFonts, type LabelFontBytes } from './mailingLabelsPdf';
 import { findMarkColor, hexToRgb01, mealCodeFor, type MealCode } from './mealColors';
 import { findMealIcon, findMarkIcon, iconViewBox } from './mealIcons';
 import { tableLabel } from './tableNumbers';
@@ -181,6 +181,26 @@ function encodable(font: PDFFont, text: string): string {
   }
 }
 
+/** The fonts for each kind of text on a tent: the guest's name, the table, and the small print. */
+export interface TentFonts {
+  name: PDFFont;
+  table: PDFFont;
+  details: PDFFont;
+}
+
+/**
+ * Font files a couple chose for each kind of text (Name Tents page). Any
+ * missing or unreadable one falls back to the default: the theme heading
+ * font for names, the theme body font for the table and small print, and
+ * Helvetica Bold for the corner letters.
+ */
+export interface TentFontBytes {
+  name?: ArrayBuffer | Uint8Array;
+  table?: ArrayBuffer | Uint8Array;
+  details?: ArrayBuffer | Uint8Array;
+  marks?: ArrayBuffer | Uint8Array;
+}
+
 export type DrawOp =
   | { kind: 'text'; text: string; font: PDFFont; size: number; x: number; y: number; color?: RGB }
   | { kind: 'circle'; x: number; y: number; radius: number; color: RGB }
@@ -206,13 +226,13 @@ type Line = { text: string; font: PDFFont; size: number; gapBefore: number };
 
 // The name (one line, or two when long), then the table, then optional small
 // print, at the largest name size up to nameCap.
-function stackLines(content: TentContent, fonts: ResolvedFonts, maxW: number, nameCap: number, withDetails: boolean): Line[] {
+function stackLines(content: TentContent, fonts: TentFonts, maxW: number, nameCap: number, withDetails: boolean): Line[] {
   const lines: Line[] = [];
-  const nameW = (s: string, size: number) => fonts.heading.widthOfTextAtSize(s, size);
+  const nameW = (s: string, size: number) => fonts.name.widthOfTextAtSize(s, size);
   let nameSize = Math.min(NAME_MAX, nameCap);
   while (nameSize > NAME_ONE_LINE_MIN && nameW(content.name, nameSize) > maxW) nameSize -= 0.5;
   if (nameW(content.name, nameSize) <= maxW) {
-    lines.push({ text: content.name, font: fonts.heading, size: nameSize, gapBefore: 0 });
+    lines.push({ text: content.name, font: fonts.name, size: nameSize, gapBefore: 0 });
   } else {
     nameSize = Math.min(NAME_TWO_LINE_MAX, nameCap);
     let wrapped = wrapText(content.name, maxW, 2, (s) => nameW(s, nameSize));
@@ -220,17 +240,17 @@ function stackLines(content: TentContent, fonts: ResolvedFonts, maxW: number, na
       nameSize -= 0.5;
       wrapped = wrapText(content.name, maxW, 2, (s) => nameW(s, nameSize));
     }
-    wrapped.forEach((text, i) => lines.push({ text, font: fonts.heading, size: nameSize, gapBefore: i ? nameSize * 0.15 : 0 }));
+    wrapped.forEach((text, i) => lines.push({ text, font: fonts.name, size: nameSize, gapBefore: i ? nameSize * 0.15 : 0 }));
   }
 
   if (content.table) {
-    const text = ellipsize(content.table, maxW, (s) => fonts.body.widthOfTextAtSize(s, TABLE_SIZE));
-    lines.push({ text, font: fonts.body, size: TABLE_SIZE, gapBefore: 7 });
+    const text = ellipsize(content.table, maxW, (s) => fonts.table.widthOfTextAtSize(s, TABLE_SIZE));
+    lines.push({ text, font: fonts.table, size: TABLE_SIZE, gapBefore: 7 });
   }
 
   if (withDetails && content.details.length) {
-    const wrapped = wrapText(content.details.join(' · '), maxW, 2, (s) => fonts.body.widthOfTextAtSize(s, DETAIL_SIZE));
-    wrapped.forEach((text, i) => lines.push({ text, font: fonts.body, size: DETAIL_SIZE, gapBefore: i ? 2 : 6 }));
+    const wrapped = wrapText(content.details.join(' · '), maxW, 2, (s) => fonts.details.widthOfTextAtSize(s, DETAIL_SIZE));
+    wrapped.forEach((text, i) => lines.push({ text, font: fonts.details, size: DETAIL_SIZE, gapBefore: i ? 2 : 6 }));
   }
   return lines;
 }
@@ -263,16 +283,16 @@ function placeLines(lines: Line[], width: number, bottomY: number, topY: number)
  */
 export function layoutTentPanel(
   raw: TentContent,
-  fonts: ResolvedFonts,
+  fonts: TentFonts,
   markFont: PDFFont,
   bands: MarkBands,
   width: number, height: number, padX: number, padY: number,
 ): DrawOp[] {
   const content: TentContent = {
     ...raw,
-    name: encodable(fonts.heading, raw.name),
-    table: encodable(fonts.body, raw.table),
-    details: raw.details.map((d) => encodable(fonts.body, d)),
+    name: encodable(fonts.name, raw.name),
+    table: encodable(fonts.table, raw.table),
+    details: raw.details.map((d) => encodable(fonts.details, d)),
   };
   const maxW = width - padX * 2;
   const markCapH = MARK_SIZE * MARK_CAP;
@@ -320,8 +340,8 @@ export function layoutTentPanel(
   if (detailsInBand && content.details.length) {
     // Between the "A" and the circle, centred on the circle's middle.
     const bandW = maxW - 2 * (CIRCLE_DIAMETER + MARK_GAP);
-    const wrapped = wrapText(content.details.join(' · '), bandW, 2, (s) => fonts.body.widthOfTextAtSize(s, DETAIL_SIZE));
-    const detailLines = wrapped.map((text, i) => ({ text, font: fonts.body, size: DETAIL_SIZE, gapBefore: i ? 2 : 0 }));
+    const wrapped = wrapText(content.details.join(' · '), bandW, 2, (s) => fonts.details.widthOfTextAtSize(s, DETAIL_SIZE));
+    const detailLines = wrapped.map((text, i) => ({ text, font: fonts.details, size: DETAIL_SIZE, gapBefore: i ? 2 : 0 }));
     const h = stackHeight(detailLines);
     ops.push(...placeLines(detailLines, width, circleY - h / 2, circleY + h / 2));
   }
@@ -361,6 +381,7 @@ export async function renderNameTentsPdf(args: {
   startPosition: number;
   tents: TentContent[];
   fonts?: LabelFontBytes;
+  tentFonts?: TentFontBytes;
   bothSides: boolean;   // print the upside-down back panel too
   outline: boolean;     // draw card edges + fold line, for test prints on plain paper
   offsetXInches?: number; // + moves everything right
@@ -368,10 +389,25 @@ export async function renderNameTentsPdf(args: {
 }): Promise<Uint8Array> {
   const { format, startPosition, tents, bothSides, outline } = args;
   const doc = await PDFDocument.create();
-  const fonts = await embedThemeFonts(doc, args.fonts);
-  // Marks always use plain bold Helvetica: a script theme font makes an
-  // "A" or "H" hard to read at a glance.
-  const markFont = await doc.embedFont(StandardFonts.HelveticaBold);
+  const theme = await embedThemeFonts(doc, args.fonts);
+  // Corner letters default to plain bold Helvetica, not the theme font: a
+  // script font makes an "A" or "H" hard to read at a glance. A couple can
+  // still pick another font for them.
+  const chosen = args.tentFonts ?? {};
+  const embed = async (bytes: ArrayBuffer | Uint8Array | undefined, fallback: () => Promise<PDFFont>) => {
+    if (!bytes) return fallback();
+    try {
+      return await embedFontFile(doc, bytes);
+    } catch {
+      return fallback();
+    }
+  };
+  const fonts: TentFonts = {
+    name: await embed(chosen.name, async () => theme.heading),
+    table: await embed(chosen.table, async () => theme.body),
+    details: await embed(chosen.details, async () => theme.body),
+  };
+  const markFont = await embed(chosen.marks, () => doc.embedFont(StandardFonts.HelveticaBold));
   const bands = markBandsFor(tents);
   const positions = computeLabelPositions({ format, startPosition, labelCount: tents.length });
 
