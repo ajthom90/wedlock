@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.25.0",
+    "date": "2026-11-02",
+    "changes": [
+      { "type": "feature", "text": "Meal icons: each meal choice on RSVP Configuration can now have an icon as well as a color, so a caterer's code like \"Blue Rooster\" or \"Black Star\" can be set up directly. Choose from 21 icons, including Rooster, Cow, Pig, Fish, Wheat, Heart and Star. The Reception Sheet's \"Color Code\" column is now \"Color/Image Code\" and reads \"Blue Rooster\", and name tents print the meal's icon in its color (a blue rooster, say) in place of the circle. Meals with a color but no icon still print a colored circle." }
+    ]
+  },
+  {
     "version": "2.24.0",
     "date": "2026-11-02",
     "changes": [
