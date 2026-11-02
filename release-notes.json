@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.28.1",
+    "date": "2026-11-02",
+    "changes": [
+      { "type": "fix", "text": "Names with \"ff\", \"fi\" or \"ffi\" no longer print with a gap, like \"Chaffi ns\" or \"Steff en\". Some fonts (Playfair Display, Crimson Text, Cormorant, Great Vibes) join those letters into one shape, which threw off the spacing. PDFs now print each letter as itself. Applies to name tents, mailing labels and invitation cards. Reprint any affected cards." },
+      { "type": "improvement", "text": "The pictures on name tents are 20% smaller: meal and allergy icons are about ⅖\" (was ½\"), and high chair and booster icons about ⅓\". They stay in their corners, and names get a little more room. The plain meal circle and the A / H / B letters are unchanged." }
+    ]
+  },
+  {
     "version": "2.28.0",
     "date": "2026-11-02",
     "changes": [
