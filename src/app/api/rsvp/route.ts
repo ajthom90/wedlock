@@ -5,6 +5,7 @@ import { parseRsvpChoices } from '@/lib/rsvpChoices';
 import { validateRsvpSubmission } from '@/lib/rsvpValidation';
 import { cookies } from 'next/headers';
 import { getEmailConfig, sendRsvpConfirmation } from '@/lib/email';
+import { isRsvpClosed } from '@/lib/rsvpStatus';
 import { carryOverPlusOneNeeds, parseGuestDietary, pruneGuestDietary } from '@/lib/guestNeeds';
 
 export async function GET(request: Request) {
@@ -69,15 +70,10 @@ export async function POST(request: Request) {
   try {
     const { code, attending, guestCount, responses, guestMeals, guestDietary, message, attendingGuests, plusOnes, songRequests, dietaryNotes, contactEmail, mailingAddress1, mailingAddress2, mailingCity, mailingState, mailingPostalCode, correction } = await request.json();
     if (!code) return NextResponse.json({ error: 'Invitation code is required' }, { status: 400 });
-    const settings = await getSiteSettings();
-    if (settings.rsvpDeadline && settings.rsvpCloseAfterDeadline) {
-      const deadline = new Date(settings.rsvpDeadline);
-      deadline.setHours(23, 59, 59, 999);
-      if (new Date() > deadline) return NextResponse.json({ error: 'RSVP submissions are now closed' }, { status: 403 });
-    }
+    const [settings, features] = await Promise.all([getSiteSettings(), getFeatures()]);
+    if (isRsvpClosed(settings, features)) return NextResponse.json({ error: 'RSVP submissions are now closed' }, { status: 403 });
     const invitation = await prisma.invitation.findUnique({ where: { code }, include: { guests: { select: { id: true } } } });
     if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
-    const features = await getFeatures();
     const existing = await prisma.rsvpResponse.findUnique({ where: { invitationId: invitation.id } });
     // With editing off, a submitted RSVP is final for guests. Checked before
     // any write so the address/email updates below don't sneak through.

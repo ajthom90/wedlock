@@ -5,6 +5,7 @@ import { MobileNav } from '@/components/public/MobileNav';
 import { SitePasswordGate } from '@/components/public/SitePasswordGate';
 import { formatDate } from '@/lib/utils';
 import prisma from '@/lib/prisma';
+import { isRsvpClosed } from '@/lib/rsvpStatus';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +43,7 @@ export default async function PublicLayout({ children }: { children: React.React
   if (!features.transportation) disallowedPaths.add('/transportation');
   if (!features.trivia) disallowedPaths.add('/trivia');
   if (features.guestBook === 'off') disallowedPaths.add('/guestbook');
+  if (isRsvpClosed(settings, features)) disallowedPaths.add('/rsvp');
 
   // Build a tree from the flat DB rows. Render groups children under their
   // parent; anything without a parent is top-level.

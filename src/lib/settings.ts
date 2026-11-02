@@ -47,6 +47,9 @@ export interface SiteSettings {
 }
 
 export interface FeatureSettings {
+  // Master switch for guest RSVPs. Off closes the RSVP page and hides the
+  // home page's RSVP Now button and the RSVP menu link (see lib/rsvpStatus.ts).
+  rsvpsOpen: boolean;
   // RSVP form toggles
   perGuestSelection: boolean;
   songRequests: boolean;
@@ -143,6 +146,7 @@ const defaultSite: SiteSettings = {
 };
 
 const defaultFeatures: FeatureSettings = {
+  rsvpsOpen: true,
   // RSVP toggles — existing defaults preserved.
   perGuestSelection: true,
   songRequests: true,

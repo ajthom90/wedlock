@@ -5,6 +5,7 @@ import { formatDate, formatTime } from '@/lib/utils';
 import { LiveCountdown } from '@/components/public/LiveCountdown';
 import { HomeBanner } from '@/components/public/HomeBanner';
 import { WeatherForecast } from '@/components/public/WeatherForecast';
+import { isRsvpClosed } from '@/lib/rsvpStatus';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,12 +45,12 @@ export default async function HomePage() {
           )}
         </p>
       )}
-      <Link
+      {!isRsvpClosed(settings, features) && <Link
         href="/rsvp"
         className="inline-block bg-primary text-white px-8 py-4 rounded-md text-lg font-medium hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       >
         RSVP Now
-      </Link>
+      </Link>}
     </div>
   );
 

@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 // Must stay in sync with FeatureSettings in lib/settings.ts.
 interface FeatureSettings {
+  rsvpsOpen: boolean;
   perGuestSelection: boolean;
   songRequests: boolean;
   dietaryNotes: boolean;
@@ -36,6 +37,7 @@ interface FeatureSettings {
 type BoolFeature = Exclude<keyof FeatureSettings, 'guestBook'>;
 
 const DEFAULTS: FeatureSettings = {
+  rsvpsOpen: true,
   perGuestSelection: true,
   songRequests: true,
   dietaryNotes: true,
@@ -89,6 +91,8 @@ const GUEST_FACING: ToggleDescriptor[] = [
 ];
 
 const RSVP_FIELDS: ToggleDescriptor[] = [
+  { key: 'rsvpsOpen', label: 'Accept RSVPs',
+    description: 'Let guests RSVP on the site. Turn off to close RSVPs: the RSVP page says RSVPs are closed, and the RSVP Now button on the home page and the RSVP menu link are hidden (they’re also hidden once the deadline passes with “close RSVPs after the deadline” on in Settings). You can still edit responses from the RSVPs admin page.' },
   { key: 'perGuestSelection', label: 'Per-guest meal selection',
     description: 'Let guests pick a meal choice for each attendee individually.' },
   { key: 'rsvpPlusOnes', label: 'Plus-one support',
